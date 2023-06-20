@@ -16,7 +16,7 @@ description: >
 **Deployment**
 - Deploy the [cf-service-operator custom resource definitions](https://github.com/sap/cf-service-operator/blob/main/crds/crd.yaml) to Kubernetes:
   ```
-  kubectl apply -f chart/crds/crd.yaml
+  kubectl apply -f crds/crd.yaml
   ```
 - Deploy the [webhook related artifacts](https://github.com/sap/cf-service-operator/blob/main/.local/k8s-resources.yaml) to Kubernetes:
   ```
