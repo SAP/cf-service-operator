@@ -1,0 +1,110 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - clusterspaces
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - clusterspaces/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - clusterspaces/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - servicebindings
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - servicebindings/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - servicebindings/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - serviceinstances
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - serviceinstances/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - serviceinstances/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - spaces
+  verbs:
+  - get
+  - list
+  - update
+  - watch
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - spaces/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - spaces/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - create
+  - get
+  - list
+  - patch
+  - update
+  - watch

@@ -1,0 +1,58 @@
+domain: cs.sap.com
+layout:
+- go.kubebuilder.io/v3
+projectName: cf-service-operator
+repo: github.com/sap/cf-service-operator
+resources:
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cs.sap.com
+  group: cf
+  kind: Space
+  path: github.com/sap/cf-service-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+  controller: true
+  domain: cs.sap.com
+  group: cf
+  kind: ClusterSpace
+  path: github.com/sap/cf-service-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cs.sap.com
+  group: cf
+  kind: ServiceInstance
+  path: github.com/sap/cf-service-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: cs.sap.com
+  group: cf
+  kind: ServiceBinding
+  path: github.com/sap/cf-service-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+version: "3"

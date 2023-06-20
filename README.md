@@ -1,32 +1,71 @@
-# SAP Repository Template
+# Kubernetes Operator For Cloud Foundry Services
 
-Default templates for SAP open source repositories, including LICENSE, .reuse/dep5, Code of Conduct, etc... All repositories on github.com/SAP will be created based on this template.
-
-## To-Do
-
-In case you are the maintainer of a new SAP open source project, these are the steps to do with the template files:
-
-- Check if the default license (Apache 2.0) also applies to your project. A license change should only be required in exceptional cases. If this is the case, please change the [license file](LICENSE).
-- Enter the correct metadata for the REUSE tool. See our [wiki page](https://wiki.wdf.sap.corp/wiki/display/ospodocs/Using+the+Reuse+Tool+of+FSFE+for+Copyright+and+License+Information) for details how to do it. You can find an initial .reuse/dep5 file to build on. Please replace the parts inside the single angle quotation marks < > by the specific information for your repository and be sure to run the REUSE tool to validate that the metadata is correct.
-- Adjust the contribution guidelines (e.g. add coding style guidelines, pull request checklists, different license if needed etc.)
-- Add information about your project to this README (name, description, requirements etc). Especially take care for the <your-project> placeholders - those ones need to be replaced with your project name. See the sections below the horizontal line and [our guidelines on our wiki page](https://wiki.wdf.sap.corp/wiki/display/ospodocs/Guidelines+for+README.md+file) what is required and recommended.
-- Remove all content in this README above and including the horizontal line ;)
-
-***
-
-# Our new open source project
+[![REUSE status](https://api.reuse.software/badge/github.com/SAP/cf-service-operator)](https://api.reuse.software/info/github.com/SAP/cf-service-operator)
 
 ## About this project
 
-*Insert a short description of your project here...*
+This repository adds native support for Cloud Foundry spaces, service instances and service bindings to Kubernetes clusters.
+It contains custom resource definitions
+- `spaces.cf.cs.sap.com` (kind `Space`)
+- `clusterspaces.cf.cs.sap.com` (kind `ClusterSpace`)
+- `serviceinstances.cf.cs.sap.com` (kind `ServiceInstance`)
+- `servicebindings.cf.cs.sap.com` (kind `ServiceBinding`)
 
-## Requirements and Setup
+and an according operator reconciling resources of these types.
 
-*Insert a short description what is required to get your project running...*
+A typical usage could look as follows:
+
+```yaml
+---
+apiVersion: cf.cs.sap.com/v1alpha1
+kind: Space
+metadata:
+  name: k8s
+spec:
+  organizationName: my-org 
+  authSecretName: k8s-space
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: k8s-space
+stringData:
+  url: "<cf api url>"
+  username: "<username>"
+  password: "<password>"
+---
+apiVersion: cf.cs.sap.com/v1alpha1
+kind: ServiceInstance
+metadata:
+  name: uaa
+spec:
+  spaceName: k8s
+  serviceOfferingName: xsuaa
+  servicePlanName: application
+---
+apiVersion: cf.cs.sap.com/v1alpha1
+kind: ServiceBinding
+metadata:
+  name: uaa
+spec:
+  serviceInstanceName: uaa
+```
+
+When reconciling these objects, the operator will ensure that according API entities (space, instance, binding) are maintained in the
+targeted Cloud Foundry environment.
+
+The scope of this project is comparable with the [SAP BTP Service Operator](https://github.com/SAP/sap-btp-service-operator).
+But other than that operator, the Cloud Foundry Service Operator provided by this repository manages services and bindings through
+Cloud Foundry APIs, instead of using native BTP APIs.
+
+## Documentation
+
+The project's documentation can be found here: [https://sap.github.io/cf-service-operator](https://sap.github.io/cf-service-operator).  
+The API reference is here: [https://pkg.go.dev/github.com/sap/cf-service-operator](https://pkg.go.dev/github.com/sap/cf-service-operator).
 
 ## Support, Feedback, Contributing
 
-This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/<your-project>/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
+This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/cf-service-operator/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
 
 ## Code of Conduct
 
@@ -34,4 +73,4 @@ We as members, contributors, and leaders pledge to make participation in our com
 
 ## Licensing
 
-Copyright (20xx-)20xx SAP SE or an SAP affiliate company and <your-project> contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/SAP/<your-project>).
+Copyright 2023 SAP SE or an SAP affiliate company and cf-service-operator contributors. Please see our [LICENSE](LICENSE) for copyright and license information. Detailed information including third-party components and their licensing/copyright information is available [via the REUSE tool](https://api.reuse.software/info/github.com/SAP/cf-service-operator).

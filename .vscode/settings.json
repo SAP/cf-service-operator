@@ -1,0 +1,3 @@
+{
+    "docker.commands.build": "docker build --pull --rm -f \"${dockerfile}\" -t ${tag} ${workspaceFolder}"
+}

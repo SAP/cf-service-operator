@@ -1,0 +1,24 @@
+# permissions for end users to edit spaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: space-editor-role
+rules:
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - spaces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - spaces/status
+  verbs:
+  - get

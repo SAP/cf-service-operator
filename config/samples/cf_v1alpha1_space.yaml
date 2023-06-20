@@ -1,0 +1,6 @@
+apiVersion: cf.cs.sap.com/v1alpha1
+kind: Space
+metadata:
+  name: space-sample
+spec:
+  # TODO(user): Add fields here

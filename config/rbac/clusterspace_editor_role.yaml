@@ -1,0 +1,24 @@
+# permissions for end users to edit clusterspaces.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterspace-editor-role
+rules:
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - clusterspaces
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - cf.cs.sap.com
+  resources:
+  - clusterspaces/status
+  verbs:
+  - get

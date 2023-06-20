@@ -1,0 +1,6 @@
+apiVersion: cf.cs.sap.com/v1alpha1
+kind: ClusterSpace
+metadata:
+  name: clusterspace-sample
+spec:
+  # TODO(user): Add fields here
