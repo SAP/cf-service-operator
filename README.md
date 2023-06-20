@@ -2,7 +2,7 @@
 
 [![REUSE status](https://api.reuse.software/badge/github.com/SAP/cf-service-operator)](https://api.reuse.software/info/github.com/SAP/cf-service-operator)
 
-Cloud Foundry is a registered trademark of THE LINUX FOUNDATION. Any rights therein are reserved to THE LINUX FOUNDATION. Any use by this project is for referential purposes only and does not indicate any sponsorship, endorsement or affiliation between CloudFoundry and this project.
+Disclaimer: Cloud Foundry is a registered trademark of THE LINUX FOUNDATION. Any rights therein are reserved to THE LINUX FOUNDATION. Any use by this project is for referential purposes only and does not indicate any sponsorship, endorsement or affiliation between CloudFoundry and this project.
 
 ## About this project
 
