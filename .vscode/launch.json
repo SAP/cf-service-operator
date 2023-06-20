@@ -10,9 +10,6 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}",
-            "env": {
-                "TMPDIR": "${workspaceFolder}/tmp"
-            },
             "args": [
                 "--kubeconfig=${workspaceFolder}/.kubeconfig",
                 "--cluster-resource-namespace=default",
