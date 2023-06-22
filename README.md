@@ -60,6 +60,14 @@ The scope of this project is comparable with the [SAP BTP Service Operator](http
 But other than that operator, the Cloud Foundry Service Operator provided by this repository manages services and bindings through
 Cloud Foundry APIs, instead of using native BTP APIs.
 
+## Requirements and Setup
+
+The recommended deployment method is to use the [Helm chart](https://github.com/sap/cf-service-operator-helm):
+
+```bash
+helm upgrade -i cf-service-operator oci://ghcr.io/sap/cf-service-operator-helm/cf-service-operator
+```
+
 ## Documentation
 
 The project's documentation can be found here: [https://sap.github.io/cf-service-operator](https://sap.github.io/cf-service-operator).  
