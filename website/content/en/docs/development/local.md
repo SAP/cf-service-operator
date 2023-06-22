@@ -24,13 +24,8 @@ description: >
   ```
 - Extract the webhook certificates to be consumed by the controller:
   ```
-  mkdir -p .local/ssl
-  kubectl get secret cf-service-operator-webhook -o jsonpath='{.data.tls\.key}' \
-    | base64 -d > .local/ssl/tls.key
-  kubectl get secret cf-service-operator-webhook -o jsonpath='{.data.tls\.crt}' \
-    | base64 -d > .local/ssl/tls.crt
+  .local/getcerts.sh
   ```
-  (paths relative to the root of this repository)
 
 **Launching**
 
