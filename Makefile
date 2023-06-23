@@ -47,12 +47,12 @@ help: ## Display this help.
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
-	kustomize build config/crd > crds/crd.yaml
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="main.go" paths="./api/..." paths="./pkg/..." paths="./internal/..." output:crd:artifacts:config=config/crd/bases
+	rm -rf crds && cp -r config/crd/bases crds
 
 .PHONY: generate
 generate: controller-gen client-gen informer-gen lister-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
-	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
+	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./api/..."
 	./hack/gen-typed-client
 
 .PHONY: fmt

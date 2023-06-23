@@ -4,7 +4,7 @@ Prerequisite: K8s cluster (kind, minikube) with cert-manager installed.
 
 1. Deploy custom resource definnitions:
    ```bash
-   kubectl apply -f crds/crd.yaml
+   kubectl apply -f crds
    ```
 
 2. Deploy webhook definitions and according objects:

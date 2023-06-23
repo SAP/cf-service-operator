@@ -14,9 +14,9 @@ description: >
 - The target cluster's kubeconfig made available as `.kubeconfig` at the root of this repository (can also be a symlink of course).
 
 **Deployment**
-- Deploy the [cf-service-operator custom resource definitions](https://github.com/sap/cf-service-operator/blob/main/crds/crd.yaml) to Kubernetes:
+- Deploy the [cf-service-operator custom resource definitions](https://github.com/sap/cf-service-operator/blob/main/crds) to Kubernetes:
   ```
-  kubectl apply -f crds/crd.yaml
+  kubectl apply -f crds
   ```
 - Deploy the [webhook related artifacts](https://github.com/sap/cf-service-operator/blob/main/.local/k8s-resources.yaml) to Kubernetes:
   ```
