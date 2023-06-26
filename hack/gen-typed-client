@@ -34,7 +34,7 @@ ln -s "$BASEDIR"/api/v1alpha1 "$BASEDIR"/tmp/apis/cf.cs.sap.com/v1alpha1
   --output-base "$BASEDIR"/tmp/pkg/client
 
 find "$BASEDIR"/tmp/pkg/client -name "*.go" -exec \
-  sed -i "" "s#github\.com/sap/cf-service-operator/tmp/apis/cf\.cs\.sap\.com/v1alpha1#github\.com/sap/cf-service-operator/api/v1alpha1#g" \
+  perl -pi -e "s#github\.com/sap/cf-service-operator/tmp/apis/cf\.cs\.sap\.com/v1alpha1#github\.com/sap/cf-service-operator/api/v1alpha1#g" \
   {} +
 
 rm -rf "$BASEDIR"/pkg/client
