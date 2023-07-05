@@ -2,8 +2,6 @@
 
 set -eo pipefail
 
-export GOROOT=$(go env GOROOT)
-
 BASEDIR=$(realpath $(dirname "$0")/..)
 
 rm -rf "$BASEDIR"/tmp
@@ -44,3 +42,4 @@ rm -rf "$BASEDIR"/tmp
 
 go fmt "$BASEDIR"/pkg/client/...
 go vet "$BASEDIR"/pkg/client/...
+

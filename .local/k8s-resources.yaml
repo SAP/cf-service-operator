@@ -5,10 +5,9 @@ metadata:
   name: cf-service-operator-webhook
   namespace: default
 spec:
-  type: ClusterIP
   ports:
-  - protocol: TCP
-    port: 443
+  - port: 443
+    protocol: TCP
     targetPort: 2443
 ---
 apiVersion: v1
@@ -36,14 +35,14 @@ metadata:
   name: cf-service-operator-webhook
   namespace: default
 spec:
-  secretName: cf-service-operator-webhook
   dnsNames:
+  - cf-service-operator-webhook
   - cf-service-operator-webhook.default
   - cf-service-operator-webhook.default.svc
   - cf-service-operator-webhook.default.svc.cluster.local
   issuerRef:
-    kind: Issuer
     name: cf-service-operator-webhook
+  secretName: cf-service-operator-webhook
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
@@ -60,8 +59,7 @@ webhooks:
       namespace: default
       path: /mutate-cf-cs-sap-com-v1alpha1-clusterspace
       port: 443
-  failurePolicy: Fail
-  name: mclusterspace.kb.io
+  name: mutate.clusterspaces.cf.cs.sap.com
   rules:
   - apiGroups:
     - cf.cs.sap.com
@@ -72,8 +70,12 @@ webhooks:
     - UPDATE
     resources:
     - clusterspaces
+    scope: Cluster
+  matchPolicy: Equivalent
   sideEffects: None
   timeoutSeconds: 10
+  failurePolicy: Fail
+  reinvocationPolicy: Never
 - admissionReviewVersions:
   - v1
   clientConfig:
@@ -82,8 +84,7 @@ webhooks:
       namespace: default
       path: /mutate-cf-cs-sap-com-v1alpha1-space
       port: 443
-  failurePolicy: Fail
-  name: mspace.kb.io
+  name: mutate.spaces.cf.cs.sap.com
   rules:
   - apiGroups:
     - cf.cs.sap.com
@@ -94,8 +95,12 @@ webhooks:
     - UPDATE
     resources:
     - spaces
+    scope: Namespaced
+  matchPolicy: Equivalent
   sideEffects: None
   timeoutSeconds: 10
+  failurePolicy: Fail
+  reinvocationPolicy: Never
 - admissionReviewVersions:
   - v1
   clientConfig:
@@ -104,8 +109,7 @@ webhooks:
       namespace: default
       path: /mutate-cf-cs-sap-com-v1alpha1-serviceinstance
       port: 443
-  failurePolicy: Fail
-  name: mserviceinstance.kb.io
+  name: mutate.serviceinstances.cf.cs.sap.com
   rules:
   - apiGroups:
     - cf.cs.sap.com
@@ -116,8 +120,12 @@ webhooks:
     - UPDATE
     resources:
     - serviceinstances
+    scope: Namespaced
+  matchPolicy: Equivalent
   sideEffects: None
   timeoutSeconds: 10
+  failurePolicy: Fail
+  reinvocationPolicy: Never
 - admissionReviewVersions:
   - v1
   clientConfig:
@@ -126,8 +134,7 @@ webhooks:
       namespace: default
       path: /mutate-cf-cs-sap-com-v1alpha1-servicebinding
       port: 443
-  failurePolicy: Fail
-  name: mservicebinding.kb.io
+  name: mutate.servicebindings.cf.cs.sap.com
   rules:
   - apiGroups:
     - cf.cs.sap.com
@@ -138,8 +145,12 @@ webhooks:
     - UPDATE
     resources:
     - servicebindings
+    scope: Namespaced
+  matchPolicy: Equivalent
   sideEffects: None
   timeoutSeconds: 10
+  failurePolicy: Fail
+  reinvocationPolicy: Never
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
@@ -156,8 +167,7 @@ webhooks:
       namespace: default
       path: /validate-cf-cs-sap-com-v1alpha1-clusterspace
       port: 443
-  failurePolicy: Fail
-  name: vclusterspace.kb.io
+  name: validate.clusterspaces.cf.cs.sap.com
   rules:
   - apiGroups:
     - cf.cs.sap.com
@@ -169,8 +179,11 @@ webhooks:
     - DELETE
     resources:
     - clusterspaces
+    scope: Cluster
+  matchPolicy: Equivalent
   sideEffects: None
   timeoutSeconds: 10
+  failurePolicy: Fail
 - admissionReviewVersions:
   - v1
   clientConfig:
@@ -179,8 +192,7 @@ webhooks:
       namespace: default
       path: /validate-cf-cs-sap-com-v1alpha1-space
       port: 443
-  failurePolicy: Fail
-  name: vspace.kb.io
+  name: validate.spaces.cf.cs.sap.com
   rules:
   - apiGroups:
     - cf.cs.sap.com
@@ -192,8 +204,11 @@ webhooks:
     - DELETE
     resources:
     - spaces
+    scope: Namespaced
+  matchPolicy: Equivalent
   sideEffects: None
   timeoutSeconds: 10
+  failurePolicy: Fail
 - admissionReviewVersions:
   - v1
   clientConfig:
@@ -202,8 +217,7 @@ webhooks:
       namespace: default
       path: /validate-cf-cs-sap-com-v1alpha1-serviceinstance
       port: 443
-  failurePolicy: Fail
-  name: vserviceinstance.kb.io
+  name: validate.serviceinstances.cf.cs.sap.com
   rules:
   - apiGroups:
     - cf.cs.sap.com
@@ -215,8 +229,11 @@ webhooks:
     - DELETE
     resources:
     - serviceinstances
+    scope: Namespaced
+  matchPolicy: Equivalent
   sideEffects: None
   timeoutSeconds: 10
+  failurePolicy: Fail
 - admissionReviewVersions:
   - v1
   clientConfig:
@@ -225,8 +242,7 @@ webhooks:
       namespace: default
       path: /validate-cf-cs-sap-com-v1alpha1-servicebinding
       port: 443
-  failurePolicy: Fail
-  name: vservicebinding.kb.io
+  name: validate.servicebindings.cf.cs.sap.com
   rules:
   - apiGroups:
     - cf.cs.sap.com
@@ -238,5 +254,8 @@ webhooks:
     - DELETE
     resources:
     - servicebindings
+    scope: Namespaced
+  matchPolicy: Equivalent
   sideEffects: None
   timeoutSeconds: 10
+  failurePolicy: Fail
