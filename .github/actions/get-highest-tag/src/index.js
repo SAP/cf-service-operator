@@ -10,6 +10,9 @@ async function run () {
     versions = (await git.listRemote(['--tags']))
       .trimEnd()
       .split('\n')
+      .filter(line => {
+        return line.trim().length > 0
+      })
       .map(line => {
         return line.match(/^.*refs\/tags\/(.+)$/)[1]
       })
