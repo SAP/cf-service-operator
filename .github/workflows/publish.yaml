@@ -12,7 +12,8 @@ on:
     branches:
     - main
 
-concurrency: publish
+  # note: we do not use any concurrency here, in order to avoid queued release workflows being cancelled by
+  # higher priority push/pull_request workflows
 
 env:
   REGCTL_VERSION: v0.4.8
