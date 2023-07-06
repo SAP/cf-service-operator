@@ -90,7 +90,7 @@ jobs:
           fi
           head -n $boilerplate_linecount $f > $tempdir/out
           if ! diff -q $tempdir/out $boilerplate >/dev/null; then
-            >&1 echo "Error: incorrect license header: $f."
+            >&1 echo "Error: incorrect license header found in $f."
             errors=$((errors+1))
           fi
           rm -f $tempdir/out
@@ -268,7 +268,7 @@ jobs:
         fi
 
         if [ $(semver compare $new_version $old_version) -lt 0 ]; then
-          echo "Target appVersion ($new_version) is lower than current appVersion ($old_version); skipping update."
+          echo "Target appVersion ($new_version) is lower than current appVersion ($old_version); skipping update ..."
           exit 0
         fi
 
@@ -277,7 +277,7 @@ jobs:
         if [ "$version_bump" != major ] && [ "$version_bump" != minor ]; then
           version_bump=patch
         fi
-        echo "Performing chart version bump: $version_bump."
+        echo "Performing chart version bump: $version_bump ..."
 
         echo "Updating custom resource definitions ($chart_directory/crds) ..."
         rm -rf $chart_directory/crds
@@ -287,7 +287,7 @@ jobs:
         perl -pi -e "s#^appVersion:.*#appVersion: $new_version#g" $chart_directory/Chart.yaml
 
         if [ -z "$(git status --porcelain)" ]; then
-          echo "Nothing has changed; skipping commit/push."
+          echo "Nothing has changed; skipping commit/push ..."
           exit 0
         fi
 
