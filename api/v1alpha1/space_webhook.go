@@ -23,7 +23,7 @@ func (r *Space) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-cf-cs-sap-com-v1alpha1-space,mutating=true,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=spaces,verbs=create;update,versions=v1alpha1,name=mspace.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-cf-cs-sap-com-v1alpha1-space,mutating=true,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=spaces,verbs=create;update,versions=v1alpha1,name=mspace.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &Space{}
 
@@ -36,7 +36,7 @@ func (r *Space) Default() {
 	}
 }
 
-//+kubebuilder:webhook:path=/validate-cf-cs-sap-com-v1alpha1-space,mutating=false,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=spaces,verbs=create;update,versions=v1alpha1,name=vspace.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-cf-cs-sap-com-v1alpha1-space,mutating=false,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=spaces,verbs=create;update,versions=v1alpha1,name=vspace.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &Space{}
 

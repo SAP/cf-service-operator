@@ -11,7 +11,7 @@ cf-service-operator relies on four custom resource types, the according definiti
 [here](https://github.com/sap/cf-service-operator/tree/main/crds).
 These definitions must be deployed before the operator can be started, otherwise it will fail.
 The core of the cf-service-operator installation is the executable built from this repository
-(Docker image `cs-devops.common.repositories.cloud.sap/cf-service-operator`).
+(Docker image `ghcr.io/sap/cf-service-operator`).
 It implements both the controller logic and validating/mutating webhooks for the above custom resource types.
 
 A valid deployment consists of:

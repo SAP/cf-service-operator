@@ -23,7 +23,7 @@ func (r *ServiceInstance) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-cf-cs-sap-com-v1alpha1-serviceinstance,mutating=true,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=serviceinstances,verbs=create;update,versions=v1alpha1,name=mserviceinstance.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-cf-cs-sap-com-v1alpha1-serviceinstance,mutating=true,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=serviceinstances,verbs=create;update,versions=v1alpha1,name=mserviceinstance.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &ServiceInstance{}
 
@@ -46,7 +46,7 @@ func (r *ServiceInstance) Default() {
 	}
 }
 
-//+kubebuilder:webhook:path=/validate-cf-cs-sap-com-v1alpha1-serviceinstance,mutating=false,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=serviceinstances,verbs=create;update,versions=v1alpha1,name=vserviceinstance.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-cf-cs-sap-com-v1alpha1-serviceinstance,mutating=false,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=serviceinstances,verbs=create;update,versions=v1alpha1,name=vserviceinstance.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &ServiceInstance{}
 

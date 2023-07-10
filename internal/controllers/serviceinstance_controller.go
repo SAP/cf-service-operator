@@ -46,13 +46,13 @@ type ServiceInstanceReconciler struct {
 	ClientBuilder            facade.SpaceClientBuilder
 }
 
-//+kubebuilder:rbac:groups=cf.cs.sap.com,resources=serviceinstances,verbs=get;list;watch;update
-//+kubebuilder:rbac:groups=cf.cs.sap.com,resources=serviceinstances/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=cf.cs.sap.com,resources=serviceinstances/finalizers,verbs=update
-//+kubebuilder:rbac:groups=cf.cs.sap.com,resources=clusterspaces,verbs=get;list;watch
-//+kubebuilder:rbac:groups=cf.cs.sap.com,resources=spaces,verbs=get;list;watch
-//+kubebuilder:rbac:groups=cf.cs.sap.com,resources=servicebindings,verbs=get;list;watch
-//+kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
+// +kubebuilder:rbac:groups=cf.cs.sap.com,resources=serviceinstances,verbs=get;list;watch;update
+// +kubebuilder:rbac:groups=cf.cs.sap.com,resources=serviceinstances/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=cf.cs.sap.com,resources=serviceinstances/finalizers,verbs=update
+// +kubebuilder:rbac:groups=cf.cs.sap.com,resources=clusterspaces,verbs=get;list;watch
+// +kubebuilder:rbac:groups=cf.cs.sap.com,resources=spaces,verbs=get;list;watch
+// +kubebuilder:rbac:groups=cf.cs.sap.com,resources=servicebindings,verbs=get;list;watch
+// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch
 
 func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	log := ctrl.LoggerFrom(ctx)

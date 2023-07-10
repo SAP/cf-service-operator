@@ -1,3 +1,5 @@
 {
-    "docker.commands.build": "docker build --pull --rm -f \"${dockerfile}\" -t ${tag} ${workspaceFolder}"
+    "go.testEnvVars": {
+      "KUBEBUILDER_ASSETS": "${workspaceFolder}/bin/k8s/current"
+    }
 }

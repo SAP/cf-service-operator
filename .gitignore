@@ -6,6 +6,8 @@
 *.dylib
 bin
 testbin/*
+__debug_bin
+Dockerfile.cross
 
 # Test binary, build with `go test -c`
 *.test
@@ -26,16 +28,12 @@ testbin/*
 # vscode stuff
 .vscode/*.log
 
-# temporary folder
+# temp stuff
 /tmp
 
 # local stuff
 /.kubeconfig
 /.local/ssl
-
-# Debug artifacts
-__debug_bin
-debug.*
 
 # Hugo artifacts
 .hugo_build.lock

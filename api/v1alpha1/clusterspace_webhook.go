@@ -23,7 +23,7 @@ func (r *ClusterSpace) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-cf-cs-sap-com-v1alpha1-clusterspace,mutating=true,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=clusterspaces,verbs=create;update,versions=v1alpha1,name=mclusterspace.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/mutate-cf-cs-sap-com-v1alpha1-clusterspace,mutating=true,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=clusterspaces,verbs=create;update,versions=v1alpha1,name=mclusterspace.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &ClusterSpace{}
 
@@ -36,7 +36,7 @@ func (r *ClusterSpace) Default() {
 	}
 }
 
-//+kubebuilder:webhook:path=/validate-cf-cs-sap-com-v1alpha1-clusterspace,mutating=false,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=clusterspaces,verbs=create;update,versions=v1alpha1,name=vclusterspace.kb.io,admissionReviewVersions=v1
+// +kubebuilder:webhook:path=/validate-cf-cs-sap-com-v1alpha1-clusterspace,mutating=false,failurePolicy=fail,sideEffects=None,groups=cf.cs.sap.com,resources=clusterspaces,verbs=create;update,versions=v1alpha1,name=vclusterspace.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &ClusterSpace{}
 
