@@ -16,7 +16,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: false
 
 defaults:
@@ -58,7 +58,7 @@ jobs:
     - name: Setup Node
       uses: actions/setup-node@v3
       with:
-        node-version: '${{ steps.get_node_version.outputs.node_version }}'
+        node-version: ${{ steps.get_node_version.outputs.node_version }}
 
     - name: Update dependencies
       run: |
@@ -81,7 +81,7 @@ jobs:
     - name: Upload artifact
       uses: actions/upload-pages-artifact@v1
       with:
-        path: ./website/public
+        path: website/public
 
   deploy:
     environment:
