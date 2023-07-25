@@ -6,7 +6,7 @@
   "extends": [
     "config:base"
   ],
-  "prHourlyLimit": 5,
+  "prHourlyLimit": 6,
   "prConcurrentLimit": 10,
   "semanticCommits": "enabled",
   "postUpdateOptions": [
