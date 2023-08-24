@@ -23,6 +23,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	cfv1alpha1 "github.com/sap/cf-service-operator/api/v1alpha1"
 	"github.com/sap/cf-service-operator/internal/cf"
@@ -89,7 +91,7 @@ func main() {
 		"cluster-resource-namespace", clusterResourceNamespace,
 	)
 
-	host, port, err := parseAddress(webhookAddr)
+	webhookHost, webhookPort, err := parseAddress(webhookAddr)
 	if err != nil {
 		setupLog.Error(err, "unable to parse webhook bind address", "controller", "Space")
 		os.Exit(1)
@@ -98,19 +100,28 @@ func main() {
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		// TODO: disable cache for further resources (e.g. secrets) ?
-		ClientDisableCacheFor: []client.Object{
-			&cfv1alpha1.Space{},
-			&cfv1alpha1.ClusterSpace{},
-			&cfv1alpha1.ServiceInstance{},
-			&cfv1alpha1.ServiceBinding{},
+		Client: client.Options{
+			Cache: &client.CacheOptions{
+				DisableFor: []client.Object{
+					&cfv1alpha1.Space{},
+					&cfv1alpha1.ClusterSpace{},
+					&cfv1alpha1.ServiceInstance{},
+					&cfv1alpha1.ServiceBinding{},
+				},
+			},
 		},
-		MetricsBindAddress:     metricsAddr,
+		LeaderElection:                enableLeaderElection,
+		LeaderElectionID:              LeaderElectionID,
+		LeaderElectionReleaseOnCancel: true,
+		WebhookServer: webhook.NewServer(webhook.Options{
+			Host:    webhookHost,
+			Port:    webhookPort,
+			CertDir: webhookCertDir,
+		}),
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
 		HealthProbeBindAddress: probeAddr,
-		Host:                   host,
-		Port:                   port,
-		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       LeaderElectionID,
-		CertDir:                webhookCertDir,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

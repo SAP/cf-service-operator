@@ -12,6 +12,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -49,14 +50,14 @@ func (r *ServiceBinding) Default() {
 var _ webhook.Validator = &ServiceBinding{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceBinding) ValidateCreate() error {
+func (r *ServiceBinding) ValidateCreate() (admission.Warnings, error) {
 	servicebindinglog.Info("validate create", "name", r.Name)
 
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceBinding) ValidateUpdate(old runtime.Object) error {
+func (r *ServiceBinding) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	servicebindinglog.Info("validate update", "name", r.Name)
 	s := old.(*ServiceBinding)
 	// Call the defaulting webhook logic for the old object (because defaulting through the webhook might be incomplete in case of generateName usage)
@@ -65,19 +66,19 @@ func (r *ServiceBinding) ValidateUpdate(old runtime.Object) error {
 
 	// TODO: why not to allow name updates ?
 	if r.Spec.Name != s.Spec.Name {
-		return fmt.Errorf("spec.name is immutable")
+		return nil, fmt.Errorf("spec.name is immutable")
 	}
 
 	if r.Spec.ServiceInstanceName != s.Spec.ServiceInstanceName {
-		return fmt.Errorf("spec.serviceInstanceName is immutable")
+		return nil, fmt.Errorf("spec.serviceInstanceName is immutable")
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceBinding) ValidateDelete() error {
+func (r *ServiceBinding) ValidateDelete() (admission.Warnings, error) {
 	servicebindinglog.Info("validate delete", "name", r.Name)
 
-	return nil
+	return nil, nil
 }

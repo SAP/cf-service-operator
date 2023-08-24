@@ -12,6 +12,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -41,7 +42,7 @@ func (r *ClusterSpace) Default() {
 var _ webhook.Validator = &ClusterSpace{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ClusterSpace) ValidateCreate() error {
+func (r *ClusterSpace) ValidateCreate() (admission.Warnings, error) {
 	clusterspacelog.Info("validate create", "name", r.Name)
 	// Call the defaulting logic again (because defaulting might be incomplete in case of generateName usage)
 	if r.Name == "" && r.GenerateName != "" {
@@ -51,14 +52,14 @@ func (r *ClusterSpace) ValidateCreate() error {
 
 	if !(r.Spec.Guid != "" && r.Spec.Name == "" && r.Spec.OrganizationName == "" ||
 		r.Spec.Guid == "" && r.Spec.Name != "" && r.Spec.OrganizationName != "") {
-		return fmt.Errorf("exactly one of spec.guid or spec.name plus spec.organizationName must be specified")
+		return nil, fmt.Errorf("exactly one of spec.guid or spec.name plus spec.organizationName must be specified")
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ClusterSpace) ValidateUpdate(old runtime.Object) error {
+func (r *ClusterSpace) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	clusterspacelog.Info("validate update", "name", r.Name)
 	s := old.(*ClusterSpace)
 	// Call the defaulting webhook logic for the old object (because defaulting through the webhook might be incomplete in case of generateName usage)
@@ -66,24 +67,24 @@ func (r *ClusterSpace) ValidateUpdate(old runtime.Object) error {
 	s.Default()
 
 	if r.Spec.Guid != s.Spec.Guid {
-		return fmt.Errorf("spec.guid is immutable")
+		return nil, fmt.Errorf("spec.guid is immutable")
 	}
 
 	// TODO: why not to allow name updates ?
 	if r.Spec.Name != s.Spec.Name {
-		return fmt.Errorf("spec.name is immutable")
+		return nil, fmt.Errorf("spec.name is immutable")
 	}
 
 	if r.Spec.OrganizationName != s.Spec.OrganizationName {
-		return fmt.Errorf("spec.organizationName is immutable")
+		return nil, fmt.Errorf("spec.organizationName is immutable")
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ClusterSpace) ValidateDelete() error {
+func (r *ClusterSpace) ValidateDelete() (admission.Warnings, error) {
 	clusterspacelog.Info("validate delete", "name", r.Name)
 
-	return nil
+	return nil, nil
 }
