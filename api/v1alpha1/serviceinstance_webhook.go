@@ -12,6 +12,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // log is for logging in this package.
@@ -51,24 +52,24 @@ func (r *ServiceInstance) Default() {
 var _ webhook.Validator = &ServiceInstance{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceInstance) ValidateCreate() error {
+func (r *ServiceInstance) ValidateCreate() (admission.Warnings, error) {
 	serviceinstancelog.Info("validate create", "name", r.Name)
 
 	if !(r.Spec.SpaceName != "" && r.Spec.ClusterSpaceName == "" ||
 		r.Spec.SpaceName == "" && r.Spec.ClusterSpaceName != "") {
-		return fmt.Errorf("exactly one of spec.spaceName or spec.clusterSpaceName must be specified")
+		return nil, fmt.Errorf("exactly one of spec.spaceName or spec.clusterSpaceName must be specified")
 	}
 
 	if !(r.Spec.ServiceOfferingName != "" && r.Spec.ServicePlanName != "" && r.Spec.ServicePlanGuid == "" ||
 		r.Spec.ServiceOfferingName == "" && r.Spec.ServicePlanName == "" && r.Spec.ServicePlanGuid != "") {
-		return fmt.Errorf("exactly one of spec.serviceOfferingName plus spec.servicePlanName or spec.servicePlanGuid must be specified")
+		return nil, fmt.Errorf("exactly one of spec.serviceOfferingName plus spec.servicePlanName or spec.servicePlanGuid must be specified")
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceInstance) ValidateUpdate(old runtime.Object) error {
+func (r *ServiceInstance) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	serviceinstancelog.Info("validate update", "name", r.Name)
 	s := old.(*ServiceInstance)
 	// Call the defaulting webhook logic for the old object (because defaulting through the webhook might be incomplete in case of generateName usage)
@@ -77,35 +78,35 @@ func (r *ServiceInstance) ValidateUpdate(old runtime.Object) error {
 
 	// TODO: why not to allow name updates ?
 	if r.Spec.Name != s.Spec.Name {
-		return fmt.Errorf("spec.name is immutable")
+		return nil, fmt.Errorf("spec.name is immutable")
 	}
 
 	if r.Spec.ClusterSpaceName != s.Spec.ClusterSpaceName {
-		return fmt.Errorf("spec.clusterSpaceName is immutable")
+		return nil, fmt.Errorf("spec.clusterSpaceName is immutable")
 	}
 
 	if r.Spec.SpaceName != s.Spec.SpaceName {
-		return fmt.Errorf("spec.spaceName is immutable")
+		return nil, fmt.Errorf("spec.spaceName is immutable")
 	}
 
 	if r.Spec.ServiceOfferingName != s.Spec.ServiceOfferingName {
-		return fmt.Errorf("spec.serviceOfferingName is immutable")
+		return nil, fmt.Errorf("spec.serviceOfferingName is immutable")
 	}
 
 	if r.Spec.ServicePlanName != s.Spec.ServicePlanName {
-		return fmt.Errorf("spec.servicePlanName is immutable")
+		return nil, fmt.Errorf("spec.servicePlanName is immutable")
 	}
 
 	if r.Spec.ServicePlanGuid != s.Spec.ServicePlanGuid {
-		return fmt.Errorf("spec.servicePlanGuid is immutable")
+		return nil, fmt.Errorf("spec.servicePlanGuid is immutable")
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *ServiceInstance) ValidateDelete() error {
+func (r *ServiceInstance) ValidateDelete() (admission.Warnings, error) {
 	serviceinstancelog.Info("validate delete", "name", r.Name)
 
-	return nil
+	return nil, nil
 }
