@@ -177,7 +177,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Retrieve cloud foundry instance
 	var cfbinding *facade.Binding
 	if client != nil {
-		cfbinding, err = client.GetBinding(string(serviceBinding.UID))
+		cfbinding, err = client.GetBinding(ctx, string(serviceBinding.UID))
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -240,6 +240,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if cfbinding == nil {
 			log.V(1).Info("triggering creation")
 			if err := client.CreateBinding(
+				ctx,
 				spec.Name,
 				serviceInstance.Status.ServiceInstanceGuid,
 				parameters,
@@ -257,7 +258,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				cfbinding.State == facade.BindingStateCreatedFailed || cfbinding.State == facade.BindingStateDeleteFailed {
 				// Re-create binding (unfortunately, cloud foundry does not support binding updates, other than metadata)
 				log.V(1).Info("triggering re-creation")
-				if err := client.DeleteBinding(cfbinding.Guid); err != nil {
+				if err := client.DeleteBinding(ctx, cfbinding.Guid); err != nil {
 					return ctrl.Result{}, err
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
@@ -268,6 +269,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				// metadata updates (such as updating the generation here) are possible with service bindings
 				log.V(1).Info("triggering update")
 				if err := client.UpdateBinding(
+					ctx,
 					cfbinding.Guid,
 					serviceBinding.Generation,
 				); err != nil {
@@ -283,7 +285,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 		if cfbinding == nil {
 			// Re-retrieve cloud foundry binding; this happens exactly if the binding was created or updated above
-			cfbinding, err = client.GetBinding(string(serviceBinding.UID))
+			cfbinding, err = client.GetBinding(ctx, string(serviceBinding.UID))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -356,7 +358,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		} else {
 			if cfbinding.State != facade.BindingStateDeleting {
 				log.V(1).Info("triggering deletion")
-				if err := client.DeleteBinding(cfbinding.Guid); err != nil {
+				if err := client.DeleteBinding(ctx, cfbinding.Guid); err != nil {
 					return ctrl.Result{}, err
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]

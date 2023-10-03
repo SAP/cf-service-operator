@@ -153,7 +153,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 		}
 
 		// Retrieve cloud foundry space
-		cfspace, err = client.GetSpace(string(space.GetUID()))
+		cfspace, err = client.GetSpace(ctx, string(space.GetUID()))
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -177,6 +177,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			if cfspace == nil {
 				log.V(1).Info("triggering creation")
 				if err := client.CreateSpace(
+					ctx,
 					spec.Name,
 					string(space.GetUID()),
 					space.GetGeneration(),
@@ -192,6 +193,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 						updateName = ""
 					}
 					if err := client.UpdateSpace(
+						ctx,
 						cfspace.Guid,
 						updateName,
 						space.GetGeneration(),
@@ -205,7 +207,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			}
 			if cfspace == nil {
 				// Re-retrieve cloud foundry space; this happens exactly if the space was created or updated above
-				cfspace, err = client.GetSpace(string(space.GetUID()))
+				cfspace, err = client.GetSpace(ctx, string(space.GetUID()))
 				if err != nil {
 					return ctrl.Result{}, err
 				}
@@ -215,7 +217,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			}
 			// TODO: the following is not very clean; if the user referenced by the secret changes, we leave the previous one orphaned;
 			// maybe we should clean it up somehow (but how ... what if that previous user has already been taken over by another manager, such as CAM?)
-			if err := client.AddDeveloper(cfspace.Guid, string(secret.Data["username"])); err != nil {
+			if err := client.AddDeveloper(ctx, cfspace.Guid, string(secret.Data["username"])); err != nil {
 				return ctrl.Result{}, err
 			}
 			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
@@ -232,7 +234,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the healthchecker from secret %s", secretName)
 		}
 
-		if err := checker.Check(); err != nil {
+		if err := checker.Check(ctx); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "healthcheck failed")
 		}
 
@@ -268,7 +270,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			return ctrl.Result{}, nil
 		} else {
 			log.V(1).Info("triggering deletion")
-			if err := client.DeleteSpace(cfspace.Guid); err != nil {
+			if err := client.DeleteSpace(ctx, cfspace.Guid); err != nil {
 				return ctrl.Result{}, err
 			}
 			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]

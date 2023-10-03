@@ -5,8 +5,10 @@ SPDX-License-Identifier: Apache-2.0
 
 package facade
 
+import "context"
+
 type SpaceHealthChecker interface {
-	Check() error
+	Check(ctx context.Context) error
 }
 
 type SpaceHealthCheckerBuilder func(string, string, string, string) (SpaceHealthChecker, error)
