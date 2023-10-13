@@ -202,24 +202,24 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				return ctrl.Result{}, errors.Wrap(err, "error decoding inline parameters")
 			}
 			parameterObjects = append(parameterObjects, obj)
-			for _, pf := range spec.ParametersFrom {
-				secretName := types.NamespacedName{
-					Namespace: serviceInstance.Namespace,
-					Name:      pf.SecretKeyRef.Name,
+		}
+		for _, pf := range spec.ParametersFrom {
+			secretName := types.NamespacedName{
+				Namespace: serviceInstance.Namespace,
+				Name:      pf.SecretKeyRef.Name,
+			}
+			secret := &corev1.Secret{}
+			if err := r.Get(ctx, secretName, secret); err != nil {
+				return ctrl.Result{}, errors.Wrapf(err, "failed to get Secret containing service instance parameters, secret name: %s", secretName)
+			}
+			if raw, ok := secret.Data[pf.SecretKeyRef.Key]; ok {
+				obj, err := unmarshalObject(raw)
+				if err != nil {
+					return ctrl.Result{}, errors.Wrapf(err, "error decoding parameters from secret, secret name: %s, key: %s", secretName, pf.SecretKeyRef.Key)
 				}
-				secret := &corev1.Secret{}
-				if err := r.Get(ctx, secretName, secret); err != nil {
-					return ctrl.Result{}, errors.Wrapf(err, "failed to get Secret containing service instance parameters, secret name: %s", secretName)
-				}
-				if raw, ok := secret.Data[pf.SecretKeyRef.Key]; ok {
-					obj, err := unmarshalObject(raw)
-					if err != nil {
-						return ctrl.Result{}, errors.Wrapf(err, "error decoding parameters from secret, secret name: %s, key: %s", secretName, pf.SecretKeyRef.Key)
-					}
-					parameterObjects = append(parameterObjects, obj)
-				} else {
-					return ctrl.Result{}, fmt.Errorf("secret key not found, secret name: %s, key: %s", secretName, pf.SecretKeyRef.Key)
-				}
+				parameterObjects = append(parameterObjects, obj)
+			} else {
+				return ctrl.Result{}, fmt.Errorf("secret key not found, secret name: %s, key: %s", secretName, pf.SecretKeyRef.Key)
 			}
 		}
 		parameters, err := mergeObjects(parameterObjects...)
