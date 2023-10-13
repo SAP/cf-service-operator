@@ -6,20 +6,21 @@ SPDX-License-Identifier: Apache-2.0
 package cf
 
 import (
+	"context"
 	"fmt"
-	"net/url"
 	"strconv"
 
-	"github.com/cloudfoundry-community/go-cfclient/v2"
+	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
+	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
 	"github.com/pkg/errors"
 
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
-func (c *organizationClient) GetSpace(owner string) (*facade.Space, error) {
-	v := url.Values{}
-	v.Set("label_selector", labelKeyOwner+"="+owner)
-	spaces, err := c.client.ListV3SpacesByQuery(v)
+func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facade.Space, error) {
+	listOpts := cfclient.NewSpaceListOptions()
+	listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
+	spaces, err := c.client.Spaces.ListAll(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +34,7 @@ func (c *organizationClient) GetSpace(owner string) (*facade.Space, error) {
 
 	guid := space.GUID
 	name := space.Name
-	generation, err := strconv.ParseInt(space.Metadata.Annotations[annotationKeyGeneration], 10, 64)
+	generation, err := strconv.ParseInt(*space.Metadata.Annotations[annotationGeneration], 10, 64)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing space generation")
 	}
@@ -46,10 +47,11 @@ func (c *organizationClient) GetSpace(owner string) (*facade.Space, error) {
 	}, nil
 }
 
-func (c *organizationClient) CreateSpace(name string, owner string, generation int64) error {
-	v := url.Values{}
-	v.Set("names", c.organizationName)
-	organizations, err := c.client.ListV3OrganizationsByQuery(v)
+// Required parameters (may not be initial): name, owner, generation
+func (c *organizationClient) CreateSpace(ctx context.Context, name string, owner string, generation int64) error {
+	listOpts := cfclient.NewOrganizationListOptions()
+	listOpts.Names.EqualTo(c.organizationName)
+	organizations, err := c.client.Organizations.ListAll(ctx, listOpts)
 	if err != nil {
 		return err
 	}
@@ -60,65 +62,68 @@ func (c *organizationClient) CreateSpace(name string, owner string, generation i
 	}
 	organization := organizations[0]
 
-	req := cfclient.CreateV3SpaceRequest{
-		Name:    name,
-		OrgGUID: organization.GUID,
-		Metadata: &cfclient.V3Metadata{
-			Labels: map[string]string{
-				labelKeyOwner: owner,
-			},
-			Annotations: map[string]string{
-				annotationKeyGeneration: strconv.FormatInt(generation, 10),
-			},
-		},
-	}
-	_, err = c.client.CreateV3Space(req)
+	req := cfresource.NewSpaceCreate(name, organization.GUID)
+	req.Metadata = cfresource.NewMetadata().
+		WithLabel(labelPrefix, labelKeyOwner, owner).
+		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
+
+	_, err = c.client.Spaces.Create(ctx, req)
 	return err
 }
 
-func (c *organizationClient) UpdateSpace(guid string, name string, generation int64) error {
-	req := cfclient.UpdateV3SpaceRequest{
-		Name: name,
-		Metadata: &cfclient.V3Metadata{
-			Annotations: map[string]string{
-				annotationKeyGeneration: strconv.FormatInt(generation, 10),
-			},
-		},
+// Required parameters (may not be initial): guid, generation
+// Optional parameters (may be initial): name
+func (c *organizationClient) UpdateSpace(ctx context.Context, guid string, name string, generation int64) error {
+	// TODO: why is there no cfresource.NewSpaceUpdate() method ?
+	req := &cfresource.SpaceUpdate{}
+	if name != "" {
+		req.Name = name
 	}
-	_, err := c.client.UpdateV3Space(guid, req)
+	req.Metadata = cfresource.NewMetadata().
+		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
+
+	_, err := c.client.Spaces.Update(ctx, guid, req)
 	return err
 }
 
-func (c *organizationClient) DeleteSpace(guid string) error {
-	return c.client.DeleteV3Space(guid)
+func (c *organizationClient) DeleteSpace(ctx context.Context, guid string) error {
+	_, err := c.client.Spaces.Delete(ctx, guid)
+	return err
 }
 
-func (c *organizationClient) AddAuditor(guid string, username string) error {
+func (c *organizationClient) AddAuditor(ctx context.Context, guid string, username string) error {
 	return nil
 }
 
-func (c *organizationClient) AddDeveloper(guid string, username string) error {
-	// TODO: replace with v3 call
-	users, err := c.client.ListSpaceDevelopers(guid)
+func (c *organizationClient) AddDeveloper(ctx context.Context, guid string, username string) error {
+	userListOpts := cfclient.NewUserListOptions()
+	userListOpts.UserNames.EqualTo(username)
+	users, err := c.client.Users.ListAll(ctx, userListOpts)
 	if err != nil {
 		return err
 	}
-	exists := false
-	for _, user := range users {
-		if user.Username == username {
-			exists = true
-			break
-		}
+	if len(users) == 0 {
+		return fmt.Errorf("found no user with name: %s", username)
+	} else if len(users) > 1 {
+		return fmt.Errorf("found multiple users with name: %s (this should not be possible, actually)", username)
 	}
-	if !exists {
-		// TODO: replace with v3 call
-		if _, err := c.client.AssociateSpaceDeveloperByUsername(guid, username); err != nil {
-			return err
-		}
+	user := users[0]
+
+	roleListOpts := cfclient.NewRoleListOptions()
+	roleListOpts.SpaceGUIDs.EqualTo(guid)
+	roleListOpts.UserGUIDs.EqualTo(user.GUID)
+	roleListOpts.Types.EqualTo(cfresource.SpaceRoleDeveloper.String())
+	roles, err := c.client.Roles.ListAll(ctx, roleListOpts)
+	if err != nil {
+		return err
 	}
-	return nil
+	if len(roles) > 0 {
+		return nil
+	}
+	_, err = c.client.Roles.CreateSpaceRole(ctx, guid, user.GUID, cfresource.SpaceRoleDeveloper)
+	return err
 }
 
-func (c *organizationClient) AddManager(guid string, username string) error {
+func (c *organizationClient) AddManager(ctx context.Context, guid string, username string) error {
 	return nil
 }

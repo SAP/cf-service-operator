@@ -5,8 +5,10 @@ SPDX-License-Identifier: Apache-2.0
 
 package cf
 
-func (c *spaceClient) Check() error {
-	_, err := c.client.GetV3SpaceByGUID(c.spaceGuid)
+import "context"
+
+func (c *spaceClient) Check(ctx context.Context) error {
+	_, err := c.client.Spaces.Get(ctx, c.spaceGuid)
 	if err != nil {
 		return err
 	}

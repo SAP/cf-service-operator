@@ -6,15 +6,17 @@ SPDX-License-Identifier: Apache-2.0
 package cf
 
 import (
+	"context"
 	"fmt"
-	"net/url"
+
+	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 )
 
-func (c *spaceClient) FindServicePlan(serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error) {
-	v := url.Values{}
-	v.Set("names", serviceOfferingName)
-	v.Set("space_guids", spaceGuid)
-	serviceOfferings, err := c.client.ListV3ServiceOfferingsByQuery(v)
+func (c *spaceClient) FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error) {
+	serviceOfferingListOpts := cfclient.NewServiceOfferingListOptions()
+	serviceOfferingListOpts.Names.EqualTo(serviceOfferingName)
+	serviceOfferingListOpts.SpaceGUIDs.EqualTo(spaceGuid)
+	serviceOfferings, err := c.client.ServiceOfferings.ListAll(ctx, serviceOfferingListOpts)
 	if err != nil {
 		return "", err
 	}
@@ -25,11 +27,11 @@ func (c *spaceClient) FindServicePlan(serviceOfferingName string, servicePlanNam
 	}
 	serviceOffering := serviceOfferings[0]
 
-	v = url.Values{}
-	v.Set("names", servicePlanName)
-	v.Set("space_guids", spaceGuid)
-	v.Set("service_offering_guids", serviceOffering.GUID)
-	servicePlans, err := c.client.ListV3ServicePlansByQuery(v)
+	servicePlanListOpts := cfclient.NewServicePlanListOptions()
+	servicePlanListOpts.Names.EqualTo(servicePlanName)
+	servicePlanListOpts.SpaceGUIDs.EqualTo(spaceGuid)
+	servicePlanListOpts.ServiceOfferingGUIDs.EqualTo(serviceOffering.GUID)
+	servicePlans, err := c.client.ServicePlans.ListAll(ctx, servicePlanListOpts)
 	if err != nil {
 		return "", err
 	}

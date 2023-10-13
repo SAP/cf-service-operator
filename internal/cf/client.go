@@ -8,16 +8,21 @@ package cf
 import (
 	"fmt"
 
-	"github.com/cloudfoundry-community/go-cfclient/v2"
+	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
+	cfconfig "github.com/cloudfoundry-community/go-cfclient/v3/config"
 
 	"github.com/sap/cf-service-operator/internal/facade"
-	"github.com/sap/cf-service-operator/pkg/cfclientext"
 )
 
 const (
-	labelKeyOwner              = "service-operator.cf.cs.sap.com/owner"
-	annotationKeyGeneration    = "service-operator.cf.cs.sap.com/generation"
-	annotationKeyParameterHash = "service-operator.cf.cs.sap.com/parameter-hash"
+	labelPrefix                = "service-operator.cf.cs.sap.com"
+	labelKeyOwner              = "owner"
+	labelOwner                 = labelPrefix + "/" + labelKeyOwner
+	annotationPrefix           = "service-operator.cf.cs.sap.com"
+	annotationKeyGeneration    = "generation"
+	annotationGeneration       = annotationPrefix + "/" + annotationKeyGeneration
+	annotationKeyParameterHash = "parameter-hash"
+	annotationParameterHash    = annotationPrefix + "/" + annotationKeyParameterHash
 )
 
 type organizationClient struct {
@@ -25,7 +30,7 @@ type organizationClient struct {
 	username         string
 	password         string
 	organizationName string
-	client           cfclientext.Client
+	client           cfclient.Client
 }
 
 type spaceClient struct {
@@ -33,7 +38,7 @@ type spaceClient struct {
 	username  string
 	password  string
 	spaceGuid string
-	client    cfclientext.Client
+	client    cfclient.Client
 }
 
 func newOrganizationClient(organizationName string, url string, username string, password string) (*organizationClient, error) {
@@ -49,12 +54,11 @@ func newOrganizationClient(organizationName string, url string, username string,
 	if password == "" {
 		return nil, fmt.Errorf("missing or empty password")
 	}
-	config := &cfclient.Config{
-		ApiAddress: url,
-		Username:   username,
-		Password:   password,
+	config, err := cfconfig.NewUserPassword(url, username, password)
+	if err != nil {
+		return nil, err
 	}
-	c, err := cfclientext.NewClient(config)
+	c, err := cfclient.New(config)
 	if err != nil {
 		return nil, err
 	}
@@ -74,12 +78,11 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	if password == "" {
 		return nil, fmt.Errorf("missing or empty password")
 	}
-	config := &cfclient.Config{
-		ApiAddress: url,
-		Username:   username,
-		Password:   password,
+	config, err := cfconfig.NewUserPassword(url, username, password)
+	if err != nil {
+		return nil, err
 	}
-	c, err := cfclientext.NewClient(config)
+	c, err := cfclient.New(config)
 	if err != nil {
 		return nil, err
 	}

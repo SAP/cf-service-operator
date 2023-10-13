@@ -172,7 +172,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Retrieve cloud foundry instance
 	var cfinstance *facade.Instance
 	if client != nil {
-		cfinstance, err = client.GetInstance(string(serviceInstance.UID))
+		cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID))
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -189,7 +189,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		servicePlanGuid := spec.ServicePlanGuid
 		if servicePlanGuid == "" {
-			servicePlanGuid, err = client.FindServicePlan(spec.ServiceOfferingName, spec.ServicePlanName, spaceGuid)
+			servicePlanGuid, err = client.FindServicePlan(ctx, spec.ServiceOfferingName, spec.ServicePlanName, spaceGuid)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -235,6 +235,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if cfinstance == nil {
 			log.V(1).Info("triggering creation")
 			if err := client.CreateInstance(
+				ctx,
 				spec.Name,
 				servicePlanGuid,
 				parameters,
@@ -251,7 +252,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			} else if recreateOnCreationFailure && cfinstance.State == facade.InstanceStateCreatedFailed {
 				// Re-create instance
 				log.V(1).Info("triggering re-creation")
-				if err := client.DeleteInstance(cfinstance.Guid); err != nil {
+				if err := client.DeleteInstance(ctx, cfinstance.Guid); err != nil {
 					return ctrl.Result{}, err
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
@@ -285,6 +286,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 					updateTags = make([]string, 0)
 				}
 				if err := client.UpdateInstance(
+					ctx,
 					cfinstance.Guid,
 					updateName,
 					updateServicePlanGuid,
@@ -302,7 +304,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		if cfinstance == nil {
 			// Re-retrieve cloud foundry instance; this happens exactly if the instance was created or updated above
-			cfinstance, err = client.GetInstance(string(serviceInstance.UID))
+			cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID))
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -358,7 +360,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		} else {
 			if cfinstance.State != facade.InstanceStateDeleting {
 				log.V(1).Info("triggering deletion")
-				if err := client.DeleteInstance(cfinstance.Guid); err != nil {
+				if err := client.DeleteInstance(ctx, cfinstance.Guid); err != nil {
 					return ctrl.Result{}, err
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]

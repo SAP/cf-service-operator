@@ -6,21 +6,22 @@ SPDX-License-Identifier: Apache-2.0
 package cf
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
-	"net/url"
 	"strconv"
 
-	"github.com/cloudfoundry-community/go-cfclient/v2"
+	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
+	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
 	"github.com/pkg/errors"
 
 	"github.com/sap/cf-service-operator/internal/facade"
-	"github.com/sap/cf-service-operator/pkg/cfclientext"
 )
 
-func (c *spaceClient) GetBinding(owner string) (*facade.Binding, error) {
-	v := url.Values{}
-	v.Set("label_selector", labelKeyOwner+"="+owner)
-	serviceBindings, err := c.client.ListV3ServiceBindingsByQuery(v)
+func (c *spaceClient) GetBinding(ctx context.Context, owner string) (*facade.Binding, error) {
+	listOpts := cfclient.NewServiceCredentialBindingListOptions()
+	listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
+	serviceBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -34,11 +35,11 @@ func (c *spaceClient) GetBinding(owner string) (*facade.Binding, error) {
 
 	guid := serviceBinding.GUID
 	name := serviceBinding.Name
-	generation, err := strconv.ParseInt(serviceBinding.Metadata.Annotations[annotationKeyGeneration], 10, 64)
+	generation, err := strconv.ParseInt(*serviceBinding.Metadata.Annotations[annotationGeneration], 10, 64)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing service binding generation")
 	}
-	parameterHash := serviceBinding.Metadata.Annotations[annotationKeyParameterHash]
+	parameterHash := *serviceBinding.Metadata.Annotations[annotationParameterHash]
 	var state facade.BindingState
 	switch serviceBinding.LastOperation.Type + ":" + serviceBinding.LastOperation.State {
 	case "create:in progress":
@@ -60,7 +61,7 @@ func (c *spaceClient) GetBinding(owner string) (*facade.Binding, error) {
 
 	var credentials map[string]interface{}
 	if state == facade.BindingStateReady {
-		details, err := c.client.GetV3ServiceBindingDetails(guid)
+		details, err := c.client.ServiceCredentialBindings.GetDetails(ctx, guid)
 		if err != nil {
 			return nil, errors.Wrap(err, "error getting service binding details")
 		}
@@ -79,38 +80,37 @@ func (c *spaceClient) GetBinding(owner string) (*facade.Binding, error) {
 	}, nil
 }
 
-func (c *spaceClient) CreateBinding(name string, serviceInstanceGuid string, parameters map[string]interface{}, owner string, generation int64) error {
-	req := cfclientext.CreateV3ServiceBindingRequest{
-		Name:                name,
-		ServiceInstanceGUID: serviceInstanceGuid,
-		Parameters:          parameters,
-		Metadata: &cfclient.V3Metadata{
-			Labels: map[string]string{
-				labelKeyOwner: owner,
-			},
-			Annotations: map[string]string{
-				annotationKeyGeneration:    strconv.FormatInt(generation, 10),
-				annotationKeyParameterHash: facade.ObjectHash(parameters),
-			},
-		},
+// Required parameters (may not be initial): name, serviceInstanceGuid, owner, generation
+// Optional parameters (may be initial): parameters
+func (c *spaceClient) CreateBinding(ctx context.Context, name string, serviceInstanceGuid string, parameters map[string]interface{}, owner string, generation int64) error {
+	req := cfresource.NewServiceCredentialBindingCreateKey(serviceInstanceGuid, name)
+	if parameters != nil {
+		jsonParameters, err := json.Marshal(parameters)
+		if err != nil {
+			return err
+		}
+		req.WithJSONParameters(string(jsonParameters))
 	}
-	_, err := c.client.CreateV3ServiceBinding(req)
+	req.Metadata = cfresource.NewMetadata().
+		WithLabel(labelPrefix, labelKeyOwner, owner).
+		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10)).
+		WithAnnotation(annotationPrefix, annotationKeyParameterHash, facade.ObjectHash(parameters))
+
+	_, _, err := c.client.ServiceCredentialBindings.Create(ctx, req)
 	return err
 }
 
-func (c *spaceClient) UpdateBinding(guid string, generation int64) error {
-	req := cfclientext.UpdateV3ServiceBindingRequest{
-		Metadata: &cfclient.V3Metadata{
-			Annotations: map[string]string{
-				annotationKeyGeneration: strconv.FormatInt(generation, 10),
-			},
-		},
-	}
-	_, err := c.client.UpdateV3ServiceBinding(guid, req)
+// Required parameters (may not be initial): guid, generation
+func (c *spaceClient) UpdateBinding(ctx context.Context, guid string, generation int64) error {
+	// TODO: why is there no cfresource.NewServiceCredentialBindingUpdate() method ?
+	req := &cfresource.ServiceCredentialBindingUpdate{}
+	req.Metadata = cfresource.NewMetadata().
+		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
+
+	_, err := c.client.ServiceCredentialBindings.Update(ctx, guid, req)
 	return err
 }
 
-func (c *spaceClient) DeleteBinding(guid string) error {
-	_, err := c.client.DeleteV3ServiceBinding(guid)
-	return err
+func (c *spaceClient) DeleteBinding(ctx context.Context, guid string) error {
+	return c.client.ServiceCredentialBindings.Delete(ctx, guid)
 }
