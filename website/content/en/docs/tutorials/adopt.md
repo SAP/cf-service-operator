@@ -49,12 +49,13 @@ cat > /tmp/patch <<END
       "service-operator.cf.cs.sap.com/owner": "<ObjectMeta.uid of the Kubernetes ServiceInstance>"
     },
     "annotations": {
-      "service-operator.cf.cs.sap.com/generation": "0"
+      "service-operator.cf.cs.sap.com/generation": "0",
+      "service-operator.cf.cs.sap.com/parameter-hash": "0"
     }
   }
 }
 END
-cf curl -X PATCH /v3/service_instances/<cf instance guid> -d /tmp/patch
+cf curl -X PATCH -H "Content-Type: application/json" /v3/service_instances/<cf instance guid> -d @/tmp/patch
 ```
 More information about this Cloud Foundry API call can be found [here](https://v3-apidocs.cloudfoundry.org/version/3.113.0/index.html#update-a-service-instance).
 After some time the controller will consider the instance as managed.
