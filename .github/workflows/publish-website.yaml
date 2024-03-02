@@ -47,7 +47,7 @@ jobs:
 
     - name: Setup Pages
       id: pages
-      uses: actions/configure-pages@v3
+      uses: actions/configure-pages@v4
 
     - name: Get node version from package.json
       id: get_node_version
@@ -56,7 +56,7 @@ jobs:
         echo "::set-output name=node_version::${node_version}"
 
     - name: Setup Node
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ steps.get_node_version.outputs.node_version }}
 
@@ -79,7 +79,7 @@ jobs:
           --baseURL "${{ steps.pages.outputs.base_url }}/"            
 
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v2
+      uses: actions/upload-pages-artifact@v3
       with:
         path: website/public
 
@@ -93,4 +93,4 @@ jobs:
     steps:
     - name: Deploy to GitHub Pages
       id: deployment
-      uses: actions/deploy-pages@v2
+      uses: actions/deploy-pages@v4
