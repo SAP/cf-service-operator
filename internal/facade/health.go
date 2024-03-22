@@ -7,6 +7,7 @@ package facade
 
 import "context"
 
+//counterfeiter:generate . SpaceHealthChecker
 type SpaceHealthChecker interface {
 	Check(ctx context.Context) error
 }

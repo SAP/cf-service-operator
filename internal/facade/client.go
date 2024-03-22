@@ -62,6 +62,10 @@ const (
 	BindingStateDeleted       BindingState = "Deleted"
 )
 
+// only once per package
+//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
+
+//counterfeiter:generate . OrganizationClient
 type OrganizationClient interface {
 	GetSpace(ctx context.Context, owner string) (*Space, error)
 	CreateSpace(ctx context.Context, name string, owner string, generation int64) error
@@ -74,6 +78,7 @@ type OrganizationClient interface {
 
 type OrganizationClientBuilder func(string, string, string, string) (OrganizationClient, error)
 
+//counterfeiter:generate . SpaceClient
 type SpaceClient interface {
 	GetInstance(ctx context.Context, owner string) (*Instance, error)
 	CreateInstance(ctx context.Context, name string, servicePlanGuid string, parameters map[string]interface{}, tags []string, owner string, generation int64) error
