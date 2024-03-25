@@ -21,7 +21,7 @@ defaults:
 jobs:
   test:
     name: Run tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - name: Checkout repository
@@ -71,7 +71,7 @@ jobs:
 
   build-docker:
     name: Build Docker image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     needs: test
     permissions:
       contents: read
