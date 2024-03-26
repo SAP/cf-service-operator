@@ -62,7 +62,7 @@ test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(LOCALBIN)/k8s/current" go test ./... -coverprofile cover.out
 
 .PHONY: test-fast ## Run tests without build.
-test-fast:
+test-fast: envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(LOCALBIN)/k8s/current" go test ./... -coverprofile cover.out -ginkgo.v
 
 ##@ Build
