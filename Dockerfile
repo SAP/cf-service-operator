@@ -21,6 +21,7 @@ COPY Makefile Makefile
 
 # Run tests and build
 RUN make envtest \
+ && netstat -a | grep 8080 \
  && CGO_ENABLED=0 KUBEBUILDER_ASSETS="/workspace/bin/k8s/current" go test ./... \
  && CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager main.go
 
