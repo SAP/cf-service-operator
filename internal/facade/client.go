@@ -62,9 +62,6 @@ const (
 	BindingStateDeleted       BindingState = "Deleted"
 )
 
-// only once per package
-//go:generate go run github.com/maxbrunsfeld/counterfeiter/v6 -generate
-
 //counterfeiter:generate . OrganizationClient
 type OrganizationClient interface {
 	GetSpace(ctx context.Context, owner string) (*Space, error)
