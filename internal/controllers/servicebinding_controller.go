@@ -311,7 +311,11 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			} else if serviceBinding.Annotations["service-operator.cf.cs.sap.com/with-sap-binding-metadata"] == "false" {
 				withMetadata = false
 			}
-			r.storeBindingSecret(ctx, serviceInstance, serviceBinding, cfbinding.Credentials, spec.SecretName, spec.SecretKey, withMetadata)
+			err = r.storeBindingSecret(ctx, serviceInstance, serviceBinding, cfbinding.Credentials, spec.SecretName, spec.SecretKey, withMetadata)
+			if err != nil {
+				// TODO: implement error handling
+				return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+			}
 			// TODO: apply some increasing period, depending on the age of the last update
 			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 		case facade.BindingStateCreatedFailed, facade.BindingStateDeleteFailed:
