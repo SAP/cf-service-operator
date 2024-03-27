@@ -17,6 +17,19 @@
                 "--cluster-resource-namespace=default",
                 "--sap-binding-metadata"
             ]
-        }
+        },
+        {
+          "name": "Run integration test",
+          "type": "go",
+          "request": "launch",
+          "mode": "test",
+          "program": "${workspaceFolder}/internal/controllers",
+          "console": "internalConsole",
+          "env": {
+            "KUBEBUILDER_ASSETS": "${workspaceFolder}/bin/k8s/current",
+          },
+          "args": [],
+          "showLog": true
+        },
     ]
 }
