@@ -16,17 +16,17 @@ import (
 )
 
 const (
-	testCfInstName            = "test-instance"
-	testK8sInstNameCreate     = "test-instance-create"
-	testK8sInstNameRecreate   = "test-instance-recreate"
-	testK8sSpaceNameInstances = "test-space-instances"
+	testCfInstName          = "test-instance"
+	testK8sInstNameCreate   = "test-instance-create"
+	testK8sInstNameRecreate = "test-instance-recreate"
+	testSpaceNameInstances  = "test-space-instances" // used for K8s CR and CF space
 )
 
 var fakeInstanceReady = &facade.Instance{
 	Guid:             testCfSpaceGuid,
 	Name:             testCfInstName,
 	ServicePlanGuid:  testCfPlanGuid,
-	Owner:            testOwner,
+	Owner:            testCfOwner,
 	Generation:       1,
 	State:            facade.InstanceStateReady,
 	StateDescription: string(facade.InstanceStateReady),
@@ -48,8 +48,8 @@ var _ = Describe("Space Controller Integration Tests", Ordered, func() {
 
 		fakeSpace := &facade.Space{
 			Guid:       testCfSpaceGuid,
-			Name:       testSpace,
-			Owner:      testOwner,
+			Name:       testSpaceNameInstances,
+			Owner:      testCfOwner,
 			Generation: 1,
 		}
 
@@ -60,7 +60,7 @@ var _ = Describe("Space Controller Integration Tests", Ordered, func() {
 		fakeSpaceHealthChecker.CheckReturns(nil)
 
 		By("creating space CR")
-		spaceCR = createSpaceCR(ctx, testK8sSpaceNameInstances)
+		spaceCR = createSpaceCR(ctx, testSpaceNameInstances)
 		waitForSpaceCR(ctx, client.ObjectKeyFromObject(spaceCR))
 		Expect(fakeOrgClient.CreateSpaceCallCount()).To(Equal(1))
 	})
@@ -97,7 +97,7 @@ var _ = Describe("Space Controller Integration Tests", Ordered, func() {
 			// only the first call returns no resource to force the creation by the controller
 			fakeSpaceClient.GetInstanceReturnsOnCall(0, kNoInstance, kNoError)
 
-			instanceCR = createInstanceCR(ctx, testK8sInstNameCreate, testK8sSpaceNameInstances)
+			instanceCR = createInstanceCR(ctx, testK8sInstNameCreate, testSpaceNameInstances)
 			waitForInstanceCR(ctx, client.ObjectKeyFromObject(instanceCR))
 			Expect(fakeSpaceClient.CreateInstanceCallCount()).To(Equal(1))
 			Expect(fakeSpaceClient.GetInstanceCallCount()).To(Equal(2))
@@ -122,7 +122,7 @@ var _ = Describe("Space Controller Integration Tests", Ordered, func() {
 			// 3) simulate ready instance to finish the test
 			fakeSpaceClient.GetInstanceReturnsOnCall(3, fakeInstanceReady, kNoError)
 
-			instanceCR = createInstanceCR(ctx, testK8sInstNameRecreate, testK8sSpaceNameInstances, true)
+			instanceCR = createInstanceCR(ctx, testK8sInstNameRecreate, testSpaceNameInstances, true)
 			waitForInstanceCR(ctx, client.ObjectKeyFromObject(instanceCR))
 			Expect(fakeSpaceClient.DeleteInstanceCallCount()).To(Equal(1))
 			Expect(fakeSpaceClient.CreateInstanceCallCount()).To(Equal(1))

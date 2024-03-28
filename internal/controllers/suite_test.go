@@ -37,12 +37,12 @@ var kNoError error = nil
 var errNotExpected = fmt.Errorf("not expected")
 
 const (
-	testK8sNamespace   = "test-namespace"
-	testK8sSecret      = "test-secret"
-	testCfOrganization = "test-organization"
-	testCfSpaceGuid    = "test-space-guid"
-	testCfPlanGuid     = "test-plan-guid"
-	testOwner          = "test-owner"
+	testK8sNamespace  = "test-namespace"
+	testK8sSecretName = "test-secret"
+	testCfOrgName     = "test-organization"
+	testCfSpaceGuid   = "test-space-guid"
+	testCfPlanGuid    = "test-plan-guid"
+	testCfOwner       = "test-owner"
 )
 
 // timeout used for waiting on changes of custom resource
@@ -162,7 +162,7 @@ func prepareOperatorResources() {
 	By("creating K8s secret")
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      testK8sSecret,
+			Name:      testK8sSecretName,
 			Namespace: testK8sNamespace,
 		},
 		Data: map[string][]byte{
@@ -213,8 +213,8 @@ func createSpaceCR(ctx context.Context, spaceName string) *v1alpha1.Space {
 			Namespace: testK8sNamespace,
 		},
 		Spec: v1alpha1.SpaceSpec{
-			AuthSecretName:   testK8sSecret,
-			OrganizationName: testCfOrganization,
+			AuthSecretName:   testK8sSecretName,
+			OrganizationName: testCfOrgName,
 		},
 	}
 	Expect(k8sClient.Create(ctx, spaceCR)).To(Succeed())

@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	testSpace = "test-space"
+	testSpaceName = "test-space" // used for K8s CR and CF space
 )
 
 // -----------------------------------------------------------------------------------------------
@@ -37,8 +37,8 @@ var _ = Describe("Space Controller Integration Tests", func() {
 			By("creating space CR")
 			fakeSpace := &facade.Space{
 				Guid:       testCfSpaceGuid,
-				Name:       testSpace,
-				Owner:      testOwner,
+				Name:       testSpaceName,
+				Owner:      testCfOwner,
 				Generation: 1,
 			}
 
@@ -48,7 +48,7 @@ var _ = Describe("Space Controller Integration Tests", func() {
 			fakeOrgClient.GetSpaceReturnsOnCall(0, kNoSpace, kNoError)
 			fakeSpaceHealthChecker.CheckReturns(kNoError)
 
-			spaceCR := createSpaceCR(ctx, testSpace)
+			spaceCR := createSpaceCR(ctx, testSpaceName)
 			waitForSpaceCR(ctx, client.ObjectKeyFromObject(spaceCR))
 			Expect(fakeOrgClient.CreateSpaceCallCount()).To(Equal(1))
 		})
