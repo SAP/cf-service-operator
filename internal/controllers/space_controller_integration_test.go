@@ -14,6 +14,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// constants useful for this controller
+// Note:
+// - if constants are used in multiple controllers, consider moving them to suite_test.go
+// - use separete resource names to prevent collisions between tests
 const (
 	testSpaceName = "test-space" // used for K8s CR and CF space
 )

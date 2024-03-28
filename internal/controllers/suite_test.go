@@ -18,7 +18,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
@@ -36,6 +35,7 @@ var kNoInstance *facade.Instance = nil
 var kNoError error = nil
 var errNotExpected = fmt.Errorf("not expected")
 
+// constants useful for all tests
 const (
 	testK8sNamespace  = "test-namespace"
 	testK8sSecretName = "test-secret"
@@ -291,59 +291,4 @@ func waitForInstanceCR(ctx context.Context, instanceKey client.ObjectKey) *v1alp
 	}, timeout, interval).Should(Succeed(), "instance CR should have been started")
 
 	return instanceCR
-}
-
-// -----------------------------------------------------------------------------------------------
-
-// cleanupResourceFromTest removes a resource and does gomega assertions about the process
-func cleanupResourceFromTest(k8sClient client.Client, name string, obj client.Object) error {
-	// timeout to wait for the deletion
-	timeout := 10 * time.Second
-	interval := 100 * time.Millisecond
-	key := client.ObjectKeyFromObject(obj)
-	displayName := fmt.Sprintf("%s (%s/%s)", name, key.Namespace, key.Name)
-
-	err := k8sClient.Delete(context.Background(), obj)
-	if apierrors.IsNotFound(err) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("deleting resource %v: %w", displayName, err)
-	}
-
-	err = retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		err := k8sClient.Get(context.Background(), key, obj)
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		if err != nil {
-			return fmt.Errorf("getting resource for deleting of %v: %w", displayName, err)
-		}
-		if len(obj.GetFinalizers()) > 0 {
-			// remove all finalizers
-			obj.SetFinalizers([]string{})
-			// Try to update
-			err = k8sClient.Update(context.Background(), obj)
-			return err
-		}
-		return nil
-	})
-
-	if err != nil {
-		return fmt.Errorf("deleting finalizers of %v: %w", displayName, err)
-	}
-
-	// wait for the deletion
-	pollingTimeout := time.After(timeout)
-	for {
-		select {
-		case <-time.After(interval):
-			err := k8sClient.Get(context.Background(), key, obj)
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-		case <-pollingTimeout:
-			return fmt.Errorf("deleting resource %v, still exists after %v", displayName, timeout)
-		}
-	}
 }

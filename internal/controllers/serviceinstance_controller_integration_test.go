@@ -9,12 +9,15 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/sap/cf-service-operator/api/v1alpha1"
 	"github.com/sap/cf-service-operator/internal/facade"
 	"github.com/sap/cf-service-operator/internal/facade/facadefakes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// constants useful for this controller
+// Note:
+// - if constants are used in multiple controllers, consider moving them to suite_test.go
+// - use separete resource names to prevent collisions between tests
 const (
 	testCfInstName          = "test-instance"
 	testK8sInstNameCreate   = "test-instance-create"
@@ -38,7 +41,6 @@ var fakeInstanceReady = &facade.Instance{
 
 var _ = Describe("Space Controller Integration Tests", Ordered, func() {
 	ctx := context.Background()
-	var spaceCR *v1alpha1.Space = nil
 
 	BeforeAll(func() {
 		// reset all fake clients to always start with clean state (e.g. call counts of zero)
@@ -60,34 +62,17 @@ var _ = Describe("Space Controller Integration Tests", Ordered, func() {
 		fakeSpaceHealthChecker.CheckReturns(nil)
 
 		By("creating space CR")
-		spaceCR = createSpaceCR(ctx, testSpaceNameInstances)
+		spaceCR := createSpaceCR(ctx, testSpaceNameInstances)
 		waitForSpaceCR(ctx, client.ObjectKeyFromObject(spaceCR))
 		Expect(fakeOrgClient.CreateSpaceCallCount()).To(Equal(1))
 	})
 
-	AfterAll(func() {
-		if spaceCR != nil {
-			Expect(cleanupResourceFromTest(k8sClient, "foo", spaceCR)).To(Succeed())
-		}
-		spaceCR = nil
-	})
-
 	Describe("Reconcile", func() {
-		var instanceCR *v1alpha1.ServiceInstance = nil
-
 		BeforeEach(func() {
 			// reset all fake clients to always start with clean state (e.g. call counts of zero)
 			fakeOrgClient = &facadefakes.FakeOrganizationClient{}
 			fakeSpaceClient = &facadefakes.FakeSpaceClient{}
 			fakeSpaceHealthChecker = &facadefakes.FakeSpaceHealthChecker{}
-		})
-
-		AfterEach(func() {
-			// TODO
-			//if instanceCR != nil {
-			//Expect(cleanupResourceFromTest(k8sClient, "bar", instanceCR)).To(Succeed())
-			//}
-			instanceCR = nil
 		})
 
 		It("should create instance", func() {
@@ -97,7 +82,7 @@ var _ = Describe("Space Controller Integration Tests", Ordered, func() {
 			// only the first call returns no resource to force the creation by the controller
 			fakeSpaceClient.GetInstanceReturnsOnCall(0, kNoInstance, kNoError)
 
-			instanceCR = createInstanceCR(ctx, testK8sInstNameCreate, testSpaceNameInstances)
+			instanceCR := createInstanceCR(ctx, testK8sInstNameCreate, testSpaceNameInstances)
 			waitForInstanceCR(ctx, client.ObjectKeyFromObject(instanceCR))
 			Expect(fakeSpaceClient.CreateInstanceCallCount()).To(Equal(1))
 			Expect(fakeSpaceClient.GetInstanceCallCount()).To(Equal(2))
@@ -122,7 +107,7 @@ var _ = Describe("Space Controller Integration Tests", Ordered, func() {
 			// 3) simulate ready instance to finish the test
 			fakeSpaceClient.GetInstanceReturnsOnCall(3, fakeInstanceReady, kNoError)
 
-			instanceCR = createInstanceCR(ctx, testK8sInstNameRecreate, testSpaceNameInstances, true)
+			instanceCR := createInstanceCR(ctx, testK8sInstNameRecreate, testSpaceNameInstances, true)
 			waitForInstanceCR(ctx, client.ObjectKeyFromObject(instanceCR))
 			Expect(fakeSpaceClient.DeleteInstanceCallCount()).To(Equal(1))
 			Expect(fakeSpaceClient.CreateInstanceCallCount()).To(Equal(1))
