@@ -27,6 +27,7 @@
           "console": "internalConsole",
           "env": {
             "KUBEBUILDER_ASSETS": "${workspaceFolder}/bin/k8s/current",
+            "TEST_TIMEOUT": "1200",
           },
           "args": [],
           "showLog": true
