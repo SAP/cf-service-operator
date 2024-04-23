@@ -8,8 +8,10 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 
 	corev1 "k8s.io/api/core/v1"
@@ -36,6 +38,15 @@ const (
 	serviceInstanceReadyConditionReasonError           = "Error"
 	serviceInstanceReadyConditionReasonDeletionBlocked = "DeletionBlocked"
 	// Additionally, all of facade.InstanceState* may occur as Ready condition reason
+
+	// Default values while waiting for ServiceInstance creation (state Progressing)
+	serviceInstanceDefaultReconcileInterval = 1 * time.Second
+	//serviceInstanceDefaultMaxReconcileInterval = 10 * time.Minute
+
+	// Default values for error cases during ServiceInstance creation
+	serviceInstanceDefaultMaxRetries       = 5
+	serviceInstanceDefaultRetryInterval    = 1 * time.Second
+	serviceInstanceDefaultMaxRetryInterval = 1 * time.Minute
 )
 
 // ServiceInstanceReconciler reconciles a ServiceInstance object
@@ -45,6 +56,9 @@ type ServiceInstanceReconciler struct {
 	ClusterResourceNamespace string
 	ClientBuilder            facade.SpaceClientBuilder
 }
+
+// RetryError is a special error to indicate that the operation should be retried.
+var RetryError = errors.New("retry")
 
 // +kubebuilder:rbac:groups=cf.cs.sap.com,resources=serviceinstances,verbs=get;list;watch;update
 // +kubebuilder:rbac:groups=cf.cs.sap.com,resources=serviceinstances/status,verbs=get;update;patch
@@ -70,6 +84,9 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Call the defaulting webhook logic also here (because defaulting through the webhook might be incomplete in case of generateName usage)
 	serviceInstance.Default()
 
+	// TODO remove this later???
+	LogLastReconcileTime(serviceInstance, log)
+
 	spec := &serviceInstance.Spec
 	status := &serviceInstance.Status
 	status.ObservedGeneration = serviceInstance.Generation
@@ -81,9 +98,12 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if skipStatusUpdate {
 			return
 		}
+
 		if err != nil {
-			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionFalse, serviceInstanceReadyConditionReasonError, err.Error())
+			result, err = r.HandleError(ctx, serviceInstance, err, log)
 		}
+
+		// update service instance CR
 		if updateErr := r.Status().Update(ctx, serviceInstance); updateErr != nil {
 			err = utilerrors.NewAggregate([]error{err, updateErr})
 			result = ctrl.Result{}
@@ -93,6 +113,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Set a first status (and requeue, because the status update itself will not trigger another reconciliation because of the event filter set)
 	if ready := serviceInstance.GetReadyCondition(); ready == nil {
 		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonNew, "First seen")
+		SetMaxRetries(serviceInstance)
 		return ctrl.Result{Requeue: true}, nil
 	}
 
@@ -146,6 +167,8 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	); err != nil {
 		return ctrl.Result{}, errors.Wrap(err, "failed to list depending service bindings")
 	}
+	// Retrieve reconcileTimeout
+	reconcileTimeout := getReconcileTimeout(serviceInstance)
 
 	// Require readiness of space unless in deletion case
 	if serviceInstance.DeletionTimestamp.IsZero() {
@@ -229,7 +252,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		status.ServiceInstanceDigest = facade.ObjectHash(map[string]interface{}{"generation": serviceInstance.Generation, "parameters": parameters})
 
-		recreateOnCreationFailure := serviceInstance.Annotations["service-operator.cf.cs.sap.com/recreate-on-creation-failure"] == "true"
+		recreateOnCreationFailure := serviceInstance.Annotations[cfv1alpha1.AnnotationRecreate] == "true"
 		inRecreation := false
 
 		if cfinstance == nil {
@@ -243,17 +266,17 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				string(serviceInstance.UID),
 				serviceInstance.Generation,
 			); err != nil {
-				return ctrl.Result{}, err
+				return ctrl.Result{}, RetryError
 			}
 			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
 		} else {
 			if cfinstance.State == facade.InstanceStateDeleting {
 				// This is the re-creation case; nothing to, we just wait until it is gone
-			} else if recreateOnCreationFailure && cfinstance.State == facade.InstanceStateCreatedFailed {
+			} else if recreateOnCreationFailure && (cfinstance.State == facade.InstanceStateCreatedFailed || cfinstance.State == facade.InstanceStateDeleteFailed) {
 				// Re-create instance
 				log.V(1).Info("triggering re-creation")
 				if err := client.DeleteInstance(ctx, cfinstance.Guid); err != nil {
-					return ctrl.Result{}, err
+					return ctrl.Result{}, RetryError
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
 				inRecreation = true
@@ -324,16 +347,17 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		switch cfinstance.State {
 		case facade.InstanceStateReady:
 			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionTrue, string(cfinstance.State), cfinstance.StateDescription)
+			serviceInstance.Status.RetryCounter = 0 // Reset the retry counter
 			// TODO: apply some increasing period, depending on the age of the last update
 			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 		case facade.InstanceStateCreatedFailed, facade.InstanceStateUpdateFailed, facade.InstanceStateDeleteFailed:
-			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionFalse, string(cfinstance.State), cfinstance.StateDescription)
-			// TODO: apply some increasing period, depending on the age of the last update
-			return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+			// Check if the retry counter exceeds the maximum allowed retries.
+			// Check if the maximum retry limit is exceeded.
+			return ctrl.Result{}, RetryError
 		default:
 			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfinstance.State), cfinstance.StateDescription)
 			// TODO: apply some increasing period, depending on the age of the last update
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: reconcileTimeout}, nil
 		}
 	} else if len(serviceBindingList.Items) > 0 {
 		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonDeletionBlocked, "Waiting for deletion of depending service bindings")
@@ -380,4 +404,91 @@ func (r *ServiceInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&cfv1alpha1.ServiceInstance{}).
 		WithEventFilter(predicate.Or(predicate.GenerationChangedPredicate{}, predicate.AnnotationChangedPredicate{})).
 		Complete(r)
+}
+
+// IncrementRetryCounterAndCheckRetryLimit increments the retry counter for a ServiceInstance and checks if the number of retries has exceeded the maximum allowed retries.
+// The maximum retries is configured per ServiceInstance via the annotation, AnnotationMaxRetries. If not specified,
+// a default value is used.
+// This function updates the ServiceInstance's Condition and State to indicate a failure when the retry limit is reached.
+// Returns:A boolean indicating whether the retry limit has been reached.
+func SetMaxRetries(serviceInstance *cfv1alpha1.ServiceInstance) {
+	// Use max retries from annotation, use default if annotation is missing
+	if serviceInstance.Status.MaxRetries == 0 {
+		serviceInstance.Status.MaxRetries = serviceInstanceDefaultMaxRetries
+		maxRetriesStr, found := serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationMaxRetries]
+		if found {
+			maxRetries, err := strconv.Atoi(maxRetriesStr)
+			if err == nil {
+				serviceInstance.Status.MaxRetries = maxRetries
+			}
+		}
+	}
+}
+
+// function to read/get reconcile timeout annotation from the service instance "AnnotationReconcileTimeout = "service-operator.cf.cs.sap.com/timeout-on-reconcile" "
+// if the annotation is not set, the default value is used serviceInstanceDefaultRequeueTimeout
+// else returns the reconcile timeout as a time duration
+func getReconcileTimeout(serviceInstance *cfv1alpha1.ServiceInstance) time.Duration {
+	// Use reconcile timeout from annotation, use default if annotation is missing or not parsable
+	reconcileTimeoutStr, ok := serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationReconcileTimeout]
+	if !ok {
+		return serviceInstanceDefaultReconcileInterval
+	}
+	reconcileTimeout, err := time.ParseDuration(reconcileTimeoutStr)
+	if err != nil {
+		return serviceInstanceDefaultReconcileInterval
+	}
+	return reconcileTimeout
+}
+
+// HandleError sets conditions and the context to handle the error.
+// Special handling for retryable errros:
+// - retry after certain time interval
+// - doubling time interval for consecutive errors
+// - time interval is capped at a certain maximum value
+func (r *ServiceInstanceReconciler) HandleError(ctx context.Context, serviceInstance *cfv1alpha1.ServiceInstance, issue error, log logr.Logger) (ctrl.Result, error) {
+	if issue != RetryError {
+		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonError, issue.Error())
+		return ctrl.Result{}, issue
+	}
+
+	// re-create case
+
+	// Check if the retry counter exceeds the maximum allowed retries.
+	serviceInstance.Status.RetryCounter++
+	if serviceInstance.Status.RetryCounter >= serviceInstance.Status.MaxRetries {
+		// Update the instance's status to reflect the failure due to too many retries.
+		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionFalse, "MaximumRetriesExceeded", "The service instance has failed due to too many retries.")
+		return ctrl.Result{}, issue
+	}
+
+	// double the requeue interval
+	condition := serviceInstance.GetReadyCondition()
+	requeueAfter := 1 * time.Second
+	// TODO: do we need this: && condition.Status == cfv1alpha1.ConditionStatus(corev1.ConditionFalse)?
+	if condition != nil && !condition.LastTransitionTime.Time.IsZero() {
+		conditionRequeueAfter := time.Since(condition.LastTransitionTime.Time).Round(time.Second)
+		if conditionRequeueAfter > requeueAfter {
+			requeueAfter = conditionRequeueAfter
+		}
+	}
+	// cap the requeue interval if necessary
+	if requeueAfter > serviceInstanceDefaultMaxRetryInterval {
+		requeueAfter = serviceInstanceDefaultMaxRetryInterval
+	}
+
+	log.V(1).Info("***Retry after interval", "RequeueAfter", requeueAfter.String())
+
+	serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonError, issue.Error())
+	return ctrl.Result{RequeueAfter: requeueAfter}, nil
+}
+
+// LogLastReconcileTime logs the time of the last reconcile.
+func LogLastReconcileTime(serviceInstance *cfv1alpha1.ServiceInstance, log logr.Logger) {
+	condition := serviceInstance.GetReadyCondition()
+
+	if condition != nil && !condition.LastTransitionTime.Time.IsZero() {
+		duration := time.Since(condition.LastTransitionTime.Time).Round(time.Second)
+		log.V(1).Info("***Last reconcile took", "Duration", duration.String(), "RetryCounter", serviceInstance.Status.RetryCounter)
+	}
 }

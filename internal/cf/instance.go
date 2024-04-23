@@ -134,6 +134,7 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 }
 
 func (c *spaceClient) DeleteInstance(ctx context.Context, guid string) error {
+	// TODO: return jobGUID to enable querying the job deletion status
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
 	return err
 }

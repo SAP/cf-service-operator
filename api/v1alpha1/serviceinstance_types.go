@@ -120,6 +120,16 @@ type ServiceInstanceStatus struct {
 	// +optional
 	ServiceInstanceDigest string `json:"serviceInstanceDigest,omitempty"`
 
+	// RetryCounter counts the number of retries that have been attempted for the reconciliation of this ServiceInstance.
+	// This counter can be used to fail the instance if too many retries occur.
+	// +optional
+	RetryCounter int `json:"retryCounter,omitempty"`
+
+	// MaxRetries is the maximum number of retries that are allowed for the reconciliation of this ServiceInstance.
+	// If the RetryCounter exceeds this value, the ServiceInstance will be marked as failed.
+	// +optional
+	MaxRetries int `json:"MaxRetries,omitempty"`
+
 	// List of status conditions to indicate the status of a ServiceInstance.
 	// Known condition types are `Ready`.
 	// +optional
