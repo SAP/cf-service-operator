@@ -34,6 +34,8 @@ var kNoInstance *facade.Instance = nil
 
 var kNoError error = nil
 var errNotExpected = fmt.Errorf("not expected")
+var errCreateInstanceFail = fmt.Errorf("create instance failed")
+var errDeleteInstanceFail = fmt.Errorf("delete instance failed")
 
 // constants useful for all tests
 const (

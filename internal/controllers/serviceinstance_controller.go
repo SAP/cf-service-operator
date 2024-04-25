@@ -84,9 +84,6 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Call the defaulting webhook logic also here (because defaulting through the webhook might be incomplete in case of generateName usage)
 	serviceInstance.Default()
 
-	// TODO remove this later???
-	LogLastReconcileTime(serviceInstance, log)
-
 	spec := &serviceInstance.Spec
 	status := &serviceInstance.Status
 	status.ObservedGeneration = serviceInstance.Generation
@@ -102,6 +99,11 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if err != nil {
 			result, err = r.HandleError(ctx, serviceInstance, err, log)
 		}
+
+		// enable this to speed up debugging
+		// if result.RequeueAfter > 0 {
+		// 	result.RequeueAfter = 1 * time.Second
+		// }
 
 		// update service instance CR
 		if updateErr := r.Status().Update(ctx, serviceInstance); updateErr != nil {
@@ -459,7 +461,7 @@ func (r *ServiceInstanceReconciler) HandleError(ctx context.Context, serviceInst
 	if serviceInstance.Status.RetryCounter >= serviceInstance.Status.MaxRetries {
 		// Update the instance's status to reflect the failure due to too many retries.
 		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionFalse, "MaximumRetriesExceeded", "The service instance has failed due to too many retries.")
-		return ctrl.Result{}, issue
+		return ctrl.Result{}, nil // finish reconcile loop
 	}
 
 	// double the requeue interval
@@ -481,14 +483,4 @@ func (r *ServiceInstanceReconciler) HandleError(ctx context.Context, serviceInst
 
 	serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonError, issue.Error())
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil
-}
-
-// LogLastReconcileTime logs the time of the last reconcile.
-func LogLastReconcileTime(serviceInstance *cfv1alpha1.ServiceInstance, log logr.Logger) {
-	condition := serviceInstance.GetReadyCondition()
-
-	if condition != nil && !condition.LastTransitionTime.Time.IsZero() {
-		duration := time.Since(condition.LastTransitionTime.Time).Round(time.Second)
-		log.V(1).Info("***Last reconcile took", "Duration", duration.String(), "RetryCounter", serviceInstance.Status.RetryCounter)
-	}
 }
