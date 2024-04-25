@@ -66,7 +66,7 @@ lint: golangci-lint ## Run linter against the code
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(LOCALBIN)/k8s/current" go test ./... -coverprofile cover.out
 
-.PHONY: test-fast ## Run tests without build.
+.PHONY: manifests test-fast ## Run tests without build.
 test-fast: envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(LOCALBIN)/k8s/current" go test ./... -coverprofile cover.out -ginkgo.v
 
@@ -138,6 +138,10 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
+.PHONY: clean
+clean:
+	rm -rf $(LOCALBIN)
+
 ## Tool Binaries
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
@@ -150,7 +154,7 @@ LISTER_GEN ?= $(shell pwd)/bin/lister-gen
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v3.8.7
-CONTROLLER_TOOLS_VERSION ?= v0.9.2
+CONTROLLER_TOOLS_VERSION ?= v0.14.0
 CODE_GENERATOR_VERSION ?= v0.23.4
 COUNTERFEITER_VERSION ?= v6.8.1
 GOLINT_VERSION ?= v1.57.1

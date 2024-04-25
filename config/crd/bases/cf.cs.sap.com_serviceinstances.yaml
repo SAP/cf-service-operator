@@ -124,11 +124,6 @@ spec:
               observedGeneration: -1
             description: ServiceInstanceStatus defines the observed state of ServiceInstance
             properties:
-              MaxRetries:
-                description: |-
-                  MaxRetries is the maximum number of retries that are allowed for the reconciliation of this ServiceInstance.
-                  If the RetryCounter exceeds this value, the ServiceInstance will be marked as failed.
-                type: integer
               conditions:
                 description: |-
                   List of status conditions to indicate the status of a ServiceInstance.
@@ -178,13 +173,18 @@ spec:
                 description: Last reconciliation timestamp
                 format: date-time
                 type: string
+              maxRetries:
+                description: |-
+                  This is the maximum number of retries that are allowed for the reconciliation of this service instance.
+                  If the retry counter exceeds this value, the service instance will be marked as failed.
+                type: integer
               observedGeneration:
                 description: Observed generation
                 format: int64
                 type: integer
               retryCounter:
                 description: |-
-                  RetryCounter counts the number of retries that have been attempted for the reconciliation of this ServiceInstance.
+                  Counts the number of retries that have been attempted for the reconciliation of this service instance.
                   This counter can be used to fail the instance if too many retries occur.
                 type: integer
               serviceInstanceDigest:
