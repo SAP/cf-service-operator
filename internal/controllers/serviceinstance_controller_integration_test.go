@@ -142,9 +142,12 @@ var _ = Describe("Service Instance Controller Integration Tests", Ordered, func(
 			// CreateInstance shall always fail directly
 			fakeSpaceClient.CreateInstanceReturns(errCreateInstanceFail)
 
-			// GetInstance shall return No errors except for below cases
-			fakeSpaceClient.GetInstanceReturns(kNoInstance, kNoError)
+			// GetInstance shall return errors except for below cases
+			fakeSpaceClient.GetInstanceReturns(kNoInstance, errNotExpected)
 			fakeSpaceClient.GetInstanceReturnsOnCall(0, &fakeInstanceFailed, kNoError) // Instance creation fails
+			for i := 1; i <= 8; i++ {
+				fakeSpaceClient.GetInstanceReturnsOnCall(i, kNoInstance, kNoError)
+			}
 
 			// Perform the actual test
 			recreateFlag := true
