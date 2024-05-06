@@ -21,13 +21,15 @@ import (
 // - if constants are used in multiple controllers, consider moving them to suite_test.go
 // - use separate resource names to prevent collisions between tests
 const (
-	testCfInstName                     = "test-instance"
-	testK8sInstNameCreate              = "test-instance-create"
-	testK8sInstNameRecreate            = "test-instance-recreate"
-	testK8sInstNameCreateInstanceFails = "test-instance-create-instance-fails"
-	testK8sInstNameStateCreatedFailed  = "test-instance-state-created-failed"
-	testK8sInstNameStateDeleteFailed   = "test-instance-state-delete-failed"
-	testSpaceNameInstances             = "test-space-instances" // used for K8s CR and CF space
+	testCfInstName                           = "test-instance"
+	testK8sInstNameCreate                    = "test-instance-create"
+	testK8sInstNameRecreate                  = "test-instance-recreate"
+	testK8sInstNameCreateInstanceFails       = "test-instance-create-instance-fails"
+	testK8sInstNameStateCreatedFailed        = "test-instance-state-created-failed"
+	testK8sInstNameStateDeleteFailed         = "test-instance-state-delete-failed"
+	testK8sInstNameStateDeleteFailedInfinite = "test-instance-state-delete-failed-infinite"
+	testK8sInstNameRecreateInfinite          = "test-instance-recreate-infinite"
+	testSpaceNameInstances                   = "test-space-instances" // used for K8s CR and CF space
 )
 
 var fakeInstanceReady = &facade.Instance{
@@ -90,7 +92,8 @@ var _ = Describe("Service Instance Controller Integration Tests", Ordered, func(
 			fakeSpaceClient.GetInstanceReturns(fakeInstanceReady, kNoError)
 
 			// perform actual test
-			instanceCR := createInstanceCR(ctx, testK8sInstNameCreate, testSpaceNameInstances)
+			infinite := false
+			instanceCR := createInstanceCR(ctx, testK8sInstNameCreate, testSpaceNameInstances, infinite)
 			waitForInstanceCR(ctx, client.ObjectKeyFromObject(instanceCR))
 
 			// check expectations on reconcile loop
@@ -119,7 +122,8 @@ var _ = Describe("Service Instance Controller Integration Tests", Ordered, func(
 
 			// perform actual test
 			recreateFlag := true
-			instanceCR := createInstanceCR(ctx, testK8sInstNameRecreate, testSpaceNameInstances, recreateFlag)
+			infinite := false
+			instanceCR := createInstanceCR(ctx, testK8sInstNameRecreate, testSpaceNameInstances, infinite, recreateFlag)
 			waitForInstanceCR(ctx, client.ObjectKeyFromObject(instanceCR))
 
 			// check expectations on reconcile loop
@@ -151,7 +155,8 @@ var _ = Describe("Service Instance Controller Integration Tests", Ordered, func(
 
 			// Perform the actual test
 			recreateFlag := true
-			srvInstanceCR := createInstanceCR(ctx, testK8sInstNameCreateInstanceFails, testSpaceNameInstances, recreateFlag)
+			infinite := false
+			srvInstanceCR := createInstanceCR(ctx, testK8sInstNameCreateInstanceFails, testSpaceNameInstances, infinite, recreateFlag)
 			finalInstanceCR := waitForInstanceCRToFail(ctx, client.ObjectKeyFromObject(srvInstanceCR))
 
 			// Verify the instance CR is in a failed state after exceeding retries
@@ -206,7 +211,8 @@ var _ = Describe("Service Instance Controller Integration Tests", Ordered, func(
 
 			// Perform the actual test
 			recreateFlag := true
-			srvInstanceCR := createInstanceCR(ctx, testK8sInstNameStateCreatedFailed, testSpaceNameInstances, recreateFlag)
+			infinite := false
+			srvInstanceCR := createInstanceCR(ctx, testK8sInstNameStateCreatedFailed, testSpaceNameInstances, infinite, recreateFlag)
 			finalInstanceCR := waitForInstanceCRToFail(ctx, client.ObjectKeyFromObject(srvInstanceCR))
 
 			// Verify the instance CR is in a failed state after exceeding retries
@@ -242,7 +248,6 @@ var _ = Describe("Service Instance Controller Integration Tests", Ordered, func(
 			// Prepare fake CF responses to simulate instance creation failure on the below CreateInstance calls
 			fakeInstanceFailed := *fakeInstanceReady
 			fakeInstanceFailed.State = facade.InstanceStateDeleteFailed
-
 			fakeOrgClient.GetSpaceReturns(&facade.Space{Guid: testCfSpaceGuid}, nil)
 			fakeSpaceClient.FindServicePlanReturns(testCfPlanGuid, kNoError)
 			fakeSpaceClient.DeleteInstanceReturns(errDeleteInstanceFail)
@@ -255,7 +260,8 @@ var _ = Describe("Service Instance Controller Integration Tests", Ordered, func(
 
 			// Perform the actual test
 			recreateFlag := true
-			srvInstanceCR := createInstanceCR(ctx, testK8sInstNameStateDeleteFailed, testSpaceNameInstances, recreateFlag)
+			infinite := false
+			srvInstanceCR := createInstanceCR(ctx, testK8sInstNameStateDeleteFailed, testSpaceNameInstances, infinite, recreateFlag)
 			finalInstanceCR := waitForInstanceCRToFail(ctx, client.ObjectKeyFromObject(srvInstanceCR))
 
 			// Verify the instance CR is in a failed state after exceeding retries
@@ -263,6 +269,76 @@ var _ = Describe("Service Instance Controller Integration Tests", Ordered, func(
 
 			// Check that CreateInstance was called several times, respecting the max retries limit
 			Expect(fakeSpaceClient.DeleteInstanceCallCount()).To(Equal(5))
+		})
+
+		It("should retry delete instance until infinite retries (state DeleteFailed)", func() {
+			// Prepare fake CF responses to simulate instance creation failure on the below CreateInstance calls
+			fakeInstanceFailed := *fakeInstanceReady
+			fakeInstanceFailed.State = facade.InstanceStateDeleteFailed
+			fakeInstanceFailed.StateDescription = string(facade.InstanceStateDeleteFailed)
+			fakeOrgClient.GetSpaceReturns(&facade.Space{Guid: testCfSpaceGuid}, nil)
+			fakeSpaceClient.FindServicePlanReturns(testCfPlanGuid, kNoError)
+			fakeSpaceClient.DeleteInstanceReturns(kNoError)
+
+			// CreateInstance shall always succeed, but the instance shall go to DeleteFailed state later on
+			fakeSpaceClient.CreateInstanceReturns(kNoError)
+
+			for i := 0; i <= 3; i++ {
+				fakeSpaceClient.GetInstanceReturnsOnCall(i, &fakeInstanceFailed, kNoError)
+				fakeSpaceClient.DeleteInstanceReturnsOnCall(i, errDeleteInstanceFail)
+			}
+			fakeSpaceClient.GetInstanceReturnsOnCall(4, &fakeInstanceFailed, kNoError)
+			fakeSpaceClient.GetInstanceReturnsOnCall(5, kNoInstance, kNoError)
+			fakeSpaceClient.GetInstanceReturnsOnCall(6, kNoInstance, kNoError)
+			fakeSpaceClient.GetInstanceReturnsOnCall(7, fakeInstanceReady, kNoError)
+
+			// Perform the actual test
+			recreateFlag := true
+			infinite := true
+			srvInstanceCR := createInstanceCR(ctx, testK8sInstNameStateDeleteFailedInfinite, testSpaceNameInstances, infinite, recreateFlag)
+			finalInstanceCR := waitForInstanceCR(ctx, client.ObjectKeyFromObject(srvInstanceCR))
+
+			// Verify the instance CR is in a failed state after exceeding retries
+			Expect(finalInstanceCR.Status.State).To(Equal(v1alpha1.ServiceInstanceStateReady))
+
+			// Check that CreateInstance was called several times, respecting the max retries limit
+			Expect(fakeSpaceClient.DeleteInstanceCallCount()).To(Equal(5))
+		})
+
+		It("should try re-create instance for Infinite tries", func() {
+			// Prepare fake CF responses to simulate instance creation failure on the below CreateInstance calls
+			fakeInstanceFailed := *fakeInstanceReady
+			fakeInstanceFailed.State = facade.InstanceStateCreatedFailed
+			fakeInstanceFailed.StateDescription = string(facade.InstanceStateCreatedFailed)
+			fakeOrgClient.GetSpaceReturns(&facade.Space{Guid: testCfSpaceGuid}, nil)
+			fakeSpaceClient.FindServicePlanReturns(testCfPlanGuid, kNoError)
+			fakeSpaceClient.DeleteInstanceReturns(kNoError)
+
+			// CreateInstance shall always fail directly
+			fakeSpaceClient.CreateInstanceReturns(errCreateInstanceFail)
+
+			// GetInstance shall return errors except for below cases
+			fakeSpaceClient.GetInstanceReturns(kNoInstance, errNotExpected)
+			fakeSpaceClient.GetInstanceReturnsOnCall(0, &fakeInstanceFailed, kNoError) // Instance creation fails
+			for i := 1; i <= 6; i++ {
+				fakeSpaceClient.GetInstanceReturnsOnCall(i, kNoInstance, kNoError)
+			}
+
+			//simulate ready instance to finish the test
+			fakeSpaceClient.CreateInstanceReturnsOnCall(4, kNoError)
+			fakeSpaceClient.GetInstanceReturnsOnCall(7, fakeInstanceReady, kNoError)
+
+			// perform actual test
+			recreateFlag := true
+			infinite := true
+			instanceCR := createInstanceCR(ctx, testK8sInstNameRecreateInfinite, testSpaceNameInstances, infinite, recreateFlag)
+			waitForInstanceCR(ctx, client.ObjectKeyFromObject(instanceCR))
+
+			// check expectations on reconcile loop
+			Expect(fakeSpaceClient.DeleteInstanceCallCount()).To(Equal(1))
+			Expect(fakeSpaceClient.CreateInstanceCallCount()).To(Equal(5))
+			Expect(fakeSpaceClient.GetInstanceCallCount()).To(Equal(8))
+
 		})
 
 	})

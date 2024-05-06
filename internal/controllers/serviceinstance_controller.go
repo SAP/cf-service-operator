@@ -8,6 +8,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -44,7 +45,7 @@ const (
 	//serviceInstanceDefaultMaxReconcileInterval = 10 * time.Minute
 
 	// Default values for error cases during ServiceInstance creation
-	serviceInstanceDefaultMaxRetries = math.MaxInt32 // infinite number of retries
+	serviceInstanceDefaultMaxRetries       = math.MaxInt32 // infinite number of retries
 	serviceInstanceDefaultRetryInterval    = 1 * time.Second
 	serviceInstanceDefaultMaxRetryInterval = 1 * time.Minute
 )
@@ -110,7 +111,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Set a first status (and requeue, because the status update itself will not trigger another reconciliation because of the event filter set)
 	if ready := serviceInstance.GetReadyCondition(); ready == nil {
 		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonNew, "First seen")
-		SetMaxRetries(serviceInstance)
+		SetMaxRetries(serviceInstance, log)
 		return ctrl.Result{Requeue: true}, nil
 	}
 
@@ -408,7 +409,7 @@ func (r *ServiceInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // a default value is used.
 // This function updates the ServiceInstance's Condition and State to indicate a failure when the retry limit is reached.
 // Returns:A boolean indicating whether the retry limit has been reached.
-func SetMaxRetries(serviceInstance *cfv1alpha1.ServiceInstance, log logr.Logge) {
+func SetMaxRetries(serviceInstance *cfv1alpha1.ServiceInstance, log logr.Logger) {
 	// Default to an infinite number number of retries
 	serviceInstance.Status.MaxRetries = serviceInstanceDefaultMaxRetries
 
@@ -418,12 +419,9 @@ func SetMaxRetries(serviceInstance *cfv1alpha1.ServiceInstance, log logr.Logge) 
 		maxRetries, err := strconv.Atoi(maxRetriesStr)
 		if err != nil {
 			log.V(1).Info("Invalid max retries annotation value, using default", "AnnotationMaxRetries", maxRetriesStr)
-		} else if maxRetries < 0 {
-			log.V(1).Info("Negative max retries annotation value, treating as zero retries", "AnnotationMaxRetries", maxRetriesStr)
-			serviceInstance.Status.MaxRetries = 0
 		} else {
 			serviceInstance.Status.MaxRetries = maxRetries
-		}		
+		}
 	}
 }
 
@@ -462,7 +460,7 @@ func (r *ServiceInstanceReconciler) HandleError(ctx context.Context, serviceInst
 		// Update the instance's status to reflect the failure due to too many retries.
 		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionFalse, "MaximumRetriesExceeded", "The service instance has failed due to too many retries.")
 		return ctrl.Result{}, nil // finish reconcile loop
-	} 
+	}
 
 	// double the requeue interval
 	condition := serviceInstance.GetReadyCondition()

@@ -270,7 +270,7 @@ func waitForSpaceCR(ctx context.Context, spaceKey client.ObjectKey) *v1alpha1.Sp
 
 // -----------------------------------------------------------------------------------------------
 
-func createInstanceCR(ctx context.Context, instanceName string, spaceName string, recreate ...bool) *v1alpha1.ServiceInstance {
+func createInstanceCR(ctx context.Context, instanceName, spaceName string, infinite bool, recreate ...bool) *v1alpha1.ServiceInstance {
 	instanceCR := &v1alpha1.ServiceInstance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instanceName,
@@ -287,7 +287,9 @@ func createInstanceCR(ctx context.Context, instanceName string, spaceName string
 	if len(recreate) > 0 && recreate[0] {
 		annotations := make(map[string]string)
 		annotations[v1alpha1.AnnotationRecreate] = "true"
-		annotations[v1alpha1.AnnotationMaxRetries] = fmt.Sprint(testServiceInstanceDefaultMaxRetries)
+		if !infinite {
+			annotations[v1alpha1.AnnotationMaxRetries] = fmt.Sprint(testServiceInstanceDefaultMaxRetries)
+		}
 		annotations[v1alpha1.AnnotationReconcileTimeout] = testServiceInstanceDefaultReconcileInterval.String()
 		instanceCR.SetAnnotations(annotations)
 	}
