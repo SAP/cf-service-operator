@@ -353,6 +353,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			// Check if the maximum retry limit is exceeded.
 			return ctrl.Result{}, RetryError
 		default:
+			// Processing case
 			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfinstance.State), cfinstance.StateDescription)
 			// TODO: apply some increasing period, depending on the age of the last update
 			return ctrl.Result{RequeueAfter: reconcileTimeout}, nil
