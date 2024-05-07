@@ -137,6 +137,7 @@ reconciliation for service instances.
    the operation as failed permanently. It allows other operators using the custom resources for
    service instances to specify how many times the controller should attempt to reconcile the
    specific service instance before giving up, providing a mechanism to handle transient errors.
+   **If this annotations is not set the number of retries is unlimited.**
 
 3. `service-operator.cf.cs.sap.com/timeout-on-reconcile`:
    Specifies the timeout for the reconciliation process. If set, this annotation determines how
