@@ -6,9 +6,9 @@ ENVTEST_K8S_VERSION = 1.25.0
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
-GOBIN=$(shell go env GOPATH)/bin
+  GOBIN=$(shell go env GOPATH)/bin
 else
-GOBIN=$(shell go env GOBIN)
+  GOBIN=$(shell go env GOBIN)
 endif
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
@@ -57,11 +57,16 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
+# Run the linter against the code
+.PHONY: lint
+lint: golangci-lint ## Run linter against the code
+	$(GOLINT) run ./...
+
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(LOCALBIN)/k8s/current" go test ./... -coverprofile cover.out
 
-.PHONY: test-fast ## Run tests without build.
+.PHONY: manifests test-fast ## Run tests without build.
 test-fast: envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(LOCALBIN)/k8s/current" go test ./... -coverprofile cover.out -ginkgo.v
 
@@ -133,10 +138,15 @@ LOCALBIN ?= $(shell pwd)/bin
 $(LOCALBIN):
 	mkdir -p $(LOCALBIN)
 
+.PHONY: clean
+clean:
+	rm -rf $(LOCALBIN)
+
 ## Tool Binaries
 KUSTOMIZE ?= $(LOCALBIN)/kustomize
 CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
 COUNTERFEITER_GEN ?= $(LOCALBIN)/counterfeiter-gen
+GOLINT ?= $(LOCALBIN)/golangci-lint
 ENVTEST ?= $(LOCALBIN)/setup-envtest
 CLIENT_GEN ?= $(shell pwd)/bin/client-gen
 INFORMER_GEN ?= $(shell pwd)/bin/informer-gen
@@ -144,9 +154,10 @@ LISTER_GEN ?= $(shell pwd)/bin/lister-gen
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v3.8.7
-CONTROLLER_TOOLS_VERSION ?= v0.9.2
+CONTROLLER_TOOLS_VERSION ?= v0.14.0
 CODE_GENERATOR_VERSION ?= v0.23.4
 COUNTERFEITER_VERSION ?= v6.8.1
+GOLINT_VERSION ?= v1.57.1
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
 .PHONY: kustomize
@@ -163,6 +174,12 @@ $(CONTROLLER_GEN): $(LOCALBIN)
 counterfeiter-gen: $(COUNTERFEITER_GEN) ## Download controller-gen locally if necessary.
 $(COUNTERFEITER_GEN): $(LOCALBIN)
 	test -s $(COUNTERFEITER_GEN) || GOBIN=$(LOCALBIN) go install github.com/maxbrunsfeld/counterfeiter/v6@$(COUNTERFEITER_VERSION)
+
+# find or download golangci-lint
+.PHONY: golangci-lint
+golangci-lint: $(GOLINT)
+$(GOLINT): $(LOCALBIN)
+	test -s $(GOLINT) || GOBIN=$(LOCALBIN) go install github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLINT_VERSION)
 
 .PHONY: envtest
 envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.

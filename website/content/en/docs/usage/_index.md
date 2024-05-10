@@ -18,4 +18,3 @@ cf-service-operator introduces the following resource types:
 * [ServiceBinding](./servicebinding): used to manage (create/update) a Cloud Foundry service binding.
   A ServiceBinding references a ServiceInstance Object, and defines the Kubernetes secret used to store the retrieved service key.
   Optionally binding parameters can be specified.
-

@@ -10,4 +10,11 @@ const (
 	LabelKeyClusterSpace    = "service-operator.cf.cs.sap.com/cluster-space"
 	LabelKeyServiceInstance = "service-operator.cf.cs.sap.com/service-instance"
 	LabelKeyServiceBinding  = "service-operator.cf.cs.sap.com/service-binding"
+
+	// annotation on custom resources
+	AnnotationRecreate = "service-operator.cf.cs.sap.com/recreate-on-creation-failure"
+	// annotation max number of retries for a failed operation on a service instance
+	AnnotationMaxRetries = "service-operator.cf.cs.sap.com/max-retries"
+	// annotation to hold the reconciliation timeout value
+	AnnotationReconcileTimeout = "service-operator.cf.cs.sap.com/timeout-on-reconcile"
 )

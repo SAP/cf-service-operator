@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.2
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: serviceinstances.cf.cs.sap.com
 spec:
   group: cf.cs.sap.com
@@ -28,14 +27,19 @@ spec:
         description: ServiceInstance is the Schema for the serviceinstances API
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -43,9 +47,10 @@ spec:
             description: ServiceInstanceSpec defines the desired state of ServiceInstance
             properties:
               clusterSpaceName:
-                description: Name of a ClusterSpace resource, identifying the Cloud
-                  Foundry space where the instance will be provisioned. Exactly one
-                  of SpaceName and ClusterSpaceName have to be specified.
+                description: |-
+                  Name of a ClusterSpace resource,
+                  identifying the Cloud Foundry space where the instance will be provisioned.
+                  Exactly one of SpaceName and ClusterSpaceName have to be specified.
                 minLength: 1
                 type: string
               name:
@@ -54,13 +59,14 @@ spec:
                 minLength: 1
                 type: string
               parameters:
-                description: Instance parameters. Do not provide any sensitve data
-                  here; instead use ParametersFrom for such data.
+                description: |-
+                  Instance parameters.
+                  Do not provide any sensitve data here; instead use ParametersFrom for such data.
                 x-kubernetes-preserve-unknown-fields: true
               parametersFrom:
-                description: References to secrets containing instance parameters.
-                  Top level keys must occur only once across Parameters and the secrest
-                  listed here.
+                description: |-
+                  References to secrets containing instance parameters.
+                  Top level keys must occur only once across Parameters and the secrest listed here.
                 items:
                   description: ParametersFromSource represents the source of a set
                     of Parameters
@@ -83,24 +89,27 @@ spec:
                   type: object
                 type: array
               serviceOfferingName:
-                description: Name of the service offering in Cloud Foundry. Either
-                  ServiceOfferingName and ServicePlanName, or ServicePlanGuid must
-                  be specified.
+                description: |-
+                  Name of the service offering in Cloud Foundry.
+                  Either ServiceOfferingName and ServicePlanName, or ServicePlanGuid must be specified.
                 minLength: 1
                 type: string
               servicePlanGuid:
-                description: GUID of the service plan in Cloud Foundry. Either ServiceOfferingName
-                  and ServicePlanName, or ServicePlanGuid must be specified.
+                description: |-
+                  GUID of the service plan in Cloud Foundry.
+                  Either ServiceOfferingName and ServicePlanName, or ServicePlanGuid must be specified.
                 minLength: 1
                 type: string
               servicePlanName:
-                description: Name of the service plan in Cloud Foundry. Either ServiceOfferingName
-                  and ServicePlanName, or ServicePlanGuid must be specified.
+                description: |-
+                  Name of the service plan in Cloud Foundry.
+                  Either ServiceOfferingName and ServicePlanName, or ServicePlanGuid must be specified.
                 minLength: 1
                 type: string
               spaceName:
-                description: Name of a Space resource in the same namespace, identifying
-                  the Cloud Foundry space where the instance will be provisioned.
+                description: |-
+                  Name of a Space resource in the same namespace,
+                  identifying the Cloud Foundry space where the instance will be provisioned.
                   Exactly one of SpaceName and ClusterSpaceName have to be specified.
                 minLength: 1
                 type: string
@@ -116,24 +125,28 @@ spec:
             description: ServiceInstanceStatus defines the observed state of ServiceInstance
             properties:
               conditions:
-                description: List of status conditions to indicate the status of a
-                  ServiceInstance. Known condition types are `Ready`.
+                description: |-
+                  List of status conditions to indicate the status of a ServiceInstance.
+                  Known condition types are `Ready`.
                 items:
                   description: ServiceInstanceCondition contains condition information
                     for a ServiceInstance.
                   properties:
                     lastTransitionTime:
-                      description: LastTransitionTime is the timestamp corresponding
-                        to the last status change of this condition.
+                      description: |-
+                        LastTransitionTime is the timestamp corresponding to the last status
+                        change of this condition.
                       format: date-time
                       type: string
                     message:
-                      description: Message is a human readable description of the
-                        details of the last transition, complementing reason.
+                      description: |-
+                        Message is a human readable description of the details of the last
+                        transition, complementing reason.
                       type: string
                     reason:
-                      description: Reason is a brief machine readable explanation
-                        for the condition's last transition.
+                      description: |-
+                        Reason is a brief machine readable explanation for the condition's last
+                        transition.
                       type: string
                     status:
                       description: Status of the condition, one of ('True', 'False',
@@ -160,9 +173,19 @@ spec:
                 description: Last reconciliation timestamp
                 format: date-time
                 type: string
+              maxRetries:
+                description: |-
+                  This is the maximum number of retries that are allowed for the reconciliation of this service instance.
+                  If the retry counter exceeds this value, the service instance will be marked as failed.
+                type: integer
               observedGeneration:
                 description: Observed generation
                 format: int64
+                type: integer
+              retryCounter:
+                description: |-
+                  Counts the number of retries that have been attempted for the reconciliation of this service instance.
+                  This counter can be used to fail the instance if too many retries occur.
                 type: integer
               serviceInstanceDigest:
                 description: Digest identifying the current target state of the service
