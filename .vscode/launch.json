@@ -14,6 +14,7 @@
                 "--kubeconfig=${workspaceFolder}/.kubeconfig",
                 "--webhook-bind-address=:2443",
                 "--webhook-tls-directory=${workspaceFolder}/.local/ssl",
+                "--enableWebhooks=false",
                 "--cluster-resource-namespace=default",
                 "--sap-binding-metadata"
             ]
