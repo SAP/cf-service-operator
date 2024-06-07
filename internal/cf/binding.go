@@ -18,16 +18,30 @@ import (
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
-func (c *spaceClient) GetBinding(ctx context.Context, owner string) (*facade.Binding, error) {
+func (c *spaceClient) GetBinding(ctx context.Context, owner, bindingName string) (*facade.Binding, error) {
 	listOpts := cfclient.NewServiceCredentialBindingListOptions()
 	listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
 	serviceBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-
+	//TODO:check also if annotation of existing binding present
 	if len(serviceBindings) == 0 {
-		return nil, nil
+		listOpts = cfclient.NewServiceCredentialBindingListOptions()
+		listOpts.Names.EqualTo(bindingName)
+		srvBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, listOpts)
+		if err != nil {
+			return nil, err
+		}
+		if len(srvBindings) == 0 {
+			return nil, nil
+		}
+		//TODO Check if the UUID is already present in the label??check what to do next??
+		serviceBindings = append(serviceBindings, srvBindings[0])
+		generationvalue := "0"
+		serviceBindings[0].Metadata.Annotations[annotationGeneration] = &generationvalue
+		parameterHashValue := "0"
+		serviceBindings[0].Metadata.Annotations[annotationParameterHash] = &parameterHashValue
 	} else if len(serviceBindings) > 1 {
 		return nil, fmt.Errorf("found multiple service bindings with owner: %s", owner)
 	}
@@ -101,11 +115,15 @@ func (c *spaceClient) CreateBinding(ctx context.Context, name string, serviceIns
 }
 
 // Required parameters (may not be initial): guid, generation
-func (c *spaceClient) UpdateBinding(ctx context.Context, guid string, generation int64) error {
+func (c *spaceClient) UpdateBinding(ctx context.Context, guid string, generation int64, parameters map[string]interface{}) error {
 	// TODO: why is there no cfresource.NewServiceCredentialBindingUpdate() method ?
 	req := &cfresource.ServiceCredentialBindingUpdate{}
 	req.Metadata = cfresource.NewMetadata().
 		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
+	if parameters != nil {
+		req.Metadata.WithAnnotation(annotationPrefix, annotationKeyParameterHash, facade.ObjectHash(parameters))
+		req.Metadata.WithLabel(labelPrefix, labelKeyOwner, parameters["owner"].(string))
+	}
 
 	_, err := c.client.ServiceCredentialBindings.Update(ctx, guid, req)
 	return err

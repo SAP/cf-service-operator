@@ -248,7 +248,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		//serviceInstance.SetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] = "true"
 
-		if serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" {
+		if serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" && cfinstance != nil {
 			newMap := make(map[string]interface{})
 			newMap["parameter-hash"] = cfinstance.ParameterHash
 			newMap["owner"] = cfinstance.Owner

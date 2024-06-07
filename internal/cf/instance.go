@@ -37,9 +37,6 @@ func (c *spaceClient) GetInstance(ctx context.Context, owner, instanceName strin
 		if len(srvInstances) == 0 {
 			return nil, nil
 		}
-		//TODO add a function to set the label
-		//labelAndAnnotateOrphanInstance()
-
 		//TODO Check if the UUID is already present in the label??check what to do next??
 		serviceInstances = append(serviceInstances, srvInstances[0])
 		generationvalue := "0"
@@ -157,5 +154,3 @@ func (c *spaceClient) DeleteInstance(ctx context.Context, guid string) error {
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
 	return err
 }
-
-//func (c *spaceClient) labelAndAnnotateOrphanInstance(owner string) error {

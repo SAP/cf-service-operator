@@ -177,7 +177,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Retrieve cloud foundry instance
 	var cfbinding *facade.Binding
 	if client != nil {
-		cfbinding, err = client.GetBinding(ctx, string(serviceBinding.UID))
+		cfbinding, err = client.GetBinding(ctx, string(serviceBinding.UID), serviceBinding.Name)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -226,6 +226,14 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return ctrl.Result{}, fmt.Errorf("secret key not found, secret name: %s, key: %s", secretName, pf.SecretKeyRef.Key)
 			}
 		}
+
+		if serviceBinding.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" && cfbinding != nil {
+			newMap := make(map[string]interface{})
+			newMap["parameter-hash"] = cfbinding.ParameterHash
+			newMap["owner"] = cfbinding.Owner
+			parameterObjects = append(parameterObjects, newMap)
+		}
+
 		parameters, err := mergeObjects(parameterObjects...)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
@@ -265,15 +273,24 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				inRecreation = true
 				// Clear binding, so it will be re-read below
 				cfbinding = nil
-			} else if cfbinding.Generation < serviceBinding.Generation {
+			} else if cfbinding.Generation < serviceBinding.Generation || serviceBinding.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" {
 				// metadata updates (such as updating the generation here) are possible with service bindings
 				log.V(1).Info("triggering update")
+				updateParameters := parameters
 				if err := client.UpdateBinding(
 					ctx,
 					cfbinding.Guid,
 					serviceBinding.Generation,
+					updateParameters,
 				); err != nil {
 					return ctrl.Result{}, err
+				}
+				//TODO remove the AnnotationAdoptInstances
+				if serviceBinding.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" {
+					// annotations := serviceInstance.GetAnnotations()
+					// delete(annotations, cfv1alpha1.AnnotationAdoptInstances)
+					// serviceInstance.SetAnnotations(annotations)
+					delete(serviceBinding.GetAnnotations(), cfv1alpha1.AnnotationAdoptInstances)
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
 				// Clear binding, so it will be re-read below
@@ -285,7 +302,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 		if cfbinding == nil {
 			// Re-retrieve cloud foundry binding; this happens exactly if the binding was created or updated above
-			cfbinding, err = client.GetBinding(ctx, string(serviceBinding.UID))
+			cfbinding, err = client.GetBinding(ctx, string(serviceBinding.UID), serviceBinding.Name)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
