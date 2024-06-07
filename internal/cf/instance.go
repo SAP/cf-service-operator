@@ -18,16 +18,34 @@ import (
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
-func (c *spaceClient) GetInstance(ctx context.Context, owner string) (*facade.Instance, error) {
+func (c *spaceClient) GetInstance(ctx context.Context, owner, instanceName string) (*facade.Instance, error) {
 	listOpts := cfclient.NewServiceInstanceListOptions()
+	//listOpts.Names.EqualTo(instanceName)
 	listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
 	serviceInstances, err := c.client.ServiceInstances.ListAll(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-
+	//TODO:check also if annotation of existing instance present
 	if len(serviceInstances) == 0 {
-		return nil, nil
+		listOpts = cfclient.NewServiceInstanceListOptions()
+		listOpts.Names.EqualTo(instanceName)
+		srvInstances, err := c.client.ServiceInstances.ListAll(ctx, listOpts)
+		if err != nil {
+			return nil, err
+		}
+		if len(srvInstances) == 0 {
+			return nil, nil
+		}
+		//TODO add a function to set the label
+		//labelAndAnnotateOrphanInstance()
+
+		//TODO Check if the UUID is already present in the label??check what to do next??
+		serviceInstances = append(serviceInstances, srvInstances[0])
+		generationvalue := "0"
+		serviceInstances[0].Metadata.Annotations[annotationGeneration] = &generationvalue
+		parameterHashValue := "0"
+		serviceInstances[0].Metadata.Annotations[annotationParameterHash] = &parameterHashValue
 	} else if len(serviceInstances) > 1 {
 		return nil, fmt.Errorf("found multiple service instances with owner: %s", owner)
 	}
@@ -127,6 +145,7 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
 	if parameters != nil {
 		req.Metadata.WithAnnotation(annotationPrefix, annotationKeyParameterHash, facade.ObjectHash(parameters))
+		req.Metadata.WithLabel(labelPrefix, labelKeyOwner, parameters["owner"].(string))
 	}
 
 	_, _, err := c.client.ServiceInstances.UpdateManaged(ctx, guid, req)
@@ -138,3 +157,5 @@ func (c *spaceClient) DeleteInstance(ctx context.Context, guid string) error {
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
 	return err
 }
+
+//func (c *spaceClient) labelAndAnnotateOrphanInstance(owner string) error {

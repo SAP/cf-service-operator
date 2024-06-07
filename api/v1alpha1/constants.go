@@ -17,4 +17,6 @@ const (
 	AnnotationMaxRetries = "service-operator.cf.cs.sap.com/max-retries"
 	// annotation to hold the reconciliation timeout value
 	AnnotationReconcileTimeout = "service-operator.cf.cs.sap.com/timeout-on-reconcile"
+	// annotation to adopt orphan CF service instance
+	AnnotationAdoptInstances = "service-operator.cf.cs.sap.com/adopt-instances"
 )

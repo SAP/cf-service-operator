@@ -193,7 +193,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Retrieve cloud foundry instance
 	var cfinstance *facade.Instance
 	if client != nil {
-		cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID))
+		cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID), serviceInstance.Name)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -243,6 +243,17 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				return ctrl.Result{}, fmt.Errorf("secret key not found, secret name: %s, key: %s", secretName, pf.SecretKeyRef.Key)
 			}
 		}
+		//correct below line
+		//serviceInstance.Annotations[cfv1alpha1.AnnotationAdoptInstances] = "true"
+
+		//serviceInstance.SetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] = "true"
+
+		if serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" {
+			newMap := make(map[string]interface{})
+			newMap["parameter-hash"] = cfinstance.ParameterHash
+			newMap["owner"] = cfinstance.Owner
+			parameterObjects = append(parameterObjects, newMap)
+		}
 		parameters, err := mergeObjects(parameterObjects...)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
@@ -252,6 +263,11 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		recreateOnCreationFailure := serviceInstance.Annotations[cfv1alpha1.AnnotationRecreate] == "true"
 		inRecreation := false
+
+		//fmt.Printf("Parameter hash is: %v and cfinstance hash %v\n", facade.ObjectHash(parameters), cfinstance.ParameterHash)
+		//fmt.Printf("Parameters are: %v \n", parameters)
+
+		//fmt.Printf("***VALIDATE CONDITIONS cfinstance.Generation < serviceInstance.Generation: %t, cfinstance.ParameterHash != facade.ObjectHash(parameters: %t, cfinstance.State == facade.InstanceStateCreatedFailed: %t, cfinstance.State == facade.InstanceStateUpdateFailed: %t", (cfinstance.Generation < serviceInstance.Generation), (cfinstance.ParameterHash != facade.ObjectHash(parameters)), (cfinstance.State == facade.InstanceStateCreatedFailed), (cfinstance.State == facade.InstanceStateUpdateFailed))
 
 		if cfinstance == nil {
 			log.V(1).Info("triggering creation")
@@ -281,7 +297,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				// Clear instance, so it will be re-read below
 				cfinstance = nil
 			} else if cfinstance.Generation < serviceInstance.Generation || cfinstance.ParameterHash != facade.ObjectHash(parameters) ||
-				cfinstance.State == facade.InstanceStateCreatedFailed || cfinstance.State == facade.InstanceStateUpdateFailed {
+				cfinstance.State == facade.InstanceStateCreatedFailed || cfinstance.State == facade.InstanceStateUpdateFailed || serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" {
 				log.V(1).Info("triggering update")
 				updateName := spec.Name
 				if updateName == cfinstance.Name {
@@ -320,12 +336,20 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
 				// Clear instance, so it will be re-read below
 				cfinstance = nil
+				//TODO remove the AnnotationAdoptInstances
+				if serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" {
+					// annotations := serviceInstance.GetAnnotations()
+					// delete(annotations, cfv1alpha1.AnnotationAdoptInstances)
+					// serviceInstance.SetAnnotations(annotations)
+					delete(serviceInstance.GetAnnotations(), cfv1alpha1.AnnotationAdoptInstances)
+				}
+
 			}
 		}
 
 		if cfinstance == nil {
 			// Re-retrieve cloud foundry instance; this happens exactly if the instance was created or updated above
-			cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID))
+			cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID), serviceInstance.Name)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
