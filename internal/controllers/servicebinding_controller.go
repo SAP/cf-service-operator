@@ -317,7 +317,11 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 			}
 			// TODO: apply some increasing period, depending on the age of the last update
-			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+			if getPollingInterval(serviceInstance).RequeueAfter > 0 {
+				return getPollingInterval(serviceInstance), nil
+			} else {
+				return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+			}
 		case facade.BindingStateCreatedFailed, facade.BindingStateDeleteFailed:
 			serviceBinding.SetReadyCondition(cfv1alpha1.ConditionFalse, string(cfbinding.State), cfbinding.StateDescription)
 			// TODO: apply some increasing period, depending on the age of the last update

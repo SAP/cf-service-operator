@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"strconv"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -111,7 +110,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Set a first status (and requeue, because the status update itself will not trigger another reconciliation because of the event filter set)
 	if ready := serviceInstance.GetReadyCondition(); ready == nil {
 		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonNew, "First seen")
-		SetMaxRetries(serviceInstance, log)
+		setMaxRetries(serviceInstance, log)
 		return ctrl.Result{Requeue: true}, nil
 	}
 
@@ -346,8 +345,11 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		case facade.InstanceStateReady:
 			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionTrue, string(cfinstance.State), cfinstance.StateDescription)
 			serviceInstance.Status.RetryCounter = 0 // Reset the retry counter
-			// TODO: apply some increasing period, depending on the age of the last update
-			return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+			if getPollingInterval(serviceInstance).RequeueAfter > 0 {
+				return getPollingInterval(serviceInstance), nil
+			} else {
+				return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+			}
 		case facade.InstanceStateCreatedFailed, facade.InstanceStateUpdateFailed, facade.InstanceStateDeleteFailed:
 			// Check if the retry counter exceeds the maximum allowed retries.
 			// Check if the maximum retry limit is exceeded.
@@ -405,43 +407,6 @@ func (r *ServiceInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// IncrementRetryCounterAndCheckRetryLimit increments the retry counter for a ServiceInstance and checks if the number of retries has exceeded the maximum allowed retries.
-// The maximum retries is configured per ServiceInstance via the annotation, AnnotationMaxRetries. If not specified,
-// a default value is used.
-// This function updates the ServiceInstance's Condition and State to indicate a failure when the retry limit is reached.
-// Returns:A boolean indicating whether the retry limit has been reached.
-func SetMaxRetries(serviceInstance *cfv1alpha1.ServiceInstance, log logr.Logger) {
-	// Default to an infinite number number of retries
-	serviceInstance.Status.MaxRetries = serviceInstanceDefaultMaxRetries
-
-	// Use max retries from annotation
-	maxRetriesStr, found := serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationMaxRetries]
-	if found {
-		maxRetries, err := strconv.Atoi(maxRetriesStr)
-		if err != nil {
-			log.V(1).Info("Invalid max retries annotation value, using default", "AnnotationMaxRetries", maxRetriesStr)
-		} else {
-			serviceInstance.Status.MaxRetries = maxRetries
-		}
-	}
-}
-
-// function to read/get reconcile timeout annotation from the service instance "AnnotationReconcileTimeout = "service-operator.cf.cs.sap.com/timeout-on-reconcile" "
-// if the annotation is not set, the default value is used serviceInstanceDefaultRequeueTimeout
-// else returns the reconcile timeout as a time duration
-func getReconcileTimeout(serviceInstance *cfv1alpha1.ServiceInstance) time.Duration {
-	// Use reconcile timeout from annotation, use default if annotation is missing or not parsable
-	reconcileTimeoutStr, ok := serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationReconcileTimeout]
-	if !ok {
-		return serviceInstanceDefaultReconcileInterval
-	}
-	reconcileTimeout, err := time.ParseDuration(reconcileTimeoutStr)
-	if err != nil {
-		return serviceInstanceDefaultReconcileInterval
-	}
-	return reconcileTimeout
-}
-
 // HandleError sets conditions and the context to handle the error.
 // Special handling for retryable errros:
 // - retry after certain time interval
@@ -460,9 +425,8 @@ func (r *ServiceInstanceReconciler) HandleError(ctx context.Context, serviceInst
 	if serviceInstance.Status.MaxRetries != serviceInstanceDefaultMaxRetries && serviceInstance.Status.RetryCounter >= serviceInstance.Status.MaxRetries {
 		// Update the instance's status to reflect the failure due to too many retries.
 		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionFalse, "MaximumRetriesExceeded", "The service instance has failed due to too many retries.")
-		return ctrl.Result{}, nil // finish reconcile loop
+		return getPollingInterval(serviceInstance), nil // finish reconcile loop
 	}
-
 	// double the requeue interval
 	condition := serviceInstance.GetReadyCondition()
 	requeueAfter := 1 * time.Second
