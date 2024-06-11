@@ -100,23 +100,12 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if err != nil {
 			result, err = r.HandleError(ctx, serviceInstance, err, log)
 		}
-		instanceReady := serviceInstance.GetReadyCondition()
-		if serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" && instanceReady != nil {
 
-			if updateErr1 := r.Status().Update(ctx, serviceInstance); updateErr1 != nil {
-				err = utilerrors.NewAggregate([]error{err, updateErr1})
-				result = ctrl.Result{}
-			}
-		} else if updateErr := r.Status().Update(ctx, serviceInstance); updateErr != nil {
+		// update service instance CR
+		if updateErr := r.Status().Update(ctx, serviceInstance); updateErr != nil {
 			err = utilerrors.NewAggregate([]error{err, updateErr})
 			result = ctrl.Result{}
 		}
-
-		// // update service instance CR
-		// if updateErr := r.Status().Update(ctx, serviceInstance); updateErr != nil {
-		// 	err = utilerrors.NewAggregate([]error{err, updateErr})
-		// 	result = ctrl.Result{}
-		// }
 	}()
 
 	// Set a first status (and requeue, because the status update itself will not trigger another reconciliation because of the event filter set)
