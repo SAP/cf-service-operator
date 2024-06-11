@@ -87,10 +87,23 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if err != nil {
 			serviceBinding.SetReadyCondition(cfv1alpha1.ConditionFalse, serviceBindingReadyConditionReasonError, err.Error())
 		}
-		if updateErr := r.Status().Update(ctx, serviceBinding); updateErr != nil {
+		bindingReady := serviceBinding.GetReadyCondition()
+		if serviceBinding.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" && bindingReady != nil {
+
+			if updateErr1 := r.Update(ctx, serviceBinding); updateErr1 != nil {
+				err = utilerrors.NewAggregate([]error{err, updateErr1})
+				result = ctrl.Result{}
+			}
+		} else if updateErr := r.Status().Update(ctx, serviceBinding); updateErr != nil {
 			err = utilerrors.NewAggregate([]error{err, updateErr})
 			result = ctrl.Result{}
 		}
+
+		// if updateErr := r.Status().Update(ctx, serviceBinding); updateErr != nil {
+		// 	err = utilerrors.NewAggregate([]error{err, updateErr})
+		// 	result = ctrl.Result{}
+		// }
+
 	}()
 
 	// Set a first status (and requeue, because the status update itself will not trigger another reconciliation because of the event filter set)
