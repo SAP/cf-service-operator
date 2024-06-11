@@ -101,7 +101,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			result, err = r.HandleError(ctx, serviceInstance, err, log)
 		}
 		instanceReady := serviceInstance.GetReadyCondition()
-		if serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" && instanceReady != nil{
+		if serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" && instanceReady != nil {
 
 			if updateErr1 := r.Status().Update(ctx, serviceInstance); updateErr1 != nil {
 				err = utilerrors.NewAggregate([]error{err, updateErr1})
