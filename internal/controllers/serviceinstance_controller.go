@@ -204,9 +204,41 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Retrieve cloud foundry instance
 	var cfinstance *facade.Instance
 	if client != nil {
-		cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID), serviceInstance.Name)
+		instanceName := ""
+		_, exists := serviceInstance.Annotations[cfv1alpha1.AnnotationAdoptInstances]
+		if exists {
+			// the instance is orphaned, so we need to find it by name
+			instanceName = serviceInstance.Name
+		}
+		cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID), instanceName)
 		if err != nil {
 			return ctrl.Result{}, err
+		}
+		if exists && instanceName != "" && cfinstance != nil {
+			var parameterObjects []map[string]interface{}
+			newMap := make(map[string]interface{})
+			newMap["parameter-hash"] = cfinstance.ParameterHash
+			newMap["owner"] = cfinstance.Owner
+			parameterObjects = append(parameterObjects, newMap)
+			parameters, err := mergeObjects(parameterObjects...)
+			if err != nil {
+				return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
+			}
+
+			// update the cloud foundry instance
+			if err := client.UpdateInstance(
+				ctx,
+				cfinstance.Guid,
+				spec.Name,
+				"",
+				parameters,
+				nil,
+				serviceInstance.Generation,
+			); err != nil {
+				return ctrl.Result{}, err
+			}
+			// return the reconcile function to requeue inmediatly after the update
+			return ctrl.Result{Requeue: true}, nil
 		}
 	}
 
@@ -254,17 +286,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				return ctrl.Result{}, fmt.Errorf("secret key not found, secret name: %s, key: %s", secretName, pf.SecretKeyRef.Key)
 			}
 		}
-		//correct below line
-		//serviceInstance.Annotations[cfv1alpha1.AnnotationAdoptInstances] = "true"
 
-		//serviceInstance.SetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] = "true"
-
-		if serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" && cfinstance != nil {
-			newMap := make(map[string]interface{})
-			newMap["parameter-hash"] = cfinstance.ParameterHash
-			newMap["owner"] = cfinstance.Owner
-			parameterObjects = append(parameterObjects, newMap)
-		}
 		parameters, err := mergeObjects(parameterObjects...)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
@@ -308,7 +330,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				// Clear instance, so it will be re-read below
 				cfinstance = nil
 			} else if cfinstance.Generation < serviceInstance.Generation || cfinstance.ParameterHash != facade.ObjectHash(parameters) ||
-				cfinstance.State == facade.InstanceStateCreatedFailed || cfinstance.State == facade.InstanceStateUpdateFailed || serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" {
+				cfinstance.State == facade.InstanceStateCreatedFailed || cfinstance.State == facade.InstanceStateUpdateFailed {
 				log.V(1).Info("triggering update")
 				updateName := spec.Name
 				if updateName == cfinstance.Name {
@@ -347,20 +369,12 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
 				// Clear instance, so it will be re-read below
 				cfinstance = nil
-				//TODO remove the AnnotationAdoptInstances
-				if serviceInstance.GetAnnotations()[cfv1alpha1.AnnotationAdoptInstances] == "true" {
-					// annotations := serviceInstance.GetAnnotations()
-					// delete(annotations, cfv1alpha1.AnnotationAdoptInstances)
-					// serviceInstance.SetAnnotations(annotations)
-					delete(serviceInstance.GetAnnotations(), cfv1alpha1.AnnotationAdoptInstances)
-				}
-
 			}
 		}
 
 		if cfinstance == nil {
 			// Re-retrieve cloud foundry instance; this happens exactly if the instance was created or updated above
-			cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID), serviceInstance.Name)
+			cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID), "")
 			if err != nil {
 				return ctrl.Result{}, err
 			}

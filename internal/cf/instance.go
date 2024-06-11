@@ -20,32 +20,35 @@ import (
 
 func (c *spaceClient) GetInstance(ctx context.Context, owner, instanceName string) (*facade.Instance, error) {
 	listOpts := cfclient.NewServiceInstanceListOptions()
-	//listOpts.Names.EqualTo(instanceName)
-	listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
+
+	value := ""
+	if instanceName != "" {
+		value := instanceName
+		listOpts.Names.EqualTo(value)
+	} else {
+		value := owner
+		listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + value)
+	}
+
 	serviceInstances, err := c.client.ServiceInstances.ListAll(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	//TODO:check also if annotation of existing instance present
+
 	if len(serviceInstances) == 0 {
-		listOpts = cfclient.NewServiceInstanceListOptions()
-		listOpts.Names.EqualTo(instanceName)
-		srvInstances, err := c.client.ServiceInstances.ListAll(ctx, listOpts)
-		if err != nil {
-			return nil, err
-		}
-		if len(srvInstances) == 0 {
-			return nil, nil
-		}
-		//TODO Check if the UUID is already present in the label??check what to do next??
-		serviceInstances = append(serviceInstances, srvInstances[0])
+		return nil, nil
+	} else if len(serviceInstances) > 1 {
+		return nil, fmt.Errorf("found multiple service instances with owner: %s", value)
+	}
+
+	// add parameter values to the cf instance
+	if instanceName != "" {
 		generationvalue := "0"
 		serviceInstances[0].Metadata.Annotations[annotationGeneration] = &generationvalue
 		parameterHashValue := "0"
 		serviceInstances[0].Metadata.Annotations[annotationParameterHash] = &parameterHashValue
-	} else if len(serviceInstances) > 1 {
-		return nil, fmt.Errorf("found multiple service instances with owner: %s", owner)
 	}
+
 	serviceInstance := serviceInstances[0]
 
 	guid := serviceInstance.GUID
@@ -142,7 +145,10 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
 	if parameters != nil {
 		req.Metadata.WithAnnotation(annotationPrefix, annotationKeyParameterHash, facade.ObjectHash(parameters))
-		req.Metadata.WithLabel(labelPrefix, labelKeyOwner, parameters["owner"].(string))
+		if parameters["owner"] != nil {
+			// Adding label to the metadata for orphan instance
+			req.Metadata.WithLabel(labelPrefix, labelKeyOwner, parameters["owner"].(string))
+		}
 	}
 
 	_, _, err := c.client.ServiceInstances.UpdateManaged(ctx, guid, req)
