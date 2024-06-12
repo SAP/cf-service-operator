@@ -57,12 +57,47 @@ cat > /tmp/patch <<END
 END
 cf curl -X PATCH -H "Content-Type: application/json" /v3/service_instances/<cf instance guid> -d @/tmp/patch
 ```
+
 More information about this Cloud Foundry API call can be found [here](https://v3-apidocs.cloudfoundry.org/version/3.113.0/index.html#update-a-service-instance).
 After some time the controller will consider the instance as managed.
 
 ## Adopt service bindings
 
-Works analogously. 
+Works analogously.
 
-The according Cloud Foundry API endpoint is `/v3/service_credential_bindings`. 
+The according Cloud Foundry API endpoint is `/v3/service_credential_bindings`.
 More information can be found [here](https://v3-apidocs.cloudfoundry.org/version/3.113.0/index.html#update-a-service-credential-binding).
+
+## Using Annotations
+
+An automated way of adopting Cloud Foundry instance is via the Kuberneste annotation `service-operator.cf.cs.sap.com/adopt-instances`.
+
+During the reconciliation of an orphan ServiceInstance and ServiceBinding custom resource, the controller will check if this annotation is present. If the annotation is found then the controller will try to update the Cloud Foundry instance with label `service-operator.cf.cs.sap.com/owner`, and the annotations `service-operator.cf.cs.sap.com/generation` and `service-operator.cf.cs.sap.com/parameter-hash`
+
+Here's an example of how to use this annotation in a ServiceInstance and ServiceBinding:
+
+```yaml
+apiVersion: cf.cs.sap.com/v1alpha1
+kind: ServiceInstance
+metadata:
+  name: example-instance
+  namespace: demo
+  annotations:
+    service-operator.cf.cs.sap.com/adopt-instances: "true"
+spec:
+  spaceName: development
+  serviceOfferingName: my-service
+  servicePlanName: standard
+```
+
+```yaml
+apiVersion: cf.cs.sap.com/v1alpha1
+kind: ServiceBinding
+metadata:
+  name: example-binding-instance
+  namespace: demo
+  annotations:
+    service-operator.cf.cs.sap.com/adopt-instances: "true"  
+spec:
+  serviceInstanceName: example-instance
+```
