@@ -18,16 +18,21 @@ import (
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
+// GetInstance returns the instance with the given owner or instanceName.
+// If instanceName is empty, the instance with the given owner is returned.
+// If instanceName is not empty, the instance with the given instanceName is returned for orphan instances.
+// If no instance is found, nil is returned.
+// If multiple instances are found, an error is returned.
 func (c *spaceClient) GetInstance(ctx context.Context, owner, instanceName string) (*facade.Instance, error) {
 	listOpts := cfclient.NewServiceInstanceListOptions()
 
-	value := ""
+	labelValueOwner := ""
 	if instanceName != "" {
-		value := instanceName
-		listOpts.Names.EqualTo(value)
+		labelValueOwner = instanceName
+		listOpts.Names.EqualTo(labelValueOwner)
 	} else {
-		value := owner
-		listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + value)
+		labelValueOwner = owner
+		listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + labelValueOwner)
 	}
 
 	serviceInstances, err := c.client.ServiceInstances.ListAll(ctx, listOpts)
@@ -38,18 +43,18 @@ func (c *spaceClient) GetInstance(ctx context.Context, owner, instanceName strin
 	if len(serviceInstances) == 0 {
 		return nil, nil
 	} else if len(serviceInstances) > 1 {
-		return nil, fmt.Errorf("found multiple service instances with owner: %s", value)
-	}
-
-	// add parameter values to the cf instance
-	if instanceName != "" {
-		generationvalue := "0"
-		serviceInstances[0].Metadata.Annotations[annotationGeneration] = &generationvalue
-		parameterHashValue := "0"
-		serviceInstances[0].Metadata.Annotations[annotationParameterHash] = &parameterHashValue
+		return nil, fmt.Errorf("found multiple service instances with owner: %s", labelValueOwner)
 	}
 
 	serviceInstance := serviceInstances[0]
+
+	// add parameter values to the orphan cf instance
+	if instanceName != "" {
+		generationvalue := "0"
+		serviceInstance.Metadata.Annotations[annotationGeneration] = &generationvalue
+		parameterHashValue := "0"
+		serviceInstance.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
+	}
 
 	guid := serviceInstance.GUID
 	name := serviceInstance.Name

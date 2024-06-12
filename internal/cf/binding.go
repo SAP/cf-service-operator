@@ -18,34 +18,44 @@ import (
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
+// GetBinding returns the binding with the given owner or bindingName.
+// If bindingName is empty, the binding with the given owner is returned.
+// If bindingName is not empty, the binding with the given bindingName is returned for orphan bindings.
+// If no binding is found, nil is returned.
+// If multiple bindings are found, an error is returned.
 func (c *spaceClient) GetBinding(ctx context.Context, owner, bindingName string) (*facade.Binding, error) {
 	listOpts := cfclient.NewServiceCredentialBindingListOptions()
-	listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
+
+	value := ""
+
+	if bindingName != "" {
+		value := bindingName
+		listOpts.Names.EqualTo(value)
+	} else {
+		value := owner
+		listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + value)
+	}
+
 	serviceBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, listOpts)
 	if err != nil {
 		return nil, err
 	}
-	//TODO:check also if annotation of existing binding present
+
 	if len(serviceBindings) == 0 {
-		listOpts = cfclient.NewServiceCredentialBindingListOptions()
-		listOpts.Names.EqualTo(bindingName)
-		srvBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, listOpts)
-		if err != nil {
-			return nil, err
-		}
-		if len(srvBindings) == 0 {
-			return nil, nil
-		}
-		//TODO Check if the UUID is already present in the label??check what to do next??
-		serviceBindings = append(serviceBindings, srvBindings[0])
-		generationvalue := "0"
-		serviceBindings[0].Metadata.Annotations[annotationGeneration] = &generationvalue
-		parameterHashValue := "0"
-		serviceBindings[0].Metadata.Annotations[annotationParameterHash] = &parameterHashValue
+		return nil, nil
 	} else if len(serviceBindings) > 1 {
-		return nil, fmt.Errorf("found multiple service bindings with owner: %s", owner)
+		return nil, fmt.Errorf("found multiple service bindings with owner: %s", value)
 	}
+
 	serviceBinding := serviceBindings[0]
+
+	// add parameter values to the cf instance
+	if bindingName != "" {
+		generationvalue := "0"
+		serviceBinding.Metadata.Annotations[annotationGeneration] = &generationvalue
+		parameterHashValue := "0"
+		serviceBinding.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
+	}
 
 	guid := serviceBinding.GUID
 	name := serviceBinding.Name
@@ -120,11 +130,13 @@ func (c *spaceClient) UpdateBinding(ctx context.Context, guid string, generation
 	req := &cfresource.ServiceCredentialBindingUpdate{}
 	req.Metadata = cfresource.NewMetadata().
 		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
+
 	if parameters != nil {
 		req.Metadata.WithAnnotation(annotationPrefix, annotationKeyParameterHash, facade.ObjectHash(parameters))
-		req.Metadata.WithLabel(labelPrefix, labelKeyOwner, parameters["owner"].(string))
+		if parameters["owner"] != nil {
+			req.Metadata.WithLabel(labelPrefix, labelKeyOwner, parameters["owner"].(string))
+		}
 	}
-
 	_, err := c.client.ServiceCredentialBindings.Update(ctx, guid, req)
 	return err
 }
