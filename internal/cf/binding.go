@@ -26,25 +26,24 @@ import (
 func (c *spaceClient) GetBinding(ctx context.Context, owner, bindingName string) (*facade.Binding, error) {
 	listOpts := cfclient.NewServiceCredentialBindingListOptions()
 
-	value := ""
-
 	if bindingName != "" {
-		value := bindingName
-		listOpts.Names.EqualTo(value)
+		listOpts.Names.EqualTo(bindingName)
 	} else {
-		value := owner
-		listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + value)
+		listOpts.LabelSelector.EqualTo(fmt.Sprintf("%s/%s=%s", labelPrefix, labelKeyOwner, owner))
 	}
 
 	serviceBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, listOpts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list service credential bindings: %w", err)
 	}
 
 	if len(serviceBindings) == 0 {
 		return nil, nil
 	} else if len(serviceBindings) > 1 {
-		return nil, fmt.Errorf("found multiple service bindings with owner: %s", value)
+		if bindingName != "" {
+			return nil, fmt.Errorf("found multiple service bindings with name: %s", bindingName)
+		}
+		return nil, fmt.Errorf("found multiple service bindings with owner: %s", owner)
 	}
 
 	serviceBinding := serviceBindings[0]

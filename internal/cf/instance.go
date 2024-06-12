@@ -26,24 +26,24 @@ import (
 func (c *spaceClient) GetInstance(ctx context.Context, owner, instanceName string) (*facade.Instance, error) {
 	listOpts := cfclient.NewServiceInstanceListOptions()
 
-	labelValueOwner := ""
 	if instanceName != "" {
-		labelValueOwner = instanceName
-		listOpts.Names.EqualTo(labelValueOwner)
+		listOpts.Names.EqualTo(instanceName)
 	} else {
-		labelValueOwner = owner
-		listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + labelValueOwner)
+		listOpts.LabelSelector.EqualTo(fmt.Sprintf("%s/%s=%s", labelPrefix, labelKeyOwner, owner))
 	}
 
 	serviceInstances, err := c.client.ServiceInstances.ListAll(ctx, listOpts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list service credential bindings: %w", err)
 	}
 
 	if len(serviceInstances) == 0 {
 		return nil, nil
 	} else if len(serviceInstances) > 1 {
-		return nil, fmt.Errorf("found multiple service instances with owner: %s", labelValueOwner)
+		if instanceName != "" {
+			return nil, fmt.Errorf("found multiple service instances with name: %s", instanceName)
+		}
+		return nil, fmt.Errorf("found multiple service instances with owner: %s", owner)
 	}
 
 	serviceInstance := serviceInstances[0]
