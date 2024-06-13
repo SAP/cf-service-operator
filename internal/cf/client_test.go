@@ -136,6 +136,8 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(err).To(BeNil())
 
 			orgClient.GetSpace(ctx, Owner)
+			orgClient, err = NewOrganizationClient(OrgName, url, Username, Password)
+			Expect(err).To(BeNil())
 			orgClient.GetSpace(ctx, Owner)
 
 			// Discover UAA endpoint
@@ -204,10 +206,12 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		})
 
 		It("should be able to query some space twice", func() {
-			spaceClient, err := newSpaceClient(OrgName, url, Username, Password)
+			spaceClient, err := NewSpaceClient(OrgName, url, Username, Password)
 			Expect(err).To(BeNil())
 
 			spaceClient.GetInstance(ctx, Owner)
+			spaceClient, err = NewSpaceClient(OrgName, url, Username, Password)
+			Expect(err).To(BeNil())
 			spaceClient.GetInstance(ctx, Owner)
 
 			// Discover UAA endpoint
