@@ -41,7 +41,6 @@ const (
 
 	// Default values while waiting for ServiceInstance creation (state Progressing)
 	serviceInstanceDefaultReconcileInterval = 1 * time.Second
-	//serviceInstanceDefaultMaxReconcileInterval = 10 * time.Minute
 
 	// Default values for error cases during ServiceInstance creation
 	serviceInstanceDefaultMaxRetries       = math.MaxInt32 // infinite number of retries
@@ -345,11 +344,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		case facade.InstanceStateReady:
 			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionTrue, string(cfinstance.State), cfinstance.StateDescription)
 			serviceInstance.Status.RetryCounter = 0 // Reset the retry counter
-			if getPollingInterval(serviceInstance).RequeueAfter > 0 {
-				return getPollingInterval(serviceInstance), nil
-			} else {
-				return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
-			}
+			return getPollingInterval(serviceInstance.GetAnnotations(), "10m"), nil
 		case facade.InstanceStateCreatedFailed, facade.InstanceStateUpdateFailed, facade.InstanceStateDeleteFailed:
 			// Check if the retry counter exceeds the maximum allowed retries.
 			// Check if the maximum retry limit is exceeded.
@@ -425,7 +420,7 @@ func (r *ServiceInstanceReconciler) HandleError(ctx context.Context, serviceInst
 	if serviceInstance.Status.MaxRetries != serviceInstanceDefaultMaxRetries && serviceInstance.Status.RetryCounter >= serviceInstance.Status.MaxRetries {
 		// Update the instance's status to reflect the failure due to too many retries.
 		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionFalse, "MaximumRetriesExceeded", "The service instance has failed due to too many retries.")
-		return getPollingInterval(serviceInstance), nil // finish reconcile loop
+		return getPollingInterval(serviceInstance.GetAnnotations(), ""), nil // finish reconcile loop
 	}
 	// double the requeue interval
 	condition := serviceInstance.GetReadyCondition()
