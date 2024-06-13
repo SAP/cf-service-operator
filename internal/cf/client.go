@@ -7,6 +7,7 @@ package cf
 
 import (
 	"fmt"
+	"sync"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfconfig "github.com/cloudfoundry-community/go-cfclient/v3/config"
@@ -31,6 +32,11 @@ type organizationClient struct {
 	password         string
 	organizationName string
 	client           cfclient.Client
+}
+
+type clientIdentifier struct {
+	URL      string
+	Username string
 }
 
 type spaceClient struct {
@@ -89,14 +95,53 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	return &spaceClient{url: url, username: username, password: password, spaceGuid: spaceGuid, client: *c}, nil
 }
 
+var (
+	spaceClientCache = make(map[clientIdentifier]*spaceClient)
+	orgClientCache   = make(map[clientIdentifier]*organizationClient)
+	cacheMutex       = &sync.Mutex{}
+)
+
 func NewOrganizationClient(organizationName string, url string, username string, password string) (facade.OrganizationClient, error) {
-	return newOrganizationClient(organizationName, url, username, password)
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	identifier := clientIdentifier{URL: url, Username: username}
+	client, cached := orgClientCache[identifier]
+	var err error
+	if !cached {
+		client, err = newOrganizationClient(organizationName, url, username, password)
+		if err == nil {
+			orgClientCache[identifier] = client
+		}
+	}
+	return client, err
 }
 
 func NewSpaceClient(spaceGuid string, url string, username string, password string) (facade.SpaceClient, error) {
-	return newSpaceClient(spaceGuid, url, username, password)
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	identifier := clientIdentifier{URL: url, Username: username}
+	client, cached := spaceClientCache[identifier]
+	var err error
+	if !cached {
+		client, err = newSpaceClient(spaceGuid, url, username, password)
+		if err == nil {
+			spaceClientCache[identifier] = client
+		}
+	}
+	return client, err
 }
 
 func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
-	return newSpaceClient(spaceGuid, url, username, password)
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+	identifier := clientIdentifier{URL: url, Username: username}
+	client, cached := spaceClientCache[identifier]
+	var err error
+	if !cached {
+		client, err = newSpaceClient(spaceGuid, url, username, password)
+		if err == nil {
+			spaceClientCache[identifier] = client
+		}
+	}
+	return client, err
 }
