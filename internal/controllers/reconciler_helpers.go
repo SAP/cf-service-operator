@@ -53,8 +53,9 @@ func getReconcileTimeout(serviceInstance *cfv1alpha1.ServiceInstance) time.Durat
 // getPollingInterval retrieves the polling interval from the service instance annotations.
 // If the annotation is not set or the value is not a valid duration, it returns either the defaultDurationStr or an empty ctrl.Result{}.
 // Otherwise, it returns a ctrl.Result  with the RequeueAfter field set in the annotation.
-func getPollingInterval(annotations map[string]string, defaultDurationStr string) ctrl.Result {
-	pollingIntervalStr, ok := annotations[cfv1alpha1.AnnotationPollingInterval]
+func getPollingInterval(annotations map[string]string, defaultDurationStr, annotationName string) ctrl.Result {
+	
+	pollingIntervalStr, ok := annotations[annotationName]
 	if ok {
 		pollingInterval, err := time.ParseDuration(pollingIntervalStr)
 		if err == nil {

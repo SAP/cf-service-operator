@@ -294,8 +294,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 					// This is the re-create case, if the binding is already gone (maybe deleted synchronously)
 					return ctrl.Result{Requeue: true}, nil
 				}
-				// TODO: Do we need another annotation for in recreation and deletion scenarios?
-				return getPollingInterval(space.GetAnnotations(), ""), fmt.Errorf("unexpected error; binding not found in cloud foundry although it should exist")
+				return ctrl.Result{}, fmt.Errorf("unexpected error; binding not found in cloud foundry although it should exist")
 			}
 		}
 
@@ -318,7 +317,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 			}
 			// TODO: apply some increasing period, depending on the age of the last update
-			return getPollingInterval(serviceInstance.GetAnnotations(), "10m"), nil
+			return getPollingInterval(serviceInstance.GetAnnotations(), "10m", cfv1alpha1.AnnotationPollingIntervalReady), nil
 		case facade.BindingStateCreatedFailed, facade.BindingStateDeleteFailed:
 			serviceBinding.SetReadyCondition(cfv1alpha1.ConditionFalse, string(cfbinding.State), cfbinding.StateDescription)
 			// TODO: apply some increasing period, depending on the age of the last update

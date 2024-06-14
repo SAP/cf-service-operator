@@ -344,7 +344,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		case facade.InstanceStateReady:
 			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionTrue, string(cfinstance.State), cfinstance.StateDescription)
 			serviceInstance.Status.RetryCounter = 0 // Reset the retry counter
-			return getPollingInterval(serviceInstance.GetAnnotations(), "10m"), nil
+			return getPollingInterval(serviceInstance.GetAnnotations(), "10m",cfv1alpha1.AnnotationPollingIntervalReady), nil
 		case facade.InstanceStateCreatedFailed, facade.InstanceStateUpdateFailed, facade.InstanceStateDeleteFailed:
 			// Check if the retry counter exceeds the maximum allowed retries.
 			// Check if the maximum retry limit is exceeded.
@@ -420,7 +420,7 @@ func (r *ServiceInstanceReconciler) HandleError(ctx context.Context, serviceInst
 	if serviceInstance.Status.MaxRetries != serviceInstanceDefaultMaxRetries && serviceInstance.Status.RetryCounter >= serviceInstance.Status.MaxRetries {
 		// Update the instance's status to reflect the failure due to too many retries.
 		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionFalse, "MaximumRetriesExceeded", "The service instance has failed due to too many retries.")
-		return getPollingInterval(serviceInstance.GetAnnotations(), ""), nil // finish reconcile loop
+		return getPollingInterval(serviceInstance.GetAnnotations(), "",cfv1alpha1.AnnotationPollingIntervalFail), nil // finish reconcile loop
 	}
 	// double the requeue interval
 	condition := serviceInstance.GetReadyCondition()

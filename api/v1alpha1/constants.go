@@ -17,6 +17,8 @@ const (
 	AnnotationMaxRetries = "service-operator.cf.cs.sap.com/max-retries"
 	// annotation to hold the reconciliation timeout value
 	AnnotationReconcileTimeout = "service-operator.cf.cs.sap.com/timeout-on-reconcile"
-	// annotation to control and decrease the interval at which the operator polls the status of service instances in a final state ready or failed.
-	AnnotationPollingInterval = "service-operator.cf.cs.sap.com/polling-interval"
+	// annotation to increase or decrease the requeue interval at which the operator polls the status of CR after final state ready.
+	AnnotationPollingIntervalReady = "service-operator.cf.cs.sap.com/polling-interval-ready"
+	// annotation to increase or decrease the requeue interval at which the operator polls the status of CR after final state failed.
+	AnnotationPollingIntervalFail = "service-operator.cf.cs.sap.com/polling-interval-fail"
 )
