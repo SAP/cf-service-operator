@@ -112,6 +112,11 @@ func NewOrganizationClient(organizationName string, url string, username string,
 		if err == nil {
 			orgClientCache[identifier] = client
 		}
+	} else {
+		// If the password has changed since we cached the client, we want to update it to the new one
+		if client.password != password {
+			client.password = password
+		}
 	}
 	return client, err
 }
@@ -146,6 +151,11 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 		client, err = newSpaceClient(spaceGuid, url, username, password)
 		if err == nil {
 			spaceClientCache[identifier] = client
+		}
+	} else {
+		// If the password has changed since we cached the client, we want to update it to the new one
+		if client.password != password {
+			client.password = password
 		}
 	}
 	return client, err
