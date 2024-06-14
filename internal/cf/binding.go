@@ -18,18 +18,18 @@ import (
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
-// GetBinding returns the binding with the given owner or bindingName.
-// If bindingName is empty, the binding with the given owner is returned.
-// If bindingName is not empty, the binding with the given bindingName is returned for orphan bindings.
+// GetBinding returns the binding with the given mapBindingOpts["owner"] or mapBindingOpts["name"].
+// If mapBindingOpts["name"] is empty, the binding with the given mapBindingOpts["owner"] is returned.
+// If mapBindingOpts["name"] is not empty, the binding with the given Name is returned for orphan bindings.
 // If no binding is found, nil is returned.
 // If multiple bindings are found, an error is returned.
-func (c *spaceClient) GetBinding(ctx context.Context, owner, bindingName string) (*facade.Binding, error) {
+// The function add the parameter values to the orphan cf instance, so that can be adopted.
+func (c *spaceClient) GetBinding(ctx context.Context, mapBindingOpts map[string]string) (*facade.Binding, error) {
 	listOpts := cfclient.NewServiceCredentialBindingListOptions()
-
-	if bindingName != "" {
-		listOpts.Names.EqualTo(bindingName)
+	if mapBindingOpts["name"] != "" {
+		listOpts.Names.EqualTo(mapBindingOpts["name"])
 	} else {
-		listOpts.LabelSelector.EqualTo(fmt.Sprintf("%s/%s=%s", labelPrefix, labelKeyOwner, owner))
+		listOpts.LabelSelector.EqualTo(fmt.Sprintf("%s/%s=%s", labelPrefix, labelKeyOwner, mapBindingOpts["owner"]))
 	}
 
 	serviceBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, listOpts)
@@ -40,16 +40,13 @@ func (c *spaceClient) GetBinding(ctx context.Context, owner, bindingName string)
 	if len(serviceBindings) == 0 {
 		return nil, nil
 	} else if len(serviceBindings) > 1 {
-		if bindingName != "" {
-			return nil, fmt.Errorf("found multiple service bindings with name: %s", bindingName)
-		}
-		return nil, fmt.Errorf("found multiple service bindings with owner: %s", owner)
+		return nil, errors.New(fmt.Sprintf("found multiple service bindings with owner: %s", mapBindingOpts["owner"]))
 	}
 
 	serviceBinding := serviceBindings[0]
 
-	// add parameter values to the cf instance
-	if bindingName != "" {
+	// add parameter values to the cf orphan instance
+	if mapBindingOpts["name"] != "" {
 		generationvalue := "0"
 		serviceBinding.Metadata.Annotations[annotationGeneration] = &generationvalue
 		parameterHashValue := "0"
@@ -94,7 +91,7 @@ func (c *spaceClient) GetBinding(ctx context.Context, owner, bindingName string)
 	return &facade.Binding{
 		Guid:             guid,
 		Name:             name,
-		Owner:            owner,
+		Owner:            mapBindingOpts["owner"],
 		Generation:       generation,
 		ParameterHash:    parameterHash,
 		State:            state,

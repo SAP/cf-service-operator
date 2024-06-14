@@ -192,51 +192,48 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Retrieve cloud foundry instance
 	var cfinstance *facade.Instance
-
-	//Empty instance name to get instance by guid
-	instanceName := ""
+	mapInstancegOpts := map[string]string{"name": "", "owner": string(serviceInstance.UID)}
 	if client != nil {
-		cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID), instanceName)
+		cfinstance, err = client.GetInstance(ctx, mapInstancegOpts)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		_, exists := serviceInstance.Annotations[cfv1alpha1.AnnotationAdoptInstances]
-		if exists && cfinstance == nil {
+		orphan, exists := serviceInstance.Annotations[cfv1alpha1.AnnotationAdoptCFResources]
+		if exists && cfinstance == nil && orphan == "adopt" {
 			// find orphaned instance by name
-			instanceName = serviceInstance.Name
-			cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID), instanceName)
+			mapInstancegOpts["name"] = serviceInstance.Name
+			cfinstance, err = client.GetInstance(ctx, mapInstancegOpts)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			if exists && instanceName != "" && cfinstance != nil {
-				//Add parameters to adopt the orphaned instance
-				var parameterObjects []map[string]interface{}
-				paramMap := make(map[string]interface{})
-				paramMap["parameter-hash"] = cfinstance.ParameterHash
-				paramMap["owner"] = cfinstance.Owner
-				parameterObjects = append(parameterObjects, paramMap)
-				parameters, err := mergeObjects(parameterObjects...)
-				if err != nil {
-					return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
-				}
-				// update the orphaned cloud foundry instance
-				log.V(1).Info("triggering update")
-				if err := client.UpdateInstance(
-					ctx,
-					cfinstance.Guid,
-					spec.Name,
-					"",
-					parameters,
-					nil,
-					serviceInstance.Generation,
-				); err != nil {
-					return ctrl.Result{}, err
-				}
-				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
-				// return the reconcile function to requeue inmediatly after the update
-				serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfinstance.State), cfinstance.StateDescription)
-				return ctrl.Result{Requeue: true}, nil
+
+			//Add parameters to adopt the orphaned instance
+			var parameterObjects []map[string]interface{}
+			paramMap := make(map[string]interface{})
+			paramMap["parameter-hash"] = cfinstance.ParameterHash
+			paramMap["owner"] = cfinstance.Owner
+			parameterObjects = append(parameterObjects, paramMap)
+			parameters, err := mergeObjects(parameterObjects...)
+			if err != nil {
+				return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
 			}
+			// update the orphaned cloud foundry instance
+			log.V(1).Info("triggering update")
+			if err := client.UpdateInstance(
+				ctx,
+				cfinstance.Guid,
+				spec.Name,
+				"",
+				parameters,
+				nil,
+				serviceInstance.Generation,
+			); err != nil {
+				return ctrl.Result{}, err
+			}
+			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
+			// return the reconcile function to requeue inmediatly after the update
+			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfinstance.State), cfinstance.StateDescription)
+			return ctrl.Result{Requeue: true}, nil
 		}
 	}
 
@@ -367,7 +364,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		if cfinstance == nil {
 			// Re-retrieve cloud foundry instance by UID; this happens exactly if the instance was created or updated above
-			cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID), instanceName)
+			cfinstance, err = client.GetInstance(ctx, mapInstancegOpts)
 			if err != nil {
 				return ctrl.Result{}, err
 			}

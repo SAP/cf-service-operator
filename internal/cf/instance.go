@@ -18,38 +18,35 @@ import (
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
-// GetInstance returns the instance with the given owner or instanceName.
-// If instanceName is empty, the instance with the given owner is returned.
-// If instanceName is not empty, the instance with the given instanceName is returned for orphan instances.
+// GetInstance returns the instance with the given mapInstancegOpts["owner"] or mapInstancegOpts["name"].
+// If mapInstancegOpts["name"] is empty, the instance with the given mapInstancegOpts["owner"] is returned.
+// If mapInstancegOpts["name"] is not empty, the instance with the given Name is returned for orphan instances.
 // If no instance is found, nil is returned.
 // If multiple instances are found, an error is returned.
-func (c *spaceClient) GetInstance(ctx context.Context, owner, instanceName string) (*facade.Instance, error) {
+// The function add the parameter values to the orphan cf instance, so that can be adopted.
+func (c *spaceClient) GetInstance(ctx context.Context, mapInstancegOpts map[string]string) (*facade.Instance, error) {
 	listOpts := cfclient.NewServiceInstanceListOptions()
-
-	if instanceName != "" {
-		listOpts.Names.EqualTo(instanceName)
+	if mapInstancegOpts["name"] != "" {
+		listOpts.Names.EqualTo(mapInstancegOpts["name"])
 	} else {
-		listOpts.LabelSelector.EqualTo(fmt.Sprintf("%s/%s=%s", labelPrefix, labelKeyOwner, owner))
+		listOpts.LabelSelector.EqualTo(fmt.Sprintf("%s/%s=%s", labelPrefix, labelKeyOwner, mapInstancegOpts["owner"]))
 	}
 
 	serviceInstances, err := c.client.ServiceInstances.ListAll(ctx, listOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to list service credential bindings: %w", err)
+		return nil, fmt.Errorf("failed to list service instances: %w", err)
 	}
 
 	if len(serviceInstances) == 0 {
 		return nil, nil
 	} else if len(serviceInstances) > 1 {
-		if instanceName != "" {
-			return nil, fmt.Errorf("found multiple service instances with name: %s", instanceName)
-		}
-		return nil, fmt.Errorf("found multiple service instances with owner: %s", owner)
+		return nil, errors.New(fmt.Sprintf("found multiple service instances with owner: %s", mapInstancegOpts["owner"]))
 	}
 
 	serviceInstance := serviceInstances[0]
 
 	// add parameter values to the orphan cf instance
-	if instanceName != "" {
+	if mapInstancegOpts["name"] != "" {
 		generationvalue := "0"
 		serviceInstance.Metadata.Annotations[annotationGeneration] = &generationvalue
 		parameterHashValue := "0"
@@ -93,7 +90,7 @@ func (c *spaceClient) GetInstance(ctx context.Context, owner, instanceName strin
 		Guid:             guid,
 		Name:             name,
 		ServicePlanGuid:  servicePlanGuid,
-		Owner:            owner,
+		Owner:            mapInstancegOpts["owner"],
 		Generation:       generation,
 		ParameterHash:    parameterHash,
 		State:            state,

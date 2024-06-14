@@ -86,12 +86,11 @@ type FakeSpaceClient struct {
 		result1 string
 		result2 error
 	}
-	GetBindingStub        func(context.Context, string, string) (*facade.Binding, error)
+	GetBindingStub        func(context.Context, map[string]string) (*facade.Binding, error)
 	getBindingMutex       sync.RWMutex
 	getBindingArgsForCall []struct {
 		arg1 context.Context
-		arg2 string
-		arg3 string
+		arg2 map[string]string
 	}
 	getBindingReturns struct {
 		result1 *facade.Binding
@@ -101,12 +100,11 @@ type FakeSpaceClient struct {
 		result1 *facade.Binding
 		result2 error
 	}
-	GetInstanceStub        func(context.Context, string, string) (*facade.Instance, error)
+	GetInstanceStub        func(context.Context, map[string]string) (*facade.Instance, error)
 	getInstanceMutex       sync.RWMutex
 	getInstanceArgsForCall []struct {
 		arg1 context.Context
-		arg2 string
-		arg3 string
+		arg2 map[string]string
 	}
 	getInstanceReturns struct {
 		result1 *facade.Instance
@@ -480,20 +478,19 @@ func (fake *FakeSpaceClient) FindServicePlanReturnsOnCall(i int, result1 string,
 	}{result1, result2}
 }
 
-func (fake *FakeSpaceClient) GetBinding(arg1 context.Context, arg2 string, arg3 string) (*facade.Binding, error) {
+func (fake *FakeSpaceClient) GetBinding(arg1 context.Context, arg2 map[string]string) (*facade.Binding, error) {
 	fake.getBindingMutex.Lock()
 	ret, specificReturn := fake.getBindingReturnsOnCall[len(fake.getBindingArgsForCall)]
 	fake.getBindingArgsForCall = append(fake.getBindingArgsForCall, struct {
 		arg1 context.Context
-		arg2 string
-		arg3 string
-	}{arg1, arg2, arg3})
+		arg2 map[string]string
+	}{arg1, arg2})
 	stub := fake.GetBindingStub
 	fakeReturns := fake.getBindingReturns
-	fake.recordInvocation("GetBinding", []interface{}{arg1, arg2, arg3})
+	fake.recordInvocation("GetBinding", []interface{}{arg1, arg2})
 	fake.getBindingMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3)
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -507,17 +504,17 @@ func (fake *FakeSpaceClient) GetBindingCallCount() int {
 	return len(fake.getBindingArgsForCall)
 }
 
-func (fake *FakeSpaceClient) GetBindingCalls(stub func(context.Context, string, string) (*facade.Binding, error)) {
+func (fake *FakeSpaceClient) GetBindingCalls(stub func(context.Context, map[string]string) (*facade.Binding, error)) {
 	fake.getBindingMutex.Lock()
 	defer fake.getBindingMutex.Unlock()
 	fake.GetBindingStub = stub
 }
 
-func (fake *FakeSpaceClient) GetBindingArgsForCall(i int) (context.Context, string, string) {
+func (fake *FakeSpaceClient) GetBindingArgsForCall(i int) (context.Context, map[string]string) {
 	fake.getBindingMutex.RLock()
 	defer fake.getBindingMutex.RUnlock()
 	argsForCall := fake.getBindingArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeSpaceClient) GetBindingReturns(result1 *facade.Binding, result2 error) {
@@ -546,20 +543,19 @@ func (fake *FakeSpaceClient) GetBindingReturnsOnCall(i int, result1 *facade.Bind
 	}{result1, result2}
 }
 
-func (fake *FakeSpaceClient) GetInstance(arg1 context.Context, arg2 string, arg3 string) (*facade.Instance, error) {
+func (fake *FakeSpaceClient) GetInstance(arg1 context.Context, arg2 map[string]string) (*facade.Instance, error) {
 	fake.getInstanceMutex.Lock()
 	ret, specificReturn := fake.getInstanceReturnsOnCall[len(fake.getInstanceArgsForCall)]
 	fake.getInstanceArgsForCall = append(fake.getInstanceArgsForCall, struct {
 		arg1 context.Context
-		arg2 string
-		arg3 string
-	}{arg1, arg2, arg3})
+		arg2 map[string]string
+	}{arg1, arg2})
 	stub := fake.GetInstanceStub
 	fakeReturns := fake.getInstanceReturns
-	fake.recordInvocation("GetInstance", []interface{}{arg1, arg2, arg3})
+	fake.recordInvocation("GetInstance", []interface{}{arg1, arg2})
 	fake.getInstanceMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3)
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1, ret.result2
@@ -573,17 +569,17 @@ func (fake *FakeSpaceClient) GetInstanceCallCount() int {
 	return len(fake.getInstanceArgsForCall)
 }
 
-func (fake *FakeSpaceClient) GetInstanceCalls(stub func(context.Context, string, string) (*facade.Instance, error)) {
+func (fake *FakeSpaceClient) GetInstanceCalls(stub func(context.Context, map[string]string) (*facade.Instance, error)) {
 	fake.getInstanceMutex.Lock()
 	defer fake.getInstanceMutex.Unlock()
 	fake.GetInstanceStub = stub
 }
 
-func (fake *FakeSpaceClient) GetInstanceArgsForCall(i int) (context.Context, string, string) {
+func (fake *FakeSpaceClient) GetInstanceArgsForCall(i int) (context.Context, map[string]string) {
 	fake.getInstanceMutex.RLock()
 	defer fake.getInstanceMutex.RUnlock()
 	argsForCall := fake.getInstanceArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeSpaceClient) GetInstanceReturns(result1 *facade.Instance, result2 error) {
