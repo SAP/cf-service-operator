@@ -127,6 +127,11 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 		if err == nil {
 			spaceClientCache[identifier] = client
 		}
+	} else {
+		// If the password has changed since we cached the client, we want to update it to the new one
+		if client.password != password {
+			client.password = password
+		}
 	}
 	return client, err
 }
