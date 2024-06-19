@@ -96,67 +96,78 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 }
 
 var (
-	spaceClientCache = make(map[clientIdentifier]*spaceClient)
-	orgClientCache   = make(map[clientIdentifier]*organizationClient)
-	cacheMutex       = &sync.Mutex{}
+	cacheMutex  = &sync.Mutex{}
+	clientCache = make(map[clientIdentifier]*cfclient.Client)
 )
 
 func NewOrganizationClient(organizationName string, url string, username string, password string) (facade.OrganizationClient, error) {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
+
+	// look up CF client in cache
 	identifier := clientIdentifier{URL: url, Username: username}
-	client, cached := orgClientCache[identifier]
-	var err error
-	if !cached {
+	cfClient, isInCache := clientCache[identifier]
+
+	var err error = nil
+	var client *organizationClient = nil
+	if isInCache {
+		// use CF client from cache but use new organizationClient with current values like organizationName
+		// otherwise, we would erroneously re-use e.g. old space GUIDs
+		client = &organizationClient{url: url, username: username, password: password, organizationName: organizationName, client: *cfClient}
+	} else {
 		client, err = newOrganizationClient(organizationName, url, username, password)
 		if err == nil {
-			orgClientCache[identifier] = client
-		}
-	} else {
-		// If the password has changed since we cached the client, we want to update it to the new one
-		if client.password != password {
-			client.password = password
+			clientCache[identifier] = &client.client // add CF client to cache
 		}
 	}
+
 	return client, err
 }
 
 func NewSpaceClient(spaceGuid string, url string, username string, password string) (facade.SpaceClient, error) {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
+
+	// look up CF client in cache
 	identifier := clientIdentifier{URL: url, Username: username}
-	client, cached := spaceClientCache[identifier]
-	var err error
-	if !cached {
+	cfClient, isInCache := clientCache[identifier]
+
+	var err error = nil
+	var client *spaceClient = nil
+	if isInCache {
+		// use CF client from cache but use new spaceClient with current values like spaceGuid
+		// otherwise, we would erroneously re-use e.g. old spaceGuid
+		client = &spaceClient{url: url, username: username, password: password, spaceGuid: spaceGuid, client: *cfClient}
+	} else {
 		client, err = newSpaceClient(spaceGuid, url, username, password)
 		if err == nil {
-			spaceClientCache[identifier] = client
-		}
-	} else {
-		// If the password has changed since we cached the client, we want to update it to the new one
-		if client.password != password {
-			client.password = password
+			clientCache[identifier] = &client.client // add CF client to cache
 		}
 	}
+
 	return client, err
 }
 
 func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
+
+	// look up CF client in cache
 	identifier := clientIdentifier{URL: url, Username: username}
-	client, cached := spaceClientCache[identifier]
-	var err error
-	if !cached {
+	cfClient, isInCache := clientCache[identifier]
+
+	var err error = nil
+	var client *spaceClient = nil
+	if isInCache {
+		// use CF client from cache but use new spaceClient with current values like spaceGuid
+		// otherwise, we would erroneously re-use e.g. old spaceGuid
+		client = &spaceClient{url: url, username: username, password: password, spaceGuid: spaceGuid, client: *cfClient}
+	} else {
 		client, err = newSpaceClient(spaceGuid, url, username, password)
 		if err == nil {
-			spaceClientCache[identifier] = client
-		}
-	} else {
-		// If the password has changed since we cached the client, we want to update it to the new one
-		if client.password != password {
-			client.password = password
+			clientCache[identifier] = &client.client // add CF client to cache
 		}
 	}
+
 	return client, err
 }
