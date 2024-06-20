@@ -3,6 +3,10 @@ SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and cf-service-o
 SPDX-License-Identifier: Apache-2.0
 */
 
+/*
+Package controllers contains the implementation of various helper functions used by the reconciler.
+*/
+
 package controllers
 
 import (
@@ -14,11 +18,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// IncrementRetryCounterAndCheckRetryLimit increments the retry counter for a ServiceInstance and checks if the number of retries has exceeded the maximum allowed retries.
-// The maximum retries is configured per ServiceInstance via the annotation, AnnotationMaxRetries. If not specified,
-// a default value is used.
-// This function updates the ServiceInstance's Condition and State to indicate a failure when the retry limit is reached.
-// Returns:A boolean indicating whether the retry limit has been reached.
+// setMaxRetries sets the maximum number of retries for a service instance based on the value provided in the annotations
+// or uses the default value if the annotation is not set or is invalid.
 // TODO: Make it Generic so applies to Space and ServiceBindig.
 // TODO: Add a test for this function.
 func setMaxRetries(serviceInstance *cfv1alpha1.ServiceInstance, log logr.Logger) {
