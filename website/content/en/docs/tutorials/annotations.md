@@ -45,4 +45,4 @@ kind: ServiceInstance
       service-operator.cf.cs.sap.com/polling-interval-fail: "5m"
 ```
 
-In the example above the custom resource will be reconcile every three hours after reaching the final state Failed.
+In the example above the custom resource will be reconcile every five minutes after reaching the final state Failed.
