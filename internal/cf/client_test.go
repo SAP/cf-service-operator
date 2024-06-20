@@ -9,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfResource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -92,7 +91,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 	Describe("NewOrganizationClient", func() {
 		BeforeEach(func() {
 			// Reset the cache so tests can be run independently
-			clientCache = make(map[clientIdentifier]*cfclient.Client)
+			clientCache = make(map[clientIdentifier]*clientCacheEntry)
 			// Reset server call counts
 			server.Reset()
 			// Register handlers
@@ -192,7 +191,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 	Describe("NewSpaceClient", func() {
 		BeforeEach(func() {
 			// Reset the cache so tests can be run independently
-			clientCache = make(map[clientIdentifier]*cfclient.Client)
+			clientCache = make(map[clientIdentifier]*clientCacheEntry)
 			// Reset server call counts
 			server.Reset()
 			// Register handlers
