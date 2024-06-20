@@ -21,10 +21,14 @@ import (
 // - use separate resource names to prevent collisions between tests
 
 const (
-	OrgName  = "test-org"
-	Username = "testUser"
-	Password = "testPass"
-	Owner    = "testOwner"
+	OrgName    = "test-org"
+	OrgName2   = "test-org-2"
+	SpaceName  = "test-space"
+	SpaceName2 = "test-space-2"
+	Username   = "testUser"
+	Password   = "testPass"
+	Owner      = "testOwner"
+	Owner2     = "testOwner2"
 
 	spacesURI           = "/v3/spaces"
 	serviceInstancesURI = "/v3/service_instances"
@@ -87,7 +91,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 	Describe("NewOrganizationClient", func() {
 		BeforeEach(func() {
 			// Reset the cache so tests can be run independently
-			orgClientCache = make(map[clientIdentifier]*organizationClient)
+			clientCache = make(map[clientIdentifier]*clientCacheEntry)
 			// Reset server call counts
 			server.Reset()
 			// Register handlers
@@ -156,12 +160,38 @@ var _ = Describe("CF Client tests", Ordered, func() {
 
 			Expect(server.ReceivedRequests()).To(HaveLen(4))
 		})
+
+		It("should be able to query two different orgs", func() {
+			// test org 1
+			orgClient1, err1 := NewOrganizationClient(OrgName, url, Username, Password)
+			Expect(err1).To(BeNil())
+			orgClient1.GetSpace(ctx, Owner)
+			// Discover UAA endpoint
+			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
+			// Get new oAuth token
+			Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
+			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
+			// Get instance
+			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(Owner))
+
+			// test org 2
+			orgClient2, err2 := NewOrganizationClient(OrgName2, url, Username, Password)
+			Expect(err2).To(BeNil())
+			orgClient2.GetSpace(ctx, Owner2)
+			// no discovery of UAA endpoint or oAuth token here due to caching
+			// Get instance
+			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[3].RequestURI).To(ContainSubstring(Owner2))
+		})
+
 	})
 
 	Describe("NewSpaceClient", func() {
 		BeforeEach(func() {
 			// Reset the cache so tests can be run independently
-			spaceClientCache = make(map[clientIdentifier]*spaceClient)
+			clientCache = make(map[clientIdentifier]*clientCacheEntry)
 			// Reset server call counts
 			server.Reset()
 			// Register handlers
@@ -230,5 +260,31 @@ var _ = Describe("CF Client tests", Ordered, func() {
 
 			Expect(server.ReceivedRequests()).To(HaveLen(4))
 		})
+
+		It("should be able to query two different spaces", func() {
+			// test space 1
+			spaceClient1, err1 := NewSpaceClient(SpaceName, url, Username, Password)
+			Expect(err1).To(BeNil())
+			spaceClient1.GetInstance(ctx, Owner)
+			// Discover UAA endpoint
+			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
+			// Get new oAuth token
+			Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
+			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
+			// Get instance
+			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(Owner))
+
+			// test space 2
+			spaceClient2, err2 := NewSpaceClient(SpaceName2, url, Username, Password)
+			Expect(err2).To(BeNil())
+			spaceClient2.GetInstance(ctx, Owner2)
+			// no discovery of UAA endpoint or oAuth token here due to caching
+			// Get instance
+			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[3].RequestURI).To(ContainSubstring(Owner2))
+		})
+
 	})
 })
