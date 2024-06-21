@@ -70,7 +70,7 @@ More information can be found [here](https://v3-apidocs.cloudfoundry.org/version
 
 ## Using Annotations
 
-An automated way of adopting Cloud Foundry instance is via the Kuberneste annotation `service-operator.cf.cs.sap.com/adopt-instances`.
+An automated way of adopting Cloud Foundry instance is via the Kuberneste annotation `service-operator.cf.cs.sap.com/adopt-cf-resources`.
 
 During the reconciliation of an orphan ServiceInstance and ServiceBinding custom resource, the controller will check if this annotation is present. If the annotation is found then the controller will try to update the Cloud Foundry instance with label `service-operator.cf.cs.sap.com/owner`, and the annotations `service-operator.cf.cs.sap.com/generation` and `service-operator.cf.cs.sap.com/parameter-hash`
 
@@ -83,7 +83,7 @@ metadata:
   name: example-instance
   namespace: demo
   annotations:
-    service-operator.cf.cs.sap.com/adopt-instances: "true"
+    service-operator.cf.cs.sap.com/adopt-cf-resources: "adopt"
 spec:
   spaceName: development
   serviceOfferingName: my-service
@@ -97,7 +97,7 @@ metadata:
   name: example-binding-instance
   namespace: demo
   annotations:
-    service-operator.cf.cs.sap.com/adopt-instances: "true"  
+    service-operator.cf.cs.sap.com/adopt-cf-resources: "adopt"  
 spec:
   serviceInstanceName: example-instance
 ```
