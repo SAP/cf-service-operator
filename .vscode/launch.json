@@ -19,18 +19,28 @@
             ]
         },
         {
-          "name": "Run integration test",
-          "type": "go",
-          "request": "launch",
-          "mode": "test",
-          "program": "${workspaceFolder}/internal/controllers",
-          "console": "internalConsole",
-          "env": {
-            "KUBEBUILDER_ASSETS": "${workspaceFolder}/bin/k8s/current",
-            "TEST_TIMEOUT": "1200"
-          },
-          "args": [],
-          "showLog": true
-        }
+            "name": "Run client test",
+            "type": "go",
+            "request": "launch",
+            "mode": "test",
+            "program": "${workspaceFolder}/internal/cf",
+            "console": "internalConsole",
+            "args": [],
+            "showLog": true
+        },
+        {
+            "name": "Run integration test",
+            "type": "go",
+            "request": "launch",
+            "mode": "test",
+            "program": "${workspaceFolder}/internal/controllers",
+            "console": "internalConsole",
+            "env": {
+              "KUBEBUILDER_ASSETS": "${workspaceFolder}/bin/k8s/current",
+              "TEST_TIMEOUT": "1200",
+            },
+            "args": [],
+            "showLog": true
+        },
     ]
 }
