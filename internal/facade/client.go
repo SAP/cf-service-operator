@@ -77,13 +77,12 @@ type OrganizationClientBuilder func(string, string, string, string) (Organizatio
 
 //counterfeiter:generate . SpaceClient
 type SpaceClient interface {
-	GetInstance(ctx context.Context, mapBindingOpts map[string]string) (*Instance, error)
+	GetInstance(ctx context.Context, instanceOpts map[string]string) (*Instance, error)
 	CreateInstance(ctx context.Context, name string, servicePlanGuid string, parameters map[string]interface{}, tags []string, owner string, generation int64) error
 	UpdateInstance(ctx context.Context, guid string, name string, servicePlanGuid string, parameters map[string]interface{}, tags []string, generation int64) error
 	DeleteInstance(ctx context.Context, guid string) error
 
-	//GetBinding(ctx context.Context, owner, bindingName string) (*Binding, error)
-	GetBinding(ctx context.Context, mapBindingOpts map[string]string) (*Binding, error)
+	GetBinding(ctx context.Context, bindingOpts map[string]string) (*Binding, error)
 	CreateBinding(ctx context.Context, name string, serviceInstanceGuid string, parameters map[string]interface{}, owner string, generation int64) error
 	UpdateBinding(ctx context.Context, guid string, generation int64, parameters map[string]interface{}) error
 	DeleteBinding(ctx context.Context, guid string) error

@@ -174,19 +174,19 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	// Retrieve cloud foundry instance
+	// Retrieve cloud foundry binding
 	var cfbinding *facade.Binding
-	mapBindingOpts := map[string]string{"name": "", "owner": string(serviceBinding.UID)}
+	bindingOpts := map[string]string{"name": "", "owner": string(serviceBinding.UID)}
 	if client != nil {
-		cfbinding, err = client.GetBinding(ctx, mapBindingOpts)
+		cfbinding, err = client.GetBinding(ctx, bindingOpts)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		orphan, exists := serviceInstance.Annotations[cfv1alpha1.AnnotationAdoptCFResources]
+		orphan, exists := serviceBinding.Annotations[cfv1alpha1.AnnotationAdoptCFResources]
 		if exists && cfbinding == nil && orphan == "adopt" {
 			// find orphaned binding by name
-			mapBindingOpts["name"] = serviceBinding.Name
-			cfbinding, err = client.GetBinding(ctx, mapBindingOpts)
+			bindingOpts["name"] = serviceBinding.Name
+			cfbinding, err = client.GetBinding(ctx, bindingOpts)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -323,7 +323,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 		if cfbinding == nil {
 			// Re-retrieve cloud foundry binding by UID; this happens exactly if the binding was created or updated above
-			cfbinding, err = client.GetBinding(ctx, mapBindingOpts)
+			cfbinding, err = client.GetBinding(ctx, bindingOpts)
 			if err != nil {
 				return ctrl.Result{}, err
 			}

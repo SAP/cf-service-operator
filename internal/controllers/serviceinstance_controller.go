@@ -192,17 +192,17 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Retrieve cloud foundry instance
 	var cfinstance *facade.Instance
-	mapInstancegOpts := map[string]string{"name": "", "owner": string(serviceInstance.UID)}
+	instanceOpts := map[string]string{"name": "", "owner": string(serviceInstance.UID)}
 	if client != nil {
-		cfinstance, err = client.GetInstance(ctx, mapInstancegOpts)
+		cfinstance, err = client.GetInstance(ctx, instanceOpts)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		orphan, exists := serviceInstance.Annotations[cfv1alpha1.AnnotationAdoptCFResources]
 		if exists && cfinstance == nil && orphan == "adopt" {
 			// find orphaned instance by name
-			mapInstancegOpts["name"] = serviceInstance.Name
-			cfinstance, err = client.GetInstance(ctx, mapInstancegOpts)
+			instanceOpts["name"] = serviceInstance.Name
+			cfinstance, err = client.GetInstance(ctx, instanceOpts)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -364,7 +364,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		if cfinstance == nil {
 			// Re-retrieve cloud foundry instance by UID; this happens exactly if the instance was created or updated above
-			cfinstance, err = client.GetInstance(ctx, mapInstancegOpts)
+			cfinstance, err = client.GetInstance(ctx, instanceOpts)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
