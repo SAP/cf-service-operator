@@ -9,15 +9,15 @@ description: >
 
 ## Adopt service instances
 
-In order to adopt an existing Cloud Foundry instance, create a Kubernetes ServiceInstance object which specifies `spec.name`
-with the name of the existing Cloud Foundry instance, and provide offering, plan, parameters and tags matching the current state.
+To adopt an existing Cloud Foundry instance, create a Kubernetes ServiceInstance object that specifies the `spec.name` with the name of the existing Cloud Foundry instance and provides the offering, plans, parameters, and tags matching the current state.
+
 Such as:
 
 ```yaml
 apiVersion: cf.cs.sap.com/v1alpha1
 kind: ServiceInstance
 metadata:
-  name: uaa
+  name: example-instance
   namespace: demo
 spec:
   # Name of a Space object in the same namespace;
@@ -26,7 +26,7 @@ spec:
   # Name of service offering to be used
   serviceOfferingName: xsuaa
   # Name of service plan to be used
-  servicePlanName: application
+  servicePlanName: standard
   # Explicitly specify the name of the Cloud Foundry instance
   name: <cf instance name>
   # Current paremeters (if any)
@@ -37,38 +37,18 @@ spec:
     ...
 ```
 
-After deploying this object, it will enter an error state, complaining that an instance with the same name already exists in Cloud Foundry,
-but is not managed by the controller. To solve this, update the Cloud Foundry metadata of the existing instance; more information about how this
-controller leverages Cloud Foundry metadata can be found [here](../../concepts/cfmetadata). The update can e.g. be done with the cf command line client:
+After deploying this object, it will enter an error state, complaining that an instance with the same name already exists in Cloud Foundry, but is not managed by the controller.
 
-```bash
-cat > /tmp/patch <<END
-{
-  "metadata": {
-    "labels": {
-      "service-operator.cf.cs.sap.com/owner": "<ObjectMeta.uid of the Kubernetes ServiceInstance>"
-    },
-    "annotations": {
-      "service-operator.cf.cs.sap.com/generation": "0",
-      "service-operator.cf.cs.sap.com/parameter-hash": "0"
-    }
-  }
-}
-END
-cf curl -X PATCH -H "Content-Type: application/json" /v3/service_instances/<cf instance guid> -d @/tmp/patch
-```
+Check the status of the Instance. The following error is expected:
+`cfclient error (CF-UnprocessableEntity|10008): The service instance name is taken`
 
-More information about this Cloud Foundry API call can be found [here](https://v3-apidocs.cloudfoundry.org/version/3.113.0/index.html#update-a-service-instance).
-After some time the controller will consider the instance as managed.
+To solve this, the Cloud Foundry metadata of the existing instance must be updated.
 
-## Adopt service bindings
+>More information about how this controller leverages Cloud Foundry metadata can be found [here](../../concepts/cfmetadata).
 
-Works analogously.
+The CF Service Operator provides a way to adopt orphan instances via a Kubernetes Annotation.
 
-The according Cloud Foundry API endpoint is `/v3/service_credential_bindings`.
-More information can be found [here](https://v3-apidocs.cloudfoundry.org/version/3.113.0/index.html#update-a-service-credential-binding).
-
-## Using Annotations
+### Using the annotations adopt-cf-resources
 
 An automated way of adopting Cloud Foundry instance is via the Kuberneste annotation `service-operator.cf.cs.sap.com/adopt-cf-resources`.
 
@@ -85,8 +65,8 @@ metadata:
   annotations:
     service-operator.cf.cs.sap.com/adopt-cf-resources: "adopt"
 spec:
-  spaceName: development
-  serviceOfferingName: my-service
+  spaceName: k8s
+  serviceOfferingName: xsuaa
   servicePlanName: standard
 ```
 
@@ -101,3 +81,5 @@ metadata:
 spec:
   serviceInstanceName: example-instance
 ```
+
+After some time the controller will consider the ServiceInstance and ServiceBinding as managed.
