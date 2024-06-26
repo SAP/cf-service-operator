@@ -20,10 +20,10 @@ import (
 
 // setMaxRetries sets the maximum number of retries for a service instance based on the value provided in the annotations
 // or uses the default value if the annotation is not set or is invalid.
-// TODO: Make it Generic so applies to Space and ServiceBindig.
+// TODO: Make it Generic so applies to Space and ServiceBinding.
 // TODO: Add a test for this function.
 func setMaxRetries(serviceInstance *cfv1alpha1.ServiceInstance, log logr.Logger) {
-	// Default to an infinite number number of retries
+	// Default to an infinite number of retries
 	serviceInstance.Status.MaxRetries = serviceInstanceDefaultMaxRetries
 
 	// Use max retries from annotation
@@ -38,10 +38,10 @@ func setMaxRetries(serviceInstance *cfv1alpha1.ServiceInstance, log logr.Logger)
 	}
 }
 
-// function to read/get reconcile timeout annotation from the service instance "AnnotationReconcileTimeout = "service-operator.cf.cs.sap.com/timeout-on-reconcile" "
-// if the annotation is not set, the default value is used serviceInstanceDefaultRequeueTimeout
-// else returns the reconcile timeout as a time duration
-// TODO: Make it Generic so applies to Space and ServiceBindig.
+// getReconcileTimeout reads the reconcile timeout from the annotation on the service instance
+// or - if the annotation is not set - uses the default value serviceInstanceDefaultRequeueTimeout
+// or else returns the reconcile timeout as a time duration
+// TODO: Make it Generic so applies to Space and ServiceBinding.
 // TODO: Add a test for this function.
 func getReconcileTimeout(serviceInstance *cfv1alpha1.ServiceInstance) time.Duration {
 	// Use reconcile timeout from annotation, use default if annotation is missing or not parsable
@@ -56,11 +56,10 @@ func getReconcileTimeout(serviceInstance *cfv1alpha1.ServiceInstance) time.Durat
 	return reconcileTimeout
 }
 
-// getPollingInterval retrieves the polling interval from the service instance annotations.
-// If the annotation is not set or the value is not a valid duration, it returns either the defaultDurationStr or an empty ctrl.Result{}.
+// getPollingInterval retrieves the polling interval from the annotaion on the service instance
+// or - in case the annotation is not set or invalid - returns either the defaultDurationStr or an empty ctrl.Result{}.
 // Otherwise, it returns a ctrl.Result  with the RequeueAfter field set in the annotation.
 func getPollingInterval(annotations map[string]string, defaultDurationStr, annotationName string) ctrl.Result {
-
 	pollingIntervalStr, ok := annotations[annotationName]
 	if ok {
 		pollingInterval, err := time.ParseDuration(pollingIntervalStr)
