@@ -13,6 +13,8 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
+	"github.com/prometheus/client_golang/prometheus"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 // constants useful for this file
@@ -90,10 +92,11 @@ var _ = Describe("CF Client tests", Ordered, func() {
 
 	Describe("NewOrganizationClient", func() {
 		BeforeEach(func() {
-			// Reset the cache so tests can be run independently
+			// Reset some entities to enable tests to run independently
 			clientCache = make(map[clientIdentifier]*clientCacheEntry)
-			// Reset server call counts
+			metrics.Registry = prometheus.NewRegistry()
 			server.Reset()
+
 			// Register handlers
 			server.RouteToHandler("GET", "/", ghttp.CombineHandlers(
 				ghttp.RespondWithJSONEncodedPtr(&statusCode, &rootResult),
@@ -190,10 +193,11 @@ var _ = Describe("CF Client tests", Ordered, func() {
 
 	Describe("NewSpaceClient", func() {
 		BeforeEach(func() {
-			// Reset the cache so tests can be run independently
+			// Reset some entities to enable tests to run independently
 			clientCache = make(map[clientIdentifier]*clientCacheEntry)
-			// Reset server call counts
+			metrics.Registry = prometheus.NewRegistry()
 			server.Reset()
+
 			// Register handlers
 			server.RouteToHandler("GET", "/", ghttp.CombineHandlers(
 				ghttp.RespondWithJSONEncodedPtr(&statusCode, &rootResult),
@@ -284,6 +288,44 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// Get instance
 			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[3].RequestURI).To(ContainSubstring(Owner2))
+		})
+
+		It("should register prometheus metrics for OrgClient", func() {
+			orgClient, err := NewOrganizationClient(OrgName, url, Username, Password)
+			Expect(err).To(BeNil())
+			Expect(orgClient).ToNot(BeNil())
+
+			// retrieve names of registered metrics
+			metricsList, err := metrics.Registry.Gather()
+			Expect(err).To(BeNil())
+			Expect(metricsList).To(HaveLen(3))
+			metricNames := make([]string, len(metricsList))
+			for i, m := range metricsList {
+				metricNames[i] = *m.Name
+			}
+
+			Expect(metricNames).To(ContainElement("http_client_request_duration_seconds"))
+			Expect(metricNames).To(ContainElement("http_client_requests_in_flight"))
+			Expect(metricNames).To(ContainElement("http_client_requests_total"))
+		})
+
+		It("should register prometheus metrics for SpaceClient", func() {
+			spaceClient, err := NewSpaceClient(SpaceName, url, Username, Password)
+			Expect(err).To(BeNil())
+			Expect(spaceClient).ToNot(BeNil())
+
+			// retrieve names of registered metrics
+			metricsList, err := metrics.Registry.Gather()
+			Expect(err).To(BeNil())
+			Expect(metricsList).To(HaveLen(3))
+			metricNames := make([]string, len(metricsList))
+			for i, m := range metricsList {
+				metricNames[i] = *m.Name
+			}
+
+			Expect(metricNames).To(ContainElement("http_client_request_duration_seconds"))
+			Expect(metricNames).To(ContainElement("http_client_requests_in_flight"))
+			Expect(metricNames).To(ContainElement("http_client_requests_total"))
 		})
 
 	})
