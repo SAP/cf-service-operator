@@ -326,6 +326,9 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(metricNames).To(ContainElement("http_client_request_duration_seconds"))
 			Expect(metricNames).To(ContainElement("http_client_requests_in_flight"))
 			Expect(metricNames).To(ContainElement("http_client_requests_total"))
+
+			// for debugging: write metrics to file
+			// prometheus.WriteToTextfile("metrics.txt", metrics.Registry)
 		})
 
 	})
