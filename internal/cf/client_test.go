@@ -141,11 +141,14 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			metricsList, err := metrics.Registry.Gather()
 			Expect(err).To(BeNil())
 			Expect(metricsList).To(HaveLen(3))
+			verified := false
 			for _, m := range metricsList {
 				if *m.Name == "http_client_requests_total" {
 					Expect(m.Metric[0].Counter.GetValue()).To(BeNumerically(">", 0))
+					verified = true
 				}
 			}
+			Expect(verified).To(BeTrue())
 		})
 
 		It("should be able to query some org twice", func() {
@@ -252,11 +255,14 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			metricsList, err := metrics.Registry.Gather()
 			Expect(err).To(BeNil())
 			Expect(metricsList).To(HaveLen(3))
+			verified := false
 			for _, m := range metricsList {
 				if *m.Name == "http_client_requests_total" {
 					Expect(m.Metric[0].Counter.GetValue()).To(BeNumerically(">", 0))
+					verified = true
 				}
 			}
+			Expect(verified).To(BeTrue())
 		})
 
 		It("should be able to query some space twice", func() {
