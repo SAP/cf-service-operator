@@ -136,6 +136,16 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(spacesURI))
 
 			Expect(server.ReceivedRequests()).To(HaveLen(3))
+
+			// verify metrics
+			metricsList, err := metrics.Registry.Gather()
+			Expect(err).To(BeNil())
+			Expect(metricsList).To(HaveLen(3))
+			for _, m := range metricsList {
+				if *m.Name == "http_client_requests_total" {
+					Expect(m.Metric[0].Counter.GetValue()).To(BeNumerically(">", 0))
+				}
+			}
 		})
 
 		It("should be able to query some org twice", func() {
@@ -220,7 +230,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()).To(HaveLen(1))
 		})
 
-		It("should be able to query space", func() {
+		It("should be able to query some space", func() {
 			spaceClient, err := NewSpaceClient(OrgName, url, Username, Password)
 			Expect(err).To(BeNil())
 
@@ -237,6 +247,16 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(serviceInstancesURI))
 
 			Expect(server.ReceivedRequests()).To(HaveLen(3))
+
+			// verify metrics
+			metricsList, err := metrics.Registry.Gather()
+			Expect(err).To(BeNil())
+			Expect(metricsList).To(HaveLen(3))
+			for _, m := range metricsList {
+				if *m.Name == "http_client_requests_total" {
+					Expect(m.Metric[0].Counter.GetValue()).To(BeNumerically(">", 0))
+				}
+			}
 		})
 
 		It("should be able to query some space twice", func() {
