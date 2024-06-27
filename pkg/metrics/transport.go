@@ -14,7 +14,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// IndependentExecutionGeneral executes several operation indepent of each other and only propagates the error value
+const (
+	metricsNamespace = ""
+	metricsSubsystem = "http_client"
+)
+
+// IndependentExecutionGeneral runs several operations independently of each other and only propagates the error value
 func IndependentExecutionGeneral(fns ...func() error) error {
 	var combinedError error
 	for _, f := range fns {
@@ -33,7 +38,7 @@ func IndependentExecutionGeneral(fns ...func() error) error {
 	return combinedError
 }
 
-// AddMetricsToTransport injects the prometheus metrics to the http transport
+// AddMetricsToTransport injects the Prometheus metrics to the HTTP transport
 func AddMetricsToTransport(transport http.RoundTripper, registry prometheus.Registerer, target string, host string) (http.RoundTripper, error) {
 	if transport == nil {
 		transport = http.DefaultTransport
@@ -43,40 +48,37 @@ func AddMetricsToTransport(transport http.RoundTripper, registry prometheus.Regi
 		"host":   host,
 	}
 
-	namespace := ""
-	subsystem := "http_client"
+	// create metrics
 	inFlightGauge := prometheus.NewGauge(prometheus.GaugeOpts{
 		Name:        "requests_in_flight",
-		Subsystem:   subsystem,
-		Namespace:   namespace,
-		Help:        "The number in-flight requests for corresponding http client",
+		Subsystem:   metricsSubsystem,
+		Namespace:   metricsNamespace,
+		Help:        "The number in-flight requests for corresponding HTTP client",
 		ConstLabels: constLabels,
 	})
-
 	counter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name:        "requests_total",
-			Subsystem:   subsystem,
-			Namespace:   namespace,
-			Help:        "The number of http requests from corresponding http client",
+			Subsystem:   metricsSubsystem,
+			Namespace:   metricsNamespace,
+			Help:        "The number of HTTP requests from corresponding HTTP client",
 			ConstLabels: constLabels,
 		},
 		[]string{"code", "method"},
 	)
-
 	histVec := prometheus.NewHistogramVec(
 		prometheus.HistogramOpts{
 			Name:        "request_duration_seconds",
-			Subsystem:   subsystem,
-			Namespace:   namespace,
-			Help:        "A histogram of request latencies.",
+			Subsystem:   metricsSubsystem,
+			Namespace:   metricsNamespace,
+			Help:        "A histogram of HTTP request latencies.",
 			Buckets:     prometheus.DefBuckets,
 			ConstLabels: constLabels,
 		},
 		[]string{},
 	)
 
-	// we register the created components or replace then with the already registered ones
+	// register created metrics or replace them by already registered ones
 	err := IndependentExecutionGeneral(
 		func() error {
 			err := registry.Register(inFlightGauge)
