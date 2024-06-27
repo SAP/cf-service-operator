@@ -220,7 +220,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			spaceClient, err := NewSpaceClient(OrgName, url, Username, Password)
 			Expect(err).To(BeNil())
 
-			spaceClient.GetInstance(ctx, Owner)
+			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
 
 			// Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
@@ -239,10 +239,10 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			spaceClient, err := NewSpaceClient(OrgName, url, Username, Password)
 			Expect(err).To(BeNil())
 
-			spaceClient.GetInstance(ctx, Owner)
+			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
 			spaceClient, err = NewSpaceClient(OrgName, url, Username, Password)
 			Expect(err).To(BeNil())
-			spaceClient.GetInstance(ctx, Owner)
+			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
 
 			// Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
@@ -265,7 +265,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// test space 1
 			spaceClient1, err1 := NewSpaceClient(SpaceName, url, Username, Password)
 			Expect(err1).To(BeNil())
-			spaceClient1.GetInstance(ctx, Owner)
+			spaceClient1.GetInstance(ctx, map[string]string{"owner": Owner})
 			// Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
@@ -279,7 +279,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// test space 2
 			spaceClient2, err2 := NewSpaceClient(SpaceName2, url, Username, Password)
 			Expect(err2).To(BeNil())
-			spaceClient2.GetInstance(ctx, Owner2)
+			spaceClient2.GetInstance(ctx, map[string]string{"owner": Owner2})
 			// no discovery of UAA endpoint or oAuth token here due to caching
 			// Get instance
 			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))

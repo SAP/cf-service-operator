@@ -190,10 +190,48 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 	// Retrieve cloud foundry instance
 	var cfinstance *facade.Instance
+	instanceOpts := map[string]string{"name": "", "owner": string(serviceInstance.UID)}
 	if client != nil {
-		cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID))
+		cfinstance, err = client.GetInstance(ctx, instanceOpts)
 		if err != nil {
 			return ctrl.Result{}, err
+		}
+		orphan, exists := serviceInstance.Annotations[cfv1alpha1.AnnotationAdoptCFResources]
+		if exists && cfinstance == nil && orphan == "adopt" {
+			// find orphaned instance by name
+			instanceOpts["name"] = serviceInstance.Name
+			cfinstance, err = client.GetInstance(ctx, instanceOpts)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			//Add parameters to adopt the orphaned instance
+			var parameterObjects []map[string]interface{}
+			paramMap := make(map[string]interface{})
+			paramMap["parameter-hash"] = cfinstance.ParameterHash
+			paramMap["owner"] = cfinstance.Owner
+			parameterObjects = append(parameterObjects, paramMap)
+			parameters, err := mergeObjects(parameterObjects...)
+			if err != nil {
+				return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
+			}
+			// update the orphaned cloud foundry instance
+			log.V(1).Info("triggering update")
+			if err := client.UpdateInstance(
+				ctx,
+				cfinstance.Guid,
+				spec.Name,
+				"",
+				parameters,
+				nil,
+				serviceInstance.Generation,
+			); err != nil {
+				return ctrl.Result{}, err
+			}
+			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
+			// return the reconcile function to requeue inmediatly after the update
+			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfinstance.State), cfinstance.StateDescription)
+			return ctrl.Result{Requeue: true}, nil
 		}
 	}
 
@@ -241,6 +279,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				return ctrl.Result{}, fmt.Errorf("secret key not found, secret name: %s, key: %s", secretName, pf.SecretKeyRef.Key)
 			}
 		}
+
 		parameters, err := mergeObjects(parameterObjects...)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
@@ -322,8 +361,8 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 
 		if cfinstance == nil {
-			// Re-retrieve cloud foundry instance; this happens exactly if the instance was created or updated above
-			cfinstance, err = client.GetInstance(ctx, string(serviceInstance.UID))
+			// Re-retrieve cloud foundry instance by UID; this happens exactly if the instance was created or updated above
+			cfinstance, err = client.GetInstance(ctx, instanceOpts)
 			if err != nil {
 				return ctrl.Result{}, err
 			}

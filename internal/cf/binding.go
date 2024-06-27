@@ -18,20 +18,63 @@ import (
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
-func (c *spaceClient) GetBinding(ctx context.Context, owner string) (*facade.Binding, error) {
+type bindingFilter interface {
+	getListOptions() *cfclient.ServiceCredentialBindingListOptions
+}
+
+type bindingFilterName struct {
+	name string
+}
+type bindingFilterOwner struct {
+	owner string
+}
+
+func (bn *bindingFilterName) getListOptions() *cfclient.ServiceCredentialBindingListOptions {
 	listOpts := cfclient.NewServiceCredentialBindingListOptions()
-	listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
+	listOpts.Names.EqualTo(bn.name)
+	return listOpts
+}
+
+func (bo *bindingFilterOwner) getListOptions() *cfclient.ServiceCredentialBindingListOptions {
+	listOpts := cfclient.NewServiceCredentialBindingListOptions()
+	listOpts.LabelSelector.EqualTo(fmt.Sprintf("%s/%s=%s", labelPrefix, labelKeyOwner, bo.owner))
+	return listOpts
+}
+
+// GetBinding returns the binding with the given bindingOpts["owner"] or bindingOpts["name"].
+// If bindingOpts["name"] is empty, the binding with the given bindingOpts["owner"] is returned.
+// If bindingOpts["name"] is not empty, the binding with the given Name is returned for orphan bindings.
+// If no binding is found, nil is returned.
+// If multiple bindings are found, an error is returned.
+// The function add the parameter values to the orphan cf binding, so that can be adopted.
+func (c *spaceClient) GetBinding(ctx context.Context, bindingOpts map[string]string) (*facade.Binding, error) {
+	var filterOpts bindingFilter
+	if bindingOpts["name"] != "" {
+		filterOpts = &bindingFilterName{name: bindingOpts["name"]}
+	} else {
+		filterOpts = &bindingFilterOwner{owner: bindingOpts["owner"]}
+	}
+	listOpts := filterOpts.getListOptions()
 	serviceBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, listOpts)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to list service credential bindings: %w", err)
 	}
 
 	if len(serviceBindings) == 0 {
 		return nil, nil
 	} else if len(serviceBindings) > 1 {
-		return nil, fmt.Errorf("found multiple service bindings with owner: %s", owner)
+		return nil, errors.New(fmt.Sprintf("found multiple service bindings with owner: %s", bindingOpts["owner"]))
 	}
+
 	serviceBinding := serviceBindings[0]
+
+	// add parameter values to the cf orphan binding
+	if bindingOpts["name"] != "" {
+		generationvalue := "0"
+		serviceBinding.Metadata.Annotations[annotationGeneration] = &generationvalue
+		parameterHashValue := "0"
+		serviceBinding.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
+	}
 
 	guid := serviceBinding.GUID
 	name := serviceBinding.Name
@@ -71,7 +114,7 @@ func (c *spaceClient) GetBinding(ctx context.Context, owner string) (*facade.Bin
 	return &facade.Binding{
 		Guid:             guid,
 		Name:             name,
-		Owner:            owner,
+		Owner:            bindingOpts["owner"],
 		Generation:       generation,
 		ParameterHash:    parameterHash,
 		State:            state,
@@ -101,12 +144,18 @@ func (c *spaceClient) CreateBinding(ctx context.Context, name string, serviceIns
 }
 
 // Required parameters (may not be initial): guid, generation
-func (c *spaceClient) UpdateBinding(ctx context.Context, guid string, generation int64) error {
+func (c *spaceClient) UpdateBinding(ctx context.Context, guid string, generation int64, parameters map[string]interface{}) error {
 	// TODO: why is there no cfresource.NewServiceCredentialBindingUpdate() method ?
 	req := &cfresource.ServiceCredentialBindingUpdate{}
 	req.Metadata = cfresource.NewMetadata().
 		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
 
+	if parameters != nil {
+		req.Metadata.WithAnnotation(annotationPrefix, annotationKeyParameterHash, facade.ObjectHash(parameters))
+		if parameters["owner"] != nil {
+			req.Metadata.WithLabel(labelPrefix, labelKeyOwner, parameters["owner"].(string))
+		}
+	}
 	_, err := c.client.ServiceCredentialBindings.Update(ctx, guid, req)
 	return err
 }

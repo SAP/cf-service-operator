@@ -174,12 +174,48 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		}
 	}
 
-	// Retrieve cloud foundry instance
+	// Retrieve cloud foundry binding
 	var cfbinding *facade.Binding
+	bindingOpts := map[string]string{"name": "", "owner": string(serviceBinding.UID)}
 	if client != nil {
-		cfbinding, err = client.GetBinding(ctx, string(serviceBinding.UID))
+		cfbinding, err = client.GetBinding(ctx, bindingOpts)
 		if err != nil {
 			return ctrl.Result{}, err
+		}
+		orphan, exists := serviceBinding.Annotations[cfv1alpha1.AnnotationAdoptCFResources]
+		if exists && cfbinding == nil && orphan == "adopt" {
+			// find orphaned binding by name
+			bindingOpts["name"] = serviceBinding.Name
+			cfbinding, err = client.GetBinding(ctx, bindingOpts)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+
+			//Add parameters to adopt the orphaned binding
+			var parameterObjects []map[string]interface{}
+			paramMap := make(map[string]interface{})
+			paramMap["parameter-hash"] = cfbinding.ParameterHash
+			paramMap["owner"] = cfbinding.Owner
+			parameterObjects = append(parameterObjects, paramMap)
+			parameters, err := mergeObjects(parameterObjects...)
+			if err != nil {
+				return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
+			}
+			// update the orphaned cloud foundry service binding
+			log.V(1).Info("triggering update")
+			if err := client.UpdateBinding(
+				ctx,
+				cfbinding.Guid,
+				serviceBinding.Generation,
+				parameters,
+			); err != nil {
+				return ctrl.Result{}, err
+			}
+			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
+
+			// return the reconcile function to requeue inmediatly after the update
+			serviceBinding.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfbinding.State), cfbinding.StateDescription)
+			return ctrl.Result{Requeue: true}, nil
 		}
 	}
 
@@ -268,10 +304,12 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			} else if cfbinding.Generation < serviceBinding.Generation {
 				// metadata updates (such as updating the generation here) are possible with service bindings
 				log.V(1).Info("triggering update")
+
 				if err := client.UpdateBinding(
 					ctx,
 					cfbinding.Guid,
 					serviceBinding.Generation,
+					nil,
 				); err != nil {
 					return ctrl.Result{}, err
 				}
@@ -284,8 +322,8 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		status.ServiceInstanceDigest = serviceInstance.Status.ServiceInstanceDigest
 
 		if cfbinding == nil {
-			// Re-retrieve cloud foundry binding; this happens exactly if the binding was created or updated above
-			cfbinding, err = client.GetBinding(ctx, string(serviceBinding.UID))
+			// Re-retrieve cloud foundry binding by UID; this happens exactly if the binding was created or updated above
+			cfbinding, err = client.GetBinding(ctx, bindingOpts)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
