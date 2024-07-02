@@ -240,7 +240,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 
 		log.V(1).Info("healthcheck successful")
 		space.SetReadyCondition(cfv1alpha1.ConditionTrue, spaceReadyConditionReasonSuccess, "Success")
-		return ctrl.Result{RequeueAfter: 60 * time.Second}, nil
+		return getPollingInterval(space.GetAnnotations(), "60s",cfv1alpha1.AnnotationPollingIntervalReady), nil
 	} else if len(serviceInstanceList.Items) > 0 {
 		space.SetReadyCondition(cfv1alpha1.ConditionUnknown, spaceReadyConditionReasonDeletionBlocked, "Waiting for deletion of depending service instances")
 		// TODO: apply some increasing period, depending on the age of the last update
