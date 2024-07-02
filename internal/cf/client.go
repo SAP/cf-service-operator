@@ -11,8 +11,10 @@ import (
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfconfig "github.com/cloudfoundry-community/go-cfclient/v3/config"
+	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/sap/cf-service-operator/internal/facade"
+	cfmetrics "github.com/sap/cf-service-operator/pkg/metrics"
 )
 
 const (
@@ -70,6 +72,13 @@ func newOrganizationClient(organizationName string, url string, username string,
 	if err != nil {
 		return nil, err
 	}
+	httpClient := config.HTTPClient()
+	transport, err := cfmetrics.AddMetricsToTransport(httpClient.Transport, metrics.Registry, "cf-api", url)
+	if err != nil {
+		return nil, err
+	}
+	httpClient.Transport = transport
+	config.WithHTTPClient(httpClient)
 	c, err := cfclient.New(config)
 	if err != nil {
 		return nil, err
@@ -94,6 +103,13 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	if err != nil {
 		return nil, err
 	}
+	httpClient := config.HTTPClient()
+	transport, err := cfmetrics.AddMetricsToTransport(httpClient.Transport, metrics.Registry, "cf-api", url)
+	if err != nil {
+		return nil, err
+	}
+	httpClient.Transport = transport
+	config.WithHTTPClient(httpClient)
 	c, err := cfclient.New(config)
 	if err != nil {
 		return nil, err

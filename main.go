@@ -53,12 +53,14 @@ func main() {
 	var webhookAddr string
 	var webhookCertDir string
 	var enableLeaderElection bool
+	var enableWebhooks bool
 	var clusterResourceNamespace string
 	var enableBindingMetadata bool
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.StringVar(&webhookAddr, "webhook-bind-address", ":9443", "The address the webhook endpoint binds to.")
-	flag.StringVar(&webhookCertDir, "webhook-tls-directory", "", "The directory containing tls server key and certificate, as tls.key and tls.crt; defaults to $TMPDIR/k8s-webhook-server/serving-certs.")
+	flag.StringVar(&webhookCertDir, "webhook-tls-directory", "", "The directory containing TLS server key and certificate, as tls.key and tls.crt; defaults to $TMPDIR/k8s-webhook-server/serving-certs.")
+	flag.BoolVar(&enableWebhooks, "enableWebhooks", true, "Enable webhooks in controller. May be disabled for local development.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
 	flag.StringVar(&clusterResourceNamespace, "cluster-resource-namespace", "", "The namespace for secrets in which cluster-scoped resources are found.")
 	flag.BoolVar(&enableBindingMetadata, "sap-binding-metadata", false, "Enhance binding secrets by SAP binding metadata by default.")
@@ -97,7 +99,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	options := ctrl.Options{
 		Scheme: scheme,
 		// TODO: disable cache for further resources (e.g. secrets) ?
 		Client: client.Options{
@@ -113,16 +115,19 @@ func main() {
 		LeaderElection:                enableLeaderElection,
 		LeaderElectionID:              LeaderElectionID,
 		LeaderElectionReleaseOnCancel: true,
-		WebhookServer: webhook.NewServer(webhook.Options{
-			Host:    webhookHost,
-			Port:    webhookPort,
-			CertDir: webhookCertDir,
-		}),
 		Metrics: metricsserver.Options{
 			BindAddress: metricsAddr,
 		},
 		HealthProbeBindAddress: probeAddr,
-	})
+	}
+	if enableWebhooks {
+		options.WebhookServer = webhook.NewServer(webhook.Options{
+			Host:    webhookHost,
+			Port:    webhookPort,
+			CertDir: webhookCertDir,
+		})
+	}
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
@@ -169,21 +174,23 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceBinding")
 		os.Exit(1)
 	}
-	if err = (&cfv1alpha1.Space{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "Space")
-		os.Exit(1)
-	}
-	if err = (&cfv1alpha1.ClusterSpace{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ClusterSpace")
-		os.Exit(1)
-	}
-	if err = (&cfv1alpha1.ServiceInstance{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ServiceInstance")
-		os.Exit(1)
-	}
-	if err = (&cfv1alpha1.ServiceBinding{}).SetupWebhookWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create webhook", "webhook", "ServiceBinding")
-		os.Exit(1)
+	if enableWebhooks {
+		if err = (&cfv1alpha1.Space{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Space")
+			os.Exit(1)
+		}
+		if err = (&cfv1alpha1.ClusterSpace{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ClusterSpace")
+			os.Exit(1)
+		}
+		if err = (&cfv1alpha1.ServiceInstance{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceInstance")
+			os.Exit(1)
+		}
+		if err = (&cfv1alpha1.ServiceBinding{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "ServiceBinding")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 
