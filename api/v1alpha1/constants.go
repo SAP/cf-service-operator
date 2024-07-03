@@ -17,6 +17,10 @@ const (
 	AnnotationMaxRetries = "service-operator.cf.cs.sap.com/max-retries"
 	// annotation to hold the reconciliation timeout value
 	AnnotationReconcileTimeout = "service-operator.cf.cs.sap.com/timeout-on-reconcile"
+	// annotation to increase or decrease the requeue interval at which the operator polls the status of CR after final state ready.
+	AnnotationPollingIntervalReady = "service-operator.cf.cs.sap.com/polling-interval-ready"
+	// annotation to increase or decrease the requeue interval at which the operator polls the status of CR after final state failed.
+	AnnotationPollingIntervalFail = "service-operator.cf.cs.sap.com/polling-interval-fail"
 	// annotation to adopt orphan CF resources. If set to 'adopt', the operator will adopt orphan CF resource.
 	// Ex. "service-operator.cf.cs.sap.com/adopt-cf-resources"="adopt"
 	AnnotationAdoptCFResources = "service-operator.cf.cs.sap.com/adopt-cf-resources"
