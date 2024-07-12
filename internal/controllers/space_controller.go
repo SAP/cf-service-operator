@@ -59,7 +59,7 @@ type SpaceReconciler struct {
 
 func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("running reconcile")
+	log.V(2).Info("Running reconcile")
 
 	// Retrieve target (cluster) space
 	space, err := r.newSpace()
@@ -71,7 +71,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 		if err := client.IgnoreNotFound(err); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "unexpected get error")
 		}
-		log.Info("not found; ignoring")
+		log.V(1).Info("Not found; ignoring")
 		return ctrl.Result{}, nil
 	}
 	// Call the defaulting webhook logic also here (because defaulting through the webhook might be incomplete in case of generateName usage)
@@ -153,6 +153,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 		}
 
 		// Retrieve cloud foundry space
+		log.V(1).Info("Retrieving space")
 		cfspace, err = client.GetSpace(ctx, string(space.GetUID()))
 		if err != nil {
 			return ctrl.Result{}, err
@@ -175,7 +176,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 
 		if spec.Guid == "" {
 			if cfspace == nil {
-				log.V(1).Info("triggering creation")
+				log.V(1).Info("Creating space")
 				if err := client.CreateSpace(
 					ctx,
 					spec.Name,
@@ -187,7 +188,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
 			} else {
 				if cfspace.Generation < space.GetGeneration() {
-					log.V(1).Info("triggering update")
+					log.V(1).Info("Updating space")
 					updateName := spec.Name
 					if updateName == cfspace.Name {
 						updateName = ""
@@ -207,6 +208,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			}
 			if cfspace == nil {
 				// Re-retrieve cloud foundry space; this happens exactly if the space was created or updated above
+				log.V(1).Info("Retrieving space")
 				cfspace, err = client.GetSpace(ctx, string(space.GetUID()))
 				if err != nil {
 					return ctrl.Result{}, err
@@ -217,6 +219,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			}
 			// TODO: the following is not very clean; if the user referenced by the secret changes, we leave the previous one orphaned;
 			// maybe we should clean it up somehow (but how ... what if that previous user has already been taken over by another manager, such as CAM?)
+			log.V(1).Info("Adding developer")
 			if err := client.AddDeveloper(ctx, cfspace.Guid, string(secret.Data["username"])); err != nil {
 				return ctrl.Result{}, err
 			}
@@ -234,11 +237,12 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the healthchecker from secret %s", secretName)
 		}
 
+		log.V(1).Info("Checking space")
 		if err := checker.Check(ctx); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "healthcheck failed")
 		}
 
-		log.V(1).Info("healthcheck successful")
+		log.V(1).Info("Healthcheck successful")
 		space.SetReadyCondition(cfv1alpha1.ConditionTrue, spaceReadyConditionReasonSuccess, "Success")
 		return getPollingInterval(space.GetAnnotations(), "60s", cfv1alpha1.AnnotationPollingIntervalReady), nil
 	} else if len(serviceInstanceList.Items) > 0 {
@@ -269,7 +273,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			skipStatusUpdate = true
 			return ctrl.Result{}, nil
 		} else {
-			log.V(1).Info("triggering deletion")
+			log.V(1).Info("Deleting space")
 			if err := client.DeleteSpace(ctx, cfspace.Guid); err != nil {
 				return ctrl.Result{}, err
 			}

@@ -87,7 +87,7 @@ func main() {
 	}
 
 	setupLog.Info(
-		"starting",
+		"Starting",
 		"enable-leader-election", enableLeaderElection,
 		"metrics-addr", metricsAddr,
 		"cluster-resource-namespace", clusterResourceNamespace,
@@ -203,7 +203,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("starting manager")
+	setupLog.Info("Starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)

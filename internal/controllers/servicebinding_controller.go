@@ -59,7 +59,7 @@ type ServiceBindingReconciler struct {
 
 func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("running reconcile")
+	log.V(2).Info("Running reconcile")
 
 	// Retrieve target service binding
 	serviceBinding := &cfv1alpha1.ServiceBinding{}
@@ -67,7 +67,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if err := client.IgnoreNotFound(err); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "unexpected get error")
 		}
-		log.Info("not found; ignoring")
+		log.V(1).Info("Not found; ignoring")
 		return ctrl.Result{}, nil
 	}
 	// Call the defaulting webhook logic also here (because defaulting through the webhook might be incomplete in case of generateName usage)
@@ -178,6 +178,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	var cfbinding *facade.Binding
 	bindingOpts := map[string]string{"name": "", "owner": string(serviceBinding.UID)}
 	if client != nil {
+		log.V(1).Info("Retrieving binding by owner")
 		cfbinding, err = client.GetBinding(ctx, bindingOpts)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -186,6 +187,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		if exists && cfbinding == nil && orphan == "adopt" {
 			// find orphaned binding by name
 			bindingOpts["name"] = serviceBinding.Name
+			log.V(1).Info("Retrieving binding by name")
 			cfbinding, err = client.GetBinding(ctx, bindingOpts)
 			if err != nil {
 				return ctrl.Result{}, err
@@ -202,7 +204,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
 			}
 			// update the orphaned cloud foundry service binding
-			log.V(1).Info("triggering update")
+			log.V(1).Info("Updating binding")
 			if err := client.UpdateBinding(
 				ctx,
 				cfbinding.Guid,
@@ -274,7 +276,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		inRecreation := false
 
 		if cfbinding == nil {
-			log.V(1).Info("triggering creation")
+			log.V(1).Info("Creating binding")
 			if err := client.CreateBinding(
 				ctx,
 				spec.Name,
@@ -293,7 +295,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				(recreateOnInstanceChange && status.ServiceInstanceDigest != serviceInstance.Status.ServiceInstanceDigest) ||
 				cfbinding.State == facade.BindingStateCreatedFailed || cfbinding.State == facade.BindingStateDeleteFailed {
 				// Re-create binding (unfortunately, cloud foundry does not support binding updates, other than metadata)
-				log.V(1).Info("triggering re-creation")
+				log.V(1).Info("Deleting binding for later re-creation")
 				if err := client.DeleteBinding(ctx, cfbinding.Guid); err != nil {
 					return ctrl.Result{}, err
 				}
@@ -303,8 +305,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				cfbinding = nil
 			} else if cfbinding.Generation < serviceBinding.Generation {
 				// metadata updates (such as updating the generation here) are possible with service bindings
-				log.V(1).Info("triggering update")
-
+				log.V(1).Info("Updating binding")
 				if err := client.UpdateBinding(
 					ctx,
 					cfbinding.Guid,
@@ -323,6 +324,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 
 		if cfbinding == nil {
 			// Re-retrieve cloud foundry binding by UID; this happens exactly if the binding was created or updated above
+			log.V(1).Info("Retrieving binding")
 			cfbinding, err = client.GetBinding(ctx, bindingOpts)
 			if err != nil {
 				return ctrl.Result{}, err
@@ -399,7 +401,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			return ctrl.Result{}, nil
 		} else {
 			if cfbinding.State != facade.BindingStateDeleting {
-				log.V(1).Info("triggering deletion")
+				log.V(1).Info("Deleting binding")
 				if err := client.DeleteBinding(ctx, cfbinding.Guid); err != nil {
 					return ctrl.Result{}, err
 				}
