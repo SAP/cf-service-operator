@@ -30,7 +30,7 @@ var _ webhook.Defaulter = &ServiceInstance{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *ServiceInstance) Default() {
-	serviceinstancelog.Info("default", "name", r.Name)
+	serviceinstancelog.V(2).Info("Default", "name", r.Name)
 
 	if r.Labels == nil {
 		r.Labels = make(map[string]string)
@@ -53,7 +53,7 @@ var _ webhook.Validator = &ServiceInstance{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *ServiceInstance) ValidateCreate() (admission.Warnings, error) {
-	serviceinstancelog.Info("validate create", "name", r.Name)
+	serviceinstancelog.V(2).Info("Validate create", "name", r.Name)
 
 	if !(r.Spec.SpaceName != "" && r.Spec.ClusterSpaceName == "" ||
 		r.Spec.SpaceName == "" && r.Spec.ClusterSpaceName != "") {
@@ -70,7 +70,7 @@ func (r *ServiceInstance) ValidateCreate() (admission.Warnings, error) {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *ServiceInstance) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	serviceinstancelog.Info("validate update", "name", r.Name)
+	serviceinstancelog.V(2).Info("Validate update", "name", r.Name)
 	s := old.(*ServiceInstance)
 	// Call the defaulting webhook logic for the old object (because defaulting through the webhook might be incomplete in case of generateName usage)
 	s.Name = r.Name
@@ -106,7 +106,7 @@ func (r *ServiceInstance) ValidateUpdate(old runtime.Object) (admission.Warnings
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *ServiceInstance) ValidateDelete() (admission.Warnings, error) {
-	serviceinstancelog.Info("validate delete", "name", r.Name)
+	serviceinstancelog.V(2).Info("Validate delete", "name", r.Name)
 
 	return nil, nil
 }

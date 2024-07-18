@@ -69,7 +69,7 @@ var RetryError = errors.New("retry")
 
 func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, err error) {
 	log := ctrl.LoggerFrom(ctx)
-	log.V(1).Info("running reconcile")
+	log.V(2).Info("Running reconcile")
 
 	// Retrieve target service instance
 	serviceInstance := &cfv1alpha1.ServiceInstance{}
@@ -77,7 +77,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if err := client.IgnoreNotFound(err); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "unexpected get error")
 		}
-		log.Info("not found; ignoring")
+		log.V(1).Info("Not found; ignoring")
 		return ctrl.Result{}, nil
 	}
 	// Call the defaulting webhook logic also here (because defaulting through the webhook might be incomplete in case of generateName usage)
@@ -192,6 +192,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	var cfinstance *facade.Instance
 	instanceOpts := map[string]string{"name": "", "owner": string(serviceInstance.UID)}
 	if client != nil {
+		log.V(1).Info("Retrieving instance by owner")
 		cfinstance, err = client.GetInstance(ctx, instanceOpts)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -200,6 +201,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if exists && cfinstance == nil && orphan == "adopt" {
 			// find orphaned instance by name
 			instanceOpts["name"] = serviceInstance.Name
+			log.V(1).Info("Retrieving instance by name")
 			cfinstance, err = client.GetInstance(ctx, instanceOpts)
 			if err != nil {
 				return ctrl.Result{}, err
@@ -216,7 +218,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
 			}
 			// update the orphaned cloud foundry instance
-			log.V(1).Info("triggering update")
+			log.V(1).Info("Updating instance")
 			if err := client.UpdateInstance(
 				ctx,
 				cfinstance.Guid,
@@ -246,6 +248,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		servicePlanGuid := spec.ServicePlanGuid
 		if servicePlanGuid == "" {
+			log.V(1).Info("Searching service plan")
 			servicePlanGuid, err = client.FindServicePlan(ctx, spec.ServiceOfferingName, spec.ServicePlanName, spaceGuid)
 			if err != nil {
 				return ctrl.Result{}, err
@@ -291,7 +294,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		inRecreation := false
 
 		if cfinstance == nil {
-			log.V(1).Info("triggering creation")
+			log.V(1).Info("Creating instance")
 			if err := client.CreateInstance(
 				ctx,
 				spec.Name,
@@ -309,7 +312,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				// This is the re-creation case; nothing to, we just wait until it is gone
 			} else if recreateOnCreationFailure && (cfinstance.State == facade.InstanceStateCreatedFailed || cfinstance.State == facade.InstanceStateDeleteFailed) {
 				// Re-create instance
-				log.V(1).Info("triggering re-creation")
+				log.V(1).Info("Deleting instance for later re-creation")
 				if err := client.DeleteInstance(ctx, cfinstance.Guid); err != nil {
 					return ctrl.Result{}, RetryError
 				}
@@ -319,7 +322,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				cfinstance = nil
 			} else if cfinstance.Generation < serviceInstance.Generation || cfinstance.ParameterHash != facade.ObjectHash(parameters) ||
 				cfinstance.State == facade.InstanceStateCreatedFailed || cfinstance.State == facade.InstanceStateUpdateFailed {
-				log.V(1).Info("triggering update")
+				log.V(1).Info("Updating instance")
 				updateName := spec.Name
 				if updateName == cfinstance.Name {
 					updateName = ""
@@ -362,6 +365,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		if cfinstance == nil {
 			// Re-retrieve cloud foundry instance by UID; this happens exactly if the instance was created or updated above
+			log.V(1).Info("Retrieving instance")
 			cfinstance, err = client.GetInstance(ctx, instanceOpts)
 			if err != nil {
 				return ctrl.Result{}, err
@@ -418,7 +422,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, nil
 		} else {
 			if cfinstance.State != facade.InstanceStateDeleting {
-				log.V(1).Info("triggering deletion")
+				log.V(1).Info("Deleting instance")
 				if err := client.DeleteInstance(ctx, cfinstance.Guid); err != nil {
 					return ctrl.Result{}, err
 				}
@@ -476,7 +480,7 @@ func (r *ServiceInstanceReconciler) HandleError(ctx context.Context, serviceInst
 		requeueAfter = serviceInstanceDefaultMaxRetryInterval
 	}
 
-	log.V(1).Info("***Retry after interval", "RequeueAfter", requeueAfter.String())
+	log.V(1).Info("Scheduling next reconcile", "RequeueAfter", requeueAfter.String())
 
 	serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonError, issue.Error())
 	return ctrl.Result{RequeueAfter: requeueAfter}, nil

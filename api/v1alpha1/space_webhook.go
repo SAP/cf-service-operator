@@ -30,7 +30,7 @@ var _ webhook.Defaulter = &Space{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *Space) Default() {
-	spacelog.Info("default", "name", r.Name)
+	spacelog.V(2).Info("Default", "name", r.Name)
 
 	if r.Spec.Guid == "" && r.Spec.Name == "" {
 		r.Spec.Name = r.Name
@@ -43,7 +43,7 @@ var _ webhook.Validator = &Space{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Space) ValidateCreate() (admission.Warnings, error) {
-	spacelog.Info("validate create", "name", r.Name)
+	spacelog.V(2).Info("Validate create", "name", r.Name)
 	// Call the defaulting logic again (because defaulting might be incomplete in case of generateName usage)
 	if r.Name == "" && r.GenerateName != "" {
 		r.Name = r.GenerateName + "xxxxx"
@@ -60,7 +60,7 @@ func (r *Space) ValidateCreate() (admission.Warnings, error) {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Space) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	spacelog.Info("validate update", "name", r.Name)
+	spacelog.V(2).Info("Validate update", "name", r.Name)
 	s := old.(*Space)
 	// Call the defaulting webhook logic for the old object (because defaulting through the webhook might be incomplete in case of generateName usage)
 	s.Name = r.Name
@@ -84,7 +84,7 @@ func (r *Space) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *Space) ValidateDelete() (admission.Warnings, error) {
-	spacelog.Info("validate delete", "name", r.Name)
+	spacelog.V(2).Info("Validate delete", "name", r.Name)
 
 	return nil, nil
 }

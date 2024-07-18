@@ -30,7 +30,7 @@ var _ webhook.Defaulter = &ServiceBinding{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *ServiceBinding) Default() {
-	servicebindinglog.Info("default", "name", r.Name)
+	servicebindinglog.V(2).Info("Default", "name", r.Name)
 
 	if r.Labels == nil {
 		r.Labels = make(map[string]string)
@@ -51,14 +51,14 @@ var _ webhook.Validator = &ServiceBinding{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *ServiceBinding) ValidateCreate() (admission.Warnings, error) {
-	servicebindinglog.Info("validate create", "name", r.Name)
+	servicebindinglog.V(2).Info("Validate create", "name", r.Name)
 
 	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *ServiceBinding) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	servicebindinglog.Info("validate update", "name", r.Name)
+	servicebindinglog.V(2).Info("Validate update", "name", r.Name)
 	s := old.(*ServiceBinding)
 	// Call the defaulting webhook logic for the old object (because defaulting through the webhook might be incomplete in case of generateName usage)
 	s.Name = r.Name
@@ -78,7 +78,7 @@ func (r *ServiceBinding) ValidateUpdate(old runtime.Object) (admission.Warnings,
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *ServiceBinding) ValidateDelete() (admission.Warnings, error) {
-	servicebindinglog.Info("validate delete", "name", r.Name)
+	servicebindinglog.V(2).Info("Validate delete", "name", r.Name)
 
 	return nil, nil
 }
