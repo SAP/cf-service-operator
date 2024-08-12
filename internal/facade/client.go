@@ -5,7 +5,10 @@ SPDX-License-Identifier: Apache-2.0
 
 package facade
 
-import "context"
+import (
+	"context"
+	"sync"
+)
 
 type Space struct {
 	Guid       string
@@ -71,6 +74,9 @@ type OrganizationClient interface {
 	AddAuditor(ctx context.Context, guid string, username string) error
 	AddDeveloper(ctx context.Context, guid string, username string) error
 	AddManager(ctx context.Context, guid string, username string) error
+
+	AddSpaceInCanche(key string, space *Space)
+	GetSpaceFromCache(key string) (*Space, bool)
 }
 
 type OrganizationClientBuilder func(string, string, string, string) (OrganizationClient, error)
@@ -88,6 +94,73 @@ type SpaceClient interface {
 	DeleteBinding(ctx context.Context, guid string) error
 
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
+
+	AddInstanceInCanche(key string, instance *Instance)
+	GetInstanceFromCache(key string) (*Instance, bool)
+	AddBindingInCanche(key string, binding *Binding)
+	GetBindingFromCache(key string) (*Binding, bool)
 }
 
 type SpaceClientBuilder func(string, string, string, string) (SpaceClient, error)
+
+// Cache is a simple in-memory cache to store spaces, instances, and bindings
+type Cache struct {
+	spaces    map[string]*Space
+	instances map[string]*Instance
+	bindings  map[string]*Binding
+	mutex     sync.RWMutex
+}
+
+// AddSpaceInCanche stores a space in the cache
+func (c *Cache) AddSpaceInCanche(key string, space *Space) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.spaces[key] = space
+}
+
+// GetSpaceFromCache retrieves a space from the cache
+func (c *Cache) GetSpaceFromCache(key string) (*Space, bool) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	space, found := c.spaces[key]
+	return space, found
+}
+
+// AddInstanceInCanche stores an instance in the cache
+func (c *Cache) AddInstanceInCanche(key string, instance *Instance) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.instances[key] = instance
+}
+
+// GetInstanceFromCache retrieves an instance from the cache
+func (c *Cache) GetInstanceFromCache(key string) (*Instance, bool) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	instance, found := c.instances[key]
+	return instance, found
+}
+
+// AddBindingInCanche stores a binding in the cache
+func (c *Cache) AddBindingInCanche(key string, binding *Binding) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.bindings[key] = binding
+}
+
+// GetBindingFromCache retrieves a binding from the cache
+func (c *Cache) GetBindingFromCache(key string) (*Binding, bool) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	binding, found := c.bindings[key]
+	return binding, found
+}
+
+// InitResourcesCache initializes a new cache
+func InitResourcesCache() *Cache {
+	return &Cache{
+		spaces:    make(map[string]*Space),
+		instances: make(map[string]*Instance),
+		bindings:  make(map[string]*Binding),
+	}
+}

@@ -48,7 +48,6 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // If multiple instances are found, an error is returned.
 // The function add the parameter values to the orphan cf instance, so that can be adopted.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
-
 	var filterOpts instanceFilter
 	if instanceOpts["name"] != "" {
 		filterOpts = &instanceFilterName{name: instanceOpts["name"]}

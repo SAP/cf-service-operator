@@ -31,11 +31,13 @@ const (
 type organizationClient struct {
 	organizationName string
 	client           cfclient.Client
+	resourcesCache   *facade.Cache
 }
 
 type spaceClient struct {
-	spaceGuid string
-	client    cfclient.Client
+	spaceGuid      string
+	client         cfclient.Client
+	resourcesCache *facade.Cache
 }
 
 type clientIdentifier struct {
@@ -53,6 +55,7 @@ type clientCacheEntry struct {
 var (
 	cacheMutex  = &sync.Mutex{}
 	clientCache = make(map[clientIdentifier]*clientCacheEntry)
+	cfCache     = facade.InitResourcesCache()
 )
 
 func newOrganizationClient(organizationName string, url string, username string, password string) (*organizationClient, error) {
@@ -83,7 +86,7 @@ func newOrganizationClient(organizationName string, url string, username string,
 	if err != nil {
 		return nil, err
 	}
-	return &organizationClient{organizationName: organizationName, client: *c}, nil
+	return &organizationClient{organizationName: organizationName, client: *c, resourcesCache: cfCache}, nil
 }
 
 func newSpaceClient(spaceGuid string, url string, username string, password string) (*spaceClient, error) {
@@ -114,7 +117,7 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	if err != nil {
 		return nil, err
 	}
-	return &spaceClient{spaceGuid: spaceGuid, client: *c}, nil
+	return &spaceClient{spaceGuid: spaceGuid, client: *c, resourcesCache: cfCache}, nil
 }
 
 func NewOrganizationClient(organizationName string, url string, username string, password string) (facade.OrganizationClient, error) {
