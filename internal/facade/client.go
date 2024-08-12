@@ -105,10 +105,12 @@ type SpaceClientBuilder func(string, string, string, string) (SpaceClient, error
 
 // Cache is a simple in-memory cache to store spaces, instances, and bindings
 type Cache struct {
-	spaces    map[string]*Space
-	instances map[string]*Instance
-	bindings  map[string]*Binding
-	mutex     sync.RWMutex
+	spaces       map[string]*Space
+	instances    map[string]*Instance
+	bindings     map[string]*Binding
+	mutex        sync.RWMutex
+	initTime     int64
+	cacheTimeOut int64
 }
 
 // AddSpaceInCanche stores a space in the cache

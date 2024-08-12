@@ -7,6 +7,7 @@ package cf
 
 import (
 	"fmt"
+	"log"
 	"sync"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
@@ -214,4 +215,60 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 	}
 
 	return client, err
+}
+
+func (c *spaceClient) populateResourcesCache(instanceOpts cfclient.ListOptions, bindingOptions cfclient.ServiceCredentialBindingListOptions, spaceOptions cfclient.SpaceListOptions) *Cache {
+	// // populate instance cache
+	// for {
+	// 	spaces, pager, err := c.Space.List(ctx, spaceOptions)
+	// 	if err != nil {
+	// 		log.Fatalf("Error listing spaces: %s", err)
+	// 	}
+
+	// 	// Cache the service instance
+	// 	for _, space := range spaces {
+	// 		// ... some caching logic
+	// 		c.resourcesCache.AddSpaceInCanche(*space.Metadata.Labels[labelOwner], &facade.Space{
+	// 			Guid:  space.GUID,
+	// 			Name:  space.Name,
+	// 			State: InstanceState(serviceInstance.LastOperation.State),
+	// 		})
+	// 	}
+
+	// 	serviceInstances = append(serviceInstances, srvInstanes...)
+	// 	if !pager.HasNextPage() {
+	// 		fmt.Printf("No more pages\n")
+	// 		break
+	// 	}
+
+	// 	pager.NextPage(listOpts)
+	// }
+
+	// populate instance cache
+	for {
+		srvInstanes, pager, err := c.ServiceInstances.List(ctx, listOpts)
+		if err != nil {
+			log.Fatalf("Error listing service instances: %s", err)
+		}
+
+		// Cache the service instance
+		for _, serviceInstance := range srvInstanes {
+			// ... some caching logic
+			// instance :=  &facade.Instance{
+			// 	Guid:  serviceInstance.GUID,
+			// 	Name:  serviceInstance.Name,
+			// 	State: InstanceState(serviceInstance.LastOperation.State),
+			// }
+			instance := facade.InitInstance(serviceInstance)
+			c.resourcesCache.AddInstanceInCanche(*serviceInstance.Metadata.Labels[labelOwner], instance)
+		}
+
+		serviceInstances = append(serviceInstances, srvInstanes...)
+		if !pager.HasNextPage() {
+			fmt.Printf("No more pages\n")
+			break
+		}
+
+		pager.NextPage(listOpts)
+	}
 }

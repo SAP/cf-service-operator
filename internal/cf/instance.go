@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/cloudfoundry-community/go-cfclient"
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
 	"github.com/pkg/errors"
@@ -48,6 +49,11 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // If multiple instances are found, an error is returned.
 // The function add the parameter values to the orphan cf instance, so that can be adopted.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
+	// else check empty cache
+	
+	// check timeOut
+	// if expired, refresh cache (InitInstanceCache)
+
 	var filterOpts instanceFilter
 	if instanceOpts["name"] != "" {
 		filterOpts = &instanceFilterName{name: instanceOpts["name"]}
@@ -76,49 +82,7 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		serviceInstance.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
 	}
 
-	guid := serviceInstance.GUID
-	name := serviceInstance.Name
-	servicePlanGuid := serviceInstance.Relationships.ServicePlan.Data.GUID
-	generation, err := strconv.ParseInt(*serviceInstance.Metadata.Annotations[annotationGeneration], 10, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "error parsing service instance generation")
-	}
-	parameterHash := *serviceInstance.Metadata.Annotations[annotationParameterHash]
-	var state facade.InstanceState
-	switch serviceInstance.LastOperation.Type + ":" + serviceInstance.LastOperation.State {
-	case "create:in progress":
-		state = facade.InstanceStateCreating
-	case "create:succeeded":
-		state = facade.InstanceStateReady
-	case "create:failed":
-		state = facade.InstanceStateCreatedFailed
-	case "update:in progress":
-		state = facade.InstanceStateUpdating
-	case "update:succeeded":
-		state = facade.InstanceStateReady
-	case "update:failed":
-		state = facade.InstanceStateUpdateFailed
-	case "delete:in progress":
-		state = facade.InstanceStateDeleting
-	case "delete:succeeded":
-		state = facade.InstanceStateDeleted
-	case "delete:failed":
-		state = facade.InstanceStateDeleteFailed
-	default:
-		state = facade.InstanceStateUnknown
-	}
-	stateDescription := serviceInstance.LastOperation.Description
-
-	return &facade.Instance{
-		Guid:             guid,
-		Name:             name,
-		ServicePlanGuid:  servicePlanGuid,
-		Owner:            instanceOpts["owner"],
-		Generation:       generation,
-		ParameterHash:    parameterHash,
-		State:            state,
-		StateDescription: stateDescription,
-	}, nil
+	returns InitInstance(serviceInstance), nil
 }
 
 // Required parameters (may not be initial): name, servicePlanGuid, owner, generation
@@ -184,4 +148,50 @@ func (c *spaceClient) DeleteInstance(ctx context.Context, guid string) error {
 	// TODO: return jobGUID to enable querying the job deletion status
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
 	return err
+}
+
+func InitInstance(serviceInstance cfresource.ServiceInstance) *facade.Instance {
+	guid := serviceInstance.GUID
+	name := serviceInstance.Name
+	servicePlanGuid := serviceInstance.Relationships.ServicePlan.Data.GUID	
+	generation, err := strconv.ParseInt(*serviceInstance.Metadata.Annotations[annotationGeneration], 10, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing service instance generation")
+	}
+	parameterHash := *serviceInstance.Metadata.Annotations[annotationParameterHash]
+	var state facade.InstanceState
+	switch serviceInstance.LastOperation.Type + ":" + serviceInstance.LastOperation.State {
+	case "create:in progress":
+		state = facade.InstanceStateCreating
+	case "create:succeeded":
+		state = facade.InstanceStateReady
+	case "create:failed":
+		state = facade.InstanceStateCreatedFailed
+	case "update:in progress":
+		state = facade.InstanceStateUpdating
+	case "update:succeeded":
+		state = facade.InstanceStateReady
+	case "update:failed":
+		state = facade.InstanceStateUpdateFailed
+	case "delete:in progress":
+		state = facade.InstanceStateDeleting
+	case "delete:succeeded":
+		state = facade.InstanceStateDeleted
+	case "delete:failed":
+		state = facade.InstanceStateDeleteFailed
+	default:
+		state = facade.InstanceStateUnknown
+	}
+	stateDescription := serviceInstance.LastOperation.Description
+
+	return &facade.Instance{
+		Guid:             guid,
+		Name:             name,
+		ServicePlanGuid:  servicePlanGuid,
+		Owner:            instanceOpts["owner"],
+		Generation:       generation,
+		ParameterHash:    parameterHash,
+		State:            state,
+		StateDescription: stateDescription,
+	}
 }
