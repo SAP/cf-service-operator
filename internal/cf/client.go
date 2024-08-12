@@ -57,7 +57,7 @@ type clientCacheEntry struct {
 var (
 	cacheMutex  = &sync.Mutex{}
 	clientCache = make(map[clientIdentifier]*clientCacheEntry)
-	cfCache     = facade.InitResourcesCache()
+	cfCache     = InitResourcesCache()
 )
 
 func newOrganizationClient(organizationName string, url string, username string, password string) (*organizationClient, error) {
@@ -88,6 +88,7 @@ func newOrganizationClient(organizationName string, url string, username string,
 	if err != nil {
 		return nil, err
 	}
+
 	return &organizationClient{organizationName: organizationName, client: *c, resourcesCache: cfCache}, nil
 }
 
@@ -119,7 +120,11 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	if err != nil {
 		return nil, err
 	}
-	return &spaceClient{spaceGuid: spaceGuid, client: *c, resourcesCache: cfCache}, nil
+
+	spcClient := &spaceClient{spaceGuid: spaceGuid, client: *c, resourcesCache: cfCache}
+	spcClient.populateResourcesCache()
+	return spcClient, nil
+
 }
 
 func NewOrganizationClient(organizationName string, url string, username string, password string) (facade.OrganizationClient, error) {
@@ -218,10 +223,29 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 	return client, err
 }
 
-func (c *spaceClient) populateResourcesCache(ctx context.Context, instanceOpts cfclient.ServiceInstanceListOptions, bindingOptions cfclient.ServiceCredentialBindingListOptions, spaceOptions cfclient.SpaceListOptions) *Cache {
+// InitResourcesCache initializes a new cache
+func InitResourcesCache() *facade.Cache {
+	return &facade.Cache{
+		Spaces:    make(map[string]*facade.Space),
+		Instances: make(map[string]*facade.Instance),
+		Bindings:  make(map[string]*facade.Binding),
+	}
+}
+
+func (c *spaceClient) populateResourcesCache() {
+	instanceOptions := cfclient.NewServiceInstanceListOptions()
+	instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+	instanceOptions.Page = 1
+	instanceOptions.PerPage = 500
+	instanceOptions.OrganizationGUIDs.EqualTo("21dc8fd6-ea17-49df-99e9-cacf57b479fc")
+
+	// bindingOptions := cfclient.NewServiceCredentialBindingListOptions()
+	// spaceOptions := cfclient.NewSpaceListOptions()
+
+	ctx := context.Background()
 	// populate instance cache
 	for {
-		srvInstanes, pager, err := c.client.ServiceInstances.List(ctx, &instanceOpts)
+		srvInstanes, pager, err := c.client.ServiceInstances.List(ctx, instanceOptions)
 		if err != nil {
 			log.Fatalf("Error listing service instances: %s", err)
 		}
@@ -229,7 +253,10 @@ func (c *spaceClient) populateResourcesCache(ctx context.Context, instanceOpts c
 		// Cache the service instance
 		for _, serviceInstance := range srvInstanes {
 			// ... some caching logic
-			instance := InitInstance(*serviceInstance)
+			instance, err := InitInstance(serviceInstance)
+			if err != nil {
+				// TODO: add logic here
+			}
 			c.resourcesCache.AddInstanceInCanche(*serviceInstance.Metadata.Labels[labelOwner], instance)
 		}
 
@@ -238,6 +265,6 @@ func (c *spaceClient) populateResourcesCache(ctx context.Context, instanceOpts c
 			break
 		}
 
-		pager.NextPage(instanceOpts)
+		pager.NextPage(instanceOptions)
 	}
 }

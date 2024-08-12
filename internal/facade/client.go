@@ -75,8 +75,8 @@ type OrganizationClient interface {
 	AddDeveloper(ctx context.Context, guid string, username string) error
 	AddManager(ctx context.Context, guid string, username string) error
 
-	AddSpaceInCanche(key string, space *Space)
-	GetSpaceFromCache(key string) (*Space, bool)
+	// AddSpaceInCanche(key string, space *Space)
+	// GetSpaceFromCache(key string) (*Space, bool)
 }
 
 type OrganizationClientBuilder func(string, string, string, string) (OrganizationClient, error)
@@ -95,19 +95,19 @@ type SpaceClient interface {
 
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
 
-	AddInstanceInCanche(key string, instance *Instance)
-	GetInstanceFromCache(key string) (*Instance, bool)
-	AddBindingInCanche(key string, binding *Binding)
-	GetBindingFromCache(key string) (*Binding, bool)
+	// AddInstanceInCanche(key string, instance *Instance)
+	// GetInstanceFromCache(key string) (*Instance, bool)
+	// AddBindingInCanche(key string, binding *Binding)
+	// GetBindingFromCache(key string) (*Binding, bool)
 }
 
 type SpaceClientBuilder func(string, string, string, string) (SpaceClient, error)
 
 // Cache is a simple in-memory cache to store spaces, instances, and bindings
 type Cache struct {
-	spaces       map[string]*Space
-	instances    map[string]*Instance
-	bindings     map[string]*Binding
+	Spaces       map[string]*Space
+	Instances    map[string]*Instance
+	Bindings     map[string]*Binding
 	mutex        sync.RWMutex
 	initTime     int64
 	cacheTimeOut int64
@@ -117,14 +117,14 @@ type Cache struct {
 func (c *Cache) AddSpaceInCanche(key string, space *Space) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.spaces[key] = space
+	c.Spaces[key] = space
 }
 
 // GetSpaceFromCache retrieves a space from the cache
 func (c *Cache) GetSpaceFromCache(key string) (*Space, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	space, found := c.spaces[key]
+	space, found := c.Spaces[key]
 	return space, found
 }
 
@@ -132,14 +132,14 @@ func (c *Cache) GetSpaceFromCache(key string) (*Space, bool) {
 func (c *Cache) AddInstanceInCanche(key string, instance *Instance) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.instances[key] = instance
+	c.Instances[key] = instance
 }
 
 // GetInstanceFromCache retrieves an instance from the cache
 func (c *Cache) GetInstanceFromCache(key string) (*Instance, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	instance, found := c.instances[key]
+	instance, found := c.Instances[key]
 	return instance, found
 }
 
@@ -147,22 +147,13 @@ func (c *Cache) GetInstanceFromCache(key string) (*Instance, bool) {
 func (c *Cache) AddBindingInCanche(key string, binding *Binding) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.bindings[key] = binding
+	c.Bindings[key] = binding
 }
 
 // GetBindingFromCache retrieves a binding from the cache
 func (c *Cache) GetBindingFromCache(key string) (*Binding, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	binding, found := c.bindings[key]
+	binding, found := c.Bindings[key]
 	return binding, found
-}
-
-// InitResourcesCache initializes a new cache
-func InitResourcesCache() *Cache {
-	return &Cache{
-		spaces:    make(map[string]*Space),
-		instances: make(map[string]*Instance),
-		bindings:  make(map[string]*Binding),
-	}
 }

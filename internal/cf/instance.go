@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/cloudfoundry-community/go-cfclient"
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
 	"github.com/pkg/errors"
@@ -49,6 +48,13 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // If multiple instances are found, an error is returned.
 // The function add the parameter values to the orphan cf instance, so that can be adopted.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
+	if len(c.resourcesCache.Instances) > 0 { // || timeOutCache == true {
+		c.populateResourcesCache()
+		serviceInstance := c.resourcesCache.GetInstanceFromCache(instanceOpts["owner"])
+	} else {
+		serviceInstance := c.resourcesCache.GetInstanceFromCache()
+	}
+
 	// else check empty cache
 
 	// check timeOut
@@ -82,7 +88,7 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		serviceInstance.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
 	}
 
-	return InitInstance(serviceInstance), nil
+	return InitInstance(serviceInstance)
 }
 
 // Required parameters (may not be initial): name, servicePlanGuid, owner, generation
@@ -150,7 +156,7 @@ func (c *spaceClient) DeleteInstance(ctx context.Context, guid string) error {
 	return err
 }
 
-func InitInstance(serviceInstance cfresource.ServiceInstance) *facade.Instance {
+func InitInstance(serviceInstance *cfresource.ServiceInstance) (*facade.Instance, error) {
 	guid := serviceInstance.GUID
 	name := serviceInstance.Name
 	servicePlanGuid := serviceInstance.Relationships.ServicePlan.Data.GUID
@@ -188,10 +194,10 @@ func InitInstance(serviceInstance cfresource.ServiceInstance) *facade.Instance {
 		Guid:             guid,
 		Name:             name,
 		ServicePlanGuid:  servicePlanGuid,
-		Owner:            instanceOpts["owner"],
+		Owner:            *serviceInstance.Metadata.Labels[labelOwner],
 		Generation:       generation,
 		ParameterHash:    parameterHash,
 		State:            state,
 		StateDescription: stateDescription,
-	}
+	}, nil
 }
