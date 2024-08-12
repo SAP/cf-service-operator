@@ -50,7 +50,7 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // The function add the parameter values to the orphan cf instance, so that can be adopted.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
 	// else check empty cache
-	
+
 	// check timeOut
 	// if expired, refresh cache (InitInstanceCache)
 
@@ -82,7 +82,7 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		serviceInstance.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
 	}
 
-	returns InitInstance(serviceInstance), nil
+	return InitInstance(serviceInstance), nil
 }
 
 // Required parameters (may not be initial): name, servicePlanGuid, owner, generation
@@ -153,7 +153,7 @@ func (c *spaceClient) DeleteInstance(ctx context.Context, guid string) error {
 func InitInstance(serviceInstance cfresource.ServiceInstance) *facade.Instance {
 	guid := serviceInstance.GUID
 	name := serviceInstance.Name
-	servicePlanGuid := serviceInstance.Relationships.ServicePlan.Data.GUID	
+	servicePlanGuid := serviceInstance.Relationships.ServicePlan.Data.GUID
 	generation, err := strconv.ParseInt(*serviceInstance.Metadata.Annotations[annotationGeneration], 10, 64)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing service instance generation")
