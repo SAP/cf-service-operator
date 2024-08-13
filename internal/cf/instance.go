@@ -48,17 +48,22 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // If multiple instances are found, an error is returned.
 // The function add the parameter values to the orphan cf instance, so that can be adopted.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
-	if len(c.resourcesCache.Instances) > 0 { // || timeOutCache == true {
+	// Attempt to retrieve instance from Cache
+	var inCache bool
+	var instance *facade.Instance
+	if len(c.resourcesCache.Instances) == 0 {
 		c.populateResourcesCache()
-		serviceInstance := c.resourcesCache.GetInstanceFromCache(instanceOpts["owner"])
+		instance, inCache = c.resourcesCache.GetInstanceFromCache(instanceOpts["owner"])
 	} else {
-		serviceInstance := c.resourcesCache.GetInstanceFromCache()
+		instance, inCache = c.resourcesCache.GetInstanceFromCache(instanceOpts["owner"])
 	}
 
-	// else check empty cache
+	if inCache {
+		return instance, nil
+	}
 
-	// check timeOut
-	// if expired, refresh cache (InitInstanceCache)
+	// Attempt to retrieve instance from Cloud Foundry
+	var serviceInstance *cfresource.ServiceInstance
 
 	var filterOpts instanceFilter
 	if instanceOpts["name"] != "" {
@@ -71,14 +76,12 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 	if err != nil {
 		return nil, fmt.Errorf("failed to list service instances: %w", err)
 	}
-
 	if len(serviceInstances) == 0 {
 		return nil, nil
 	} else if len(serviceInstances) > 1 {
 		return nil, errors.New(fmt.Sprintf("found multiple service instances with owner: %s", instanceOpts["owner"]))
 	}
-
-	serviceInstance := serviceInstances[0]
+	serviceInstance = serviceInstances[0]
 
 	// add parameter values to the orphan cf instance
 	if instanceOpts["name"] != "" {

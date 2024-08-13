@@ -40,6 +40,7 @@ type spaceClient struct {
 	spaceGuid      string
 	client         cfclient.Client
 	resourcesCache *facade.Cache
+	populateOnce   sync.Once
 }
 
 type clientIdentifier struct {
@@ -122,7 +123,7 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	}
 
 	spcClient := &spaceClient{spaceGuid: spaceGuid, client: *c, resourcesCache: cfCache}
-	spcClient.populateResourcesCache()
+	go spcClient.populateResourcesCache()
 	return spcClient, nil
 
 }
@@ -233,38 +234,37 @@ func InitResourcesCache() *facade.Cache {
 }
 
 func (c *spaceClient) populateResourcesCache() {
-	instanceOptions := cfclient.NewServiceInstanceListOptions()
-	instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
-	instanceOptions.Page = 1
-	instanceOptions.PerPage = 500
-	instanceOptions.OrganizationGUIDs.EqualTo("21dc8fd6-ea17-49df-99e9-cacf57b479fc")
+	c.populateOnce.Do(func() {
+		instanceOptions := cfclient.NewServiceInstanceListOptions()
+		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+		instanceOptions.Page = 1
+		instanceOptions.PerPage = 500
+		instanceOptions.OrganizationGUIDs.EqualTo("21dc8fd6-ea17-49df-99e9-cacf57b479fc")
 
-	// bindingOptions := cfclient.NewServiceCredentialBindingListOptions()
-	// spaceOptions := cfclient.NewSpaceListOptions()
-
-	ctx := context.Background()
-	// populate instance cache
-	for {
-		srvInstanes, pager, err := c.client.ServiceInstances.List(ctx, instanceOptions)
-		if err != nil {
-			log.Fatalf("Error listing service instances: %s", err)
-		}
-
-		// Cache the service instance
-		for _, serviceInstance := range srvInstanes {
-			// ... some caching logic
-			instance, err := InitInstance(serviceInstance)
+		ctx := context.Background()
+		// populate instance cache
+		for {
+			srvInstanes, pager, err := c.client.ServiceInstances.List(ctx, instanceOptions)
 			if err != nil {
-				// TODO: add logic here
+				log.Fatalf("Error listing service instances: %s", err)
 			}
-			c.resourcesCache.AddInstanceInCanche(*serviceInstance.Metadata.Labels[labelOwner], instance)
-		}
 
-		if !pager.HasNextPage() {
-			fmt.Printf("No more pages\n")
-			break
-		}
+			// Cache the service instance
+			for _, serviceInstance := range srvInstanes {
+				// ... some caching logic
+				instance, err := InitInstance(serviceInstance)
+				// instance is added to cache only if error is nil
+				if err == nil {
+					c.resourcesCache.AddInstanceInCanche(*serviceInstance.Metadata.Labels[labelOwner], instance)
+				}
+			}
 
-		pager.NextPage(instanceOptions)
-	}
+			if !pager.HasNextPage() {
+				fmt.Printf("No more pages\n")
+				break
+			}
+
+			pager.NextPage(instanceOptions)
+		}
+	})
 }
