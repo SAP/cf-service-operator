@@ -9,7 +9,10 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
+	"strconv"
 	"sync"
+	"time"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfconfig "github.com/cloudfoundry-community/go-cfclient/v3/config"
@@ -56,9 +59,10 @@ type clientCacheEntry struct {
 }
 
 var (
-	cacheMutex  = &sync.Mutex{}
-	clientCache = make(map[clientIdentifier]*clientCacheEntry)
-	cfCache     = InitResourcesCache()
+	cacheMutex             = &sync.Mutex{}
+	clientCache            = make(map[clientIdentifier]*clientCacheEntry)
+	cfCache                = InitResourcesCache()
+	isResourceCacheEnabled = false
 )
 
 func newOrganizationClient(organizationName string, url string, username string, password string) (*organizationClient, error) {
@@ -123,7 +127,12 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	}
 
 	spcClient := &spaceClient{spaceGuid: spaceGuid, client: *c, resourcesCache: cfCache}
-	go spcClient.populateResourcesCache()
+
+	isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("ENABLE_RESOURCES_CACHE"))
+	if isResourceCacheEnabled {
+		spcClient.refreshCache()
+	}
+
 	return spcClient, nil
 
 }
@@ -235,6 +244,10 @@ func InitResourcesCache() *facade.Cache {
 
 func (c *spaceClient) populateResourcesCache() {
 	c.populateOnce.Do(func() {
+
+		// TODO: Create the space options
+		// TODO: Add for loop for space
+
 		instanceOptions := cfclient.NewServiceInstanceListOptions()
 		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 		instanceOptions.Page = 1
@@ -267,4 +280,27 @@ func (c *spaceClient) populateResourcesCache() {
 			pager.NextPage(instanceOptions)
 		}
 	})
+
+	// TODO: Add for loop for bindings
+}
+
+func (c *spaceClient) refreshCache() {
+	cacheInterval := os.Getenv("RESOURCES_CACHE_INTERVAL")
+	var interval time.Duration
+	if cacheInterval == "" {
+		cacheInterval = "300" // Default to 5 minutes
+		log.Println("Empty RESOURCES_CACHE_INTERVAL, using 5 minutes as default cache interval.")
+	}
+	interval, err := time.ParseDuration(cacheInterval + "s")
+	if err != nil {
+		log.Fatalf("Invalid RESOURCES_CACHE_INTERVAL: %s.", err)
+	}
+
+	go func() {
+		for {
+			c.populateResourcesCache()
+			log.Println("Last resource cached time", time.Now())
+			time.Sleep(interval)
+		}
+	}()
 }

@@ -49,16 +49,13 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // The function add the parameter values to the orphan cf instance, so that can be adopted.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
 	// Attempt to retrieve instance from Cache
-	var inCache bool
+	var instanceInCache bool
 	var instance *facade.Instance
-	if len(c.resourcesCache.Instances) == 0 {
-		c.populateResourcesCache()
-		instance, inCache = c.resourcesCache.GetInstanceFromCache(instanceOpts["owner"])
-	} else {
-		instance, inCache = c.resourcesCache.GetInstanceFromCache(instanceOpts["owner"])
+	if len(c.resourcesCache.Instances) != 0 {
+		instance, instanceInCache = c.resourcesCache.GetInstanceFromCache(instanceOpts["owner"])
 	}
 
-	if inCache {
+	if instanceInCache {
 		return instance, nil
 	}
 
