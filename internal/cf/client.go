@@ -61,7 +61,7 @@ type clientCacheEntry struct {
 var (
 	cacheMutex             = &sync.Mutex{}
 	clientCache            = make(map[clientIdentifier]*clientCacheEntry)
-	cfCache                = InitResourcesCache()
+	cfCache                *facade.Cache
 	isResourceCacheEnabled = false
 )
 
@@ -126,7 +126,7 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 		return nil, err
 	}
 
-	spcClient := &spaceClient{spaceGuid: spaceGuid, client: *c, resourcesCache: cfCache}
+	spcClient := &spaceClient{spaceGuid: spaceGuid, client: *c}
 
 	isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("ENABLE_RESOURCES_CACHE"))
 	if isResourceCacheEnabled {
@@ -285,10 +285,15 @@ func (c *spaceClient) populateResourcesCache() {
 }
 
 func (c *spaceClient) refreshCache() {
+	resrcCache := InitResourcesCache()
+	c.resourcesCache = resrcCache
+	cfCache = c.resourcesCache
+
 	cacheInterval := os.Getenv("RESOURCES_CACHE_INTERVAL")
 	var interval time.Duration
 	if cacheInterval == "" {
-		cacheInterval = "300" // Default to 5 minutes
+		// TODO. put this code back, cacheInterval = "300" // Default to 5 minutes
+		cacheInterval = "15"
 		log.Println("Empty RESOURCES_CACHE_INTERVAL, using 5 minutes as default cache interval.")
 	}
 	interval, err := time.ParseDuration(cacheInterval + "s")

@@ -48,6 +48,11 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // If multiple instances are found, an error is returned.
 // The function add the parameter values to the orphan cf instance, so that can be adopted.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
+	// Ensure resourcesCache is initialized
+	if c.resourcesCache == nil {
+		c.resourcesCache = InitResourcesCache()
+	}
+
 	// Attempt to retrieve instance from Cache
 	var instanceInCache bool
 	var instance *facade.Instance
