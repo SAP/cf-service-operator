@@ -299,6 +299,8 @@ func (c *spaceClient) refreshCache(ctx context.Context) {
 		log.Fatalf("Invalid RESOURCES_CACHE_INTERVAL: %s.", err)
 	}
 
+	doneCh := make(chan bool) // Channel to signal cache refresh completion
+
 	go func() {
 		for {
 			select {
@@ -308,10 +310,19 @@ func (c *spaceClient) refreshCache(ctx context.Context) {
 			default:
 				c.populateResourcesCache()
 				log.Println("Last resource cached time", time.Now())
+				doneCh <- true // Signal that cache has been refreshed
 				time.Sleep(interval)
 			}
 		}
 	}()
+
+	// Example of waiting for a single cache refresh (could be in a different part of code)
+	select {
+	case <-doneCh:
+		log.Println("Cache has been refreshed")
+	case <-ctx.Done():
+		log.Println("Context cancelled")
+	}
 }
 
 func (c *spaceClient) StopCacheRefresh() {
