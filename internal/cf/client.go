@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -36,14 +35,14 @@ const (
 type organizationClient struct {
 	organizationName string
 	client           cfclient.Client
-	resourcesCache   *facade.Cache
+	//resourcesCache   *facade.Cache
 }
 
 type spaceClient struct {
 	spaceGuid      string
 	client         cfclient.Client
 	resourcesCache *facade.Cache
-	populateOnce   sync.Once
+	cancelFunc     context.CancelFunc
 }
 
 type clientIdentifier struct {
@@ -59,10 +58,10 @@ type clientCacheEntry struct {
 }
 
 var (
-	cacheMutex             = &sync.Mutex{}
-	clientCache            = make(map[clientIdentifier]*clientCacheEntry)
-	cfCache                *facade.Cache
-	isResourceCacheEnabled = false
+	cacheMutex  = &sync.Mutex{}
+	clientCache = make(map[clientIdentifier]*clientCacheEntry)
+	cfCache     *facade.Cache
+	//isResourceCacheEnabled = false
 )
 
 func newOrganizationClient(organizationName string, url string, username string, password string) (*organizationClient, error) {
@@ -94,7 +93,7 @@ func newOrganizationClient(organizationName string, url string, username string,
 		return nil, err
 	}
 
-	return &organizationClient{organizationName: organizationName, client: *c, resourcesCache: cfCache}, nil
+	return &organizationClient{organizationName: organizationName, client: *c}, nil
 }
 
 func newSpaceClient(spaceGuid string, url string, username string, password string) (*spaceClient, error) {
@@ -128,11 +127,13 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 
 	spcClient := &spaceClient{spaceGuid: spaceGuid, client: *c}
 
-	isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("ENABLE_RESOURCES_CACHE"))
-	if isResourceCacheEnabled {
-		spcClient.refreshCache()
-	}
-
+	// isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("ENABLE_RESOURCES_CACHE"))
+	// if isResourceCacheEnabled {
+	// 	spcClient.refreshCache()
+	// }
+	ctx, cancel := context.WithCancel(context.Background())
+	spcClient.cancelFunc = cancel
+	spcClient.refreshCache(ctx)
 	return spcClient, nil
 
 }
@@ -181,7 +182,7 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 	var client *spaceClient = nil
 	if isInCache {
 		// re-use CF client from cache and wrap it as spaceClient
-		client = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client}
+		client = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client, resourcesCache: cfCache}
 		if cacheEntry.password != password {
 			// password was rotated => delete client from cache and create a new one below
 			delete(clientCache, identifier)
@@ -243,50 +244,47 @@ func InitResourcesCache() *facade.Cache {
 }
 
 func (c *spaceClient) populateResourcesCache() {
-	c.populateOnce.Do(func() {
 
-		// TODO: Create the space options
-		// TODO: Add for loop for space
+	// TODO: Create the space options
+	// TODO: Add for loop for space
 
-		instanceOptions := cfclient.NewServiceInstanceListOptions()
-		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
-		instanceOptions.Page = 1
-		instanceOptions.PerPage = 500
-		instanceOptions.OrganizationGUIDs.EqualTo("21dc8fd6-ea17-49df-99e9-cacf57b479fc")
+	instanceOptions := cfclient.NewServiceInstanceListOptions()
+	instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+	instanceOptions.Page = 1
+	instanceOptions.PerPage = 500
+	//instanceOptions.OrganizationGUIDs.EqualTo("21dc8fd6-ea17-49df-99e9-cacf57b479fc")
 
-		ctx := context.Background()
-		// populate instance cache
-		for {
-			srvInstanes, pager, err := c.client.ServiceInstances.List(ctx, instanceOptions)
-			if err != nil {
-				log.Fatalf("Error listing service instances: %s", err)
-			}
-
-			// Cache the service instance
-			for _, serviceInstance := range srvInstanes {
-				// ... some caching logic
-				instance, err := InitInstance(serviceInstance)
-				// instance is added to cache only if error is nil
-				if err == nil {
-					c.resourcesCache.AddInstanceInCanche(*serviceInstance.Metadata.Labels[labelOwner], instance)
-				}
-			}
-
-			if !pager.HasNextPage() {
-				fmt.Printf("No more pages\n")
-				break
-			}
-
-			pager.NextPage(instanceOptions)
+	ctx := context.Background()
+	// populate instance cache
+	for {
+		srvInstanes, pager, err := c.client.ServiceInstances.List(ctx, instanceOptions)
+		if err != nil {
+			log.Fatalf("Error listing service instances: %s", err)
 		}
-	})
+
+		// Cache the service instance
+		for _, serviceInstance := range srvInstanes {
+			// ... some caching logic
+			instance, err := InitInstance(serviceInstance)
+			// instance is added to cache only if error is nil
+			if err == nil {
+				c.resourcesCache.AddInstanceInCanche(*serviceInstance.Metadata.Labels[labelOwner], instance)
+			}
+		}
+
+		if !pager.HasNextPage() {
+			fmt.Printf("No more pages\n")
+			break
+		}
+
+		pager.NextPage(instanceOptions)
+	}
 
 	// TODO: Add for loop for bindings
 }
 
-func (c *spaceClient) refreshCache() {
-	resrcCache := InitResourcesCache()
-	c.resourcesCache = resrcCache
+func (c *spaceClient) refreshCache(ctx context.Context) {
+	c.resourcesCache = InitResourcesCache()
 	cfCache = c.resourcesCache
 
 	cacheInterval := os.Getenv("RESOURCES_CACHE_INTERVAL")
@@ -303,9 +301,21 @@ func (c *spaceClient) refreshCache() {
 
 	go func() {
 		for {
-			c.populateResourcesCache()
-			log.Println("Last resource cached time", time.Now())
-			time.Sleep(interval)
+			select {
+			case <-ctx.Done():
+				log.Println("Stopping cache refresh goroutine")
+				return
+			default:
+				c.populateResourcesCache()
+				log.Println("Last resource cached time", time.Now())
+				time.Sleep(interval)
+			}
 		}
 	}()
+}
+
+func (c *spaceClient) StopCacheRefresh() {
+	if c.cancelFunc != nil {
+		c.cancelFunc()
+	}
 }
