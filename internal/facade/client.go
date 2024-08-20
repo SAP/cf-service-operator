@@ -75,7 +75,7 @@ type OrganizationClient interface {
 	AddDeveloper(ctx context.Context, guid string, username string) error
 	AddManager(ctx context.Context, guid string, username string) error
 
-	// AddSpaceInCanche(key string, space *Space)
+	// AddSpaceInCache(key string, space *Space)
 	// GetSpaceFromCache(key string) (*Space, bool)
 }
 
@@ -95,9 +95,9 @@ type SpaceClient interface {
 
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
 
-	// AddInstanceInCanche(key string, instance *Instance)
+	// AddInstanceInCache(key string, instance *Instance)
 	// GetInstanceFromCache(key string) (*Instance, bool)
-	// AddBindingInCanche(key string, binding *Binding)
+	// AddBindingInCache(key string, binding *Binding)
 	// GetBindingFromCache(key string) (*Binding, bool)
 }
 
@@ -113,8 +113,8 @@ type Cache struct {
 	cacheTimeOut int64
 }
 
-// AddSpaceInCanche stores a space in the cache
-func (c *Cache) AddSpaceInCanche(key string, space *Space) {
+// AddSpaceInCache stores a space in the cache
+func (c *Cache) AddSpaceInCache(key string, space *Space) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.Spaces[key] = space
@@ -128,8 +128,8 @@ func (c *Cache) GetSpaceFromCache(key string) (*Space, bool) {
 	return space, found
 }
 
-// AddInstanceInCanche stores an instance in the cache
-func (c *Cache) AddInstanceInCanche(key string, instance *Instance) {
+// AddInstanceInCache stores an instance in the cache
+func (c *Cache) AddInstanceInCache(key string, instance *Instance) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.Instances[key] = instance
@@ -143,8 +143,8 @@ func (c *Cache) GetInstanceFromCache(key string) (*Instance, bool) {
 	return instance, found
 }
 
-// AddBindingInCanche stores a binding in the cache
-func (c *Cache) AddBindingInCanche(key string, binding *Binding) {
+// AddBindingInCache stores a binding in the cache
+func (c *Cache) AddBindingInCache(key string, binding *Binding) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.Bindings[key] = binding
