@@ -316,7 +316,7 @@ func (c *spaceClient) refreshCache(ctx context.Context) {
 		}
 	}()
 
-	// Example of waiting for a single cache refresh (could be in a different part of code)
+	// Waiting for a single cache refresh
 	select {
 	case <-doneCh:
 		log.Println("Cache has been refreshed")
