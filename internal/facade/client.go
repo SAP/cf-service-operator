@@ -8,6 +8,7 @@ package facade
 import (
 	"context"
 	"sync"
+	"time"
 )
 
 type Space struct {
@@ -105,12 +106,31 @@ type SpaceClientBuilder func(string, string, string, string) (SpaceClient, error
 
 // Cache is a simple in-memory cache to store spaces, instances, and bindings
 type Cache struct {
-	Spaces       map[string]*Space
-	Instances    map[string]*Instance
-	Bindings     map[string]*Binding
-	mutex        sync.RWMutex
-	initTime     int64
-	cacheTimeOut int64
+	Spaces        map[string]*Space
+	Instances     map[string]*Instance
+	Bindings      map[string]*Binding
+	mutex         sync.RWMutex
+	lastCacheTime time.Time
+	CacheTimeOut  time.Duration
+}
+
+func (c *Cache) GetLastCacheTime() time.Time {
+	return c.lastCacheTime
+}
+
+func (c *Cache) GetCacheTimeOut() time.Duration {
+	return c.CacheTimeOut
+}
+
+func (c *Cache) IsCacheExpired() bool {
+
+	expiryTime := time.Until(c.lastCacheTime)
+
+	return expiryTime > c.CacheTimeOut
+
+}
+func (c *Cache) SetLastCacheTime() {
+	c.lastCacheTime = time.Now()
 }
 
 // AddSpaceInCache stores a space in the cache

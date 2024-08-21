@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"sync"
 	"time"
 
@@ -51,17 +50,19 @@ type clientIdentifier struct {
 }
 
 type clientCacheEntry struct {
-	url      string
-	username string
-	password string
-	client   cfclient.Client
+	url            string
+	username       string
+	password       string
+	client         cfclient.Client
+	resourcesCache *facade.Cache
 }
 
 var (
-	cacheMutex  = &sync.Mutex{}
-	clientCache = make(map[clientIdentifier]*clientCacheEntry)
-	cfCache     *facade.Cache
-	//isResourceCacheEnabled = false
+	cacheMutex             = &sync.Mutex{}
+	clientCache            = make(map[clientIdentifier]*clientCacheEntry)
+	cfCache                *facade.Cache
+	isResourceCacheEnabled = true
+	refreshCacheMutex      = &sync.Mutex{}
 )
 
 func newOrganizationClient(organizationName string, url string, username string, password string) (*organizationClient, error) {
@@ -92,6 +93,11 @@ func newOrganizationClient(organizationName string, url string, username string,
 	if err != nil {
 		return nil, err
 	}
+	// isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("ENABLE_RESOURCES_CACHE"))
+	// if isResourceCacheEnabled && c.resourcesCache == nil {
+	// 	c.resourcesCache = InitResourcesCache()
+	// 	c.populateResourcesCache()
+	// }
 
 	return &organizationClient{organizationName: organizationName, client: *c}, nil
 }
@@ -127,15 +133,7 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 
 	spcClient := &spaceClient{spaceGuid: spaceGuid, client: *c}
 
-	// isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("ENABLE_RESOURCES_CACHE"))
-	// if isResourceCacheEnabled {
-	// 	spcClient.refreshCache()
-	// }
-	ctx, cancel := context.WithCancel(context.Background())
-	spcClient.cancelFunc = cancel
-	spcClient.refreshCache(ctx)
 	return spcClient, nil
-
 }
 
 func NewOrganizationClient(organizationName string, url string, username string, password string) (facade.OrganizationClient, error) {
@@ -179,10 +177,10 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 	cacheEntry, isInCache := clientCache[identifier]
 
 	var err error = nil
-	var client *spaceClient = nil
+	var spcClient *spaceClient = nil
 	if isInCache {
 		// re-use CF client from cache and wrap it as spaceClient
-		client = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client, resourcesCache: cfCache}
+		spcClient = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client, resourcesCache: cfCache}
 		if cacheEntry.password != password {
 			// password was rotated => delete client from cache and create a new one below
 			delete(clientCache, identifier)
@@ -192,14 +190,20 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 
 	if !isInCache {
 		// create new CF client and wrap it as spaceClient
-		client, err = newSpaceClient(spaceGuid, url, username, password)
+		spcClient, err = newSpaceClient(spaceGuid, url, username, password)
 		if err == nil {
 			// add CF client to cache
-			clientCache[identifier] = &clientCacheEntry{url: url, username: username, password: password, client: client.client}
+			clientCache[identifier] = &clientCacheEntry{url: url, username: username, password: password, client: spcClient.client}
 		}
 	}
 
-	return client, err
+	//isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("ENABLE_RESOURCES_CACHE"))
+	if isResourceCacheEnabled && spcClient.resourcesCache == nil {
+		spcClient.resourcesCache = InitResourcesCache()
+		spcClient.populateResourcesCache()
+	}
+
+	return spcClient, err
 }
 
 func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
@@ -237,16 +241,18 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 // InitResourcesCache initializes a new cache
 func InitResourcesCache() *facade.Cache {
 	return &facade.Cache{
-		Spaces:    make(map[string]*facade.Space),
-		Instances: make(map[string]*facade.Instance),
-		Bindings:  make(map[string]*facade.Binding),
+		Spaces:       make(map[string]*facade.Space),
+		Instances:    make(map[string]*facade.Instance),
+		Bindings:     make(map[string]*facade.Binding),
+		CacheTimeOut: 1 * time.Minute,
 	}
 }
 
 func (c *spaceClient) populateResourcesCache() {
-
 	// TODO: Create the space options
 	// TODO: Add for loop for space
+	refreshCacheMutex.Lock()
+	defer refreshCacheMutex.Unlock()
 
 	instanceOptions := cfclient.NewServiceInstanceListOptions()
 	instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
@@ -280,53 +286,7 @@ func (c *spaceClient) populateResourcesCache() {
 		pager.NextPage(instanceOptions)
 	}
 
-	// TODO: Add for loop for bindings
-}
-
-func (c *spaceClient) refreshCache(ctx context.Context) {
-	c.resourcesCache = InitResourcesCache()
 	cfCache = c.resourcesCache
-
-	cacheInterval := os.Getenv("RESOURCES_CACHE_INTERVAL")
-	var interval time.Duration
-	if cacheInterval == "" {
-		// TODO. put this code back, cacheInterval = "300" // Default to 5 minutes
-		cacheInterval = "15"
-		log.Println("Empty RESOURCES_CACHE_INTERVAL, using 5 minutes as default cache interval.")
-	}
-	interval, err := time.ParseDuration(cacheInterval + "s")
-	if err != nil {
-		log.Fatalf("Invalid RESOURCES_CACHE_INTERVAL: %s.", err)
-	}
-
-	doneCh := make(chan bool) // Channel to signal cache refresh completion
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				log.Println("Stopping cache refresh goroutine")
-				return
-			default:
-				c.populateResourcesCache()
-				log.Println("Last resource cached time", time.Now())
-				doneCh <- true // Signal that cache has been refreshed
-				time.Sleep(interval)
-			}
-		}
-	}()
-
-	// Waiting for a single cache refresh
-	select {
-	case <-doneCh:
-		log.Println("Cache has been refreshed")
-	case <-ctx.Done():
-		log.Println("Context cancelled")
-	}
-}
-
-func (c *spaceClient) StopCacheRefresh() {
-	if c.cancelFunc != nil {
-		c.cancelFunc()
-	}
+	c.resourcesCache.SetLastCacheTime()
+	// TODO: Add for loop for bindings
 }
