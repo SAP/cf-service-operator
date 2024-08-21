@@ -15,6 +15,7 @@ import (
 	cfconfig "github.com/cloudfoundry-community/go-cfclient/v3/config"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/facade"
 	cfmetrics "github.com/sap/cf-service-operator/pkg/metrics"
 )
@@ -40,7 +41,6 @@ type spaceClient struct {
 	spaceGuid      string
 	client         cfclient.Client
 	resourcesCache *facade.Cache
-	cancelFunc     context.CancelFunc
 }
 
 type clientIdentifier struct {
@@ -49,19 +49,17 @@ type clientIdentifier struct {
 }
 
 type clientCacheEntry struct {
-	url            string
-	username       string
-	password       string
-	client         cfclient.Client
-	resourcesCache *facade.Cache
+	url      string
+	username string
+	password string
+	client   cfclient.Client
 }
 
 var (
-	cacheMutex             = &sync.Mutex{}
-	clientCache            = make(map[clientIdentifier]*clientCacheEntry)
-	cfCache                *facade.Cache
-	isResourceCacheEnabled = true
-	refreshCacheMutex      = &sync.Mutex{}
+	cacheMutex        = &sync.Mutex{}
+	clientCache       = make(map[clientIdentifier]*clientCacheEntry)
+	cfCache           *facade.Cache
+	refreshCacheMutex = &sync.Mutex{}
 )
 
 func newOrganizationClient(organizationName string, url string, username string, password string) (*organizationClient, error) {
@@ -167,7 +165,7 @@ func NewOrganizationClient(organizationName string, url string, username string,
 	return client, err
 }
 
-func NewSpaceClient(spaceGuid string, url string, username string, password string) (facade.SpaceClient, error) {
+func NewSpaceClient(spaceGuid string, url string, username string, password string, config config.Config) (facade.SpaceClient, error) {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -196,13 +194,15 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 		}
 	}
 
-	//isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("RESOURCE_CACHE_ENABLED"))
-	if isResourceCacheEnabled && spcClient.resourcesCache == nil {
+	if config.IsResourceCacheEnabled && spcClient.resourcesCache == nil {
 		spcClient.resourcesCache = facade.InitResourcesCache()
+		spcClient.resourcesCache.SetResourceCacheEnabled(config.IsResourceCacheEnabled)
+		spcClient.resourcesCache.SetCacheTimeOut(config.CacheTimeOut)
 		spcClient.populateResourcesCache()
 	}
 
 	return spcClient, err
+
 }
 
 func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
@@ -242,40 +242,40 @@ func (c *spaceClient) populateResourcesCache() {
 	// TODO: Add for loop for space
 	refreshCacheMutex.Lock()
 	defer refreshCacheMutex.Unlock()
+	if c.resourcesCache.IsCacheExpired() {
+		instanceOptions := cfclient.NewServiceInstanceListOptions()
+		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+		instanceOptions.Page = 1
+		instanceOptions.PerPage = 500
+		//instanceOptions.OrganizationGUIDs.EqualTo("21dc8fd6-ea17-49df-99e9-cacf57b479fc")
 
-	instanceOptions := cfclient.NewServiceInstanceListOptions()
-	instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
-	instanceOptions.Page = 1
-	instanceOptions.PerPage = 500
-	//instanceOptions.OrganizationGUIDs.EqualTo("21dc8fd6-ea17-49df-99e9-cacf57b479fc")
-
-	ctx := context.Background()
-	// populate instance cache
-	for {
-		srvInstanes, pager, err := c.client.ServiceInstances.List(ctx, instanceOptions)
-		if err != nil {
-			log.Fatalf("Error listing service instances: %s", err)
-		}
-
-		// Cache the service instance
-		for _, serviceInstance := range srvInstanes {
-			// ... some caching logic
-			instance, err := InitInstance(serviceInstance)
-			// instance is added to cache only if error is nil
-			if err == nil {
-				c.resourcesCache.AddInstanceInCache(*serviceInstance.Metadata.Labels[labelOwner], instance)
+		ctx := context.Background()
+		// populate instance cache
+		for {
+			srvInstanes, pager, err := c.client.ServiceInstances.List(ctx, instanceOptions)
+			if err != nil {
+				log.Fatalf("Error listing service instances: %s", err)
 			}
-		}
 
-		if !pager.HasNextPage() {
-			fmt.Printf("No more pages\n")
-			break
-		}
+			// Cache the service instance
+			for _, serviceInstance := range srvInstanes {
+				// ... some caching logic
+				instance, err := InitInstance(serviceInstance)
+				// instance is added to cache only if error is nil
+				if err == nil {
+					c.resourcesCache.AddInstanceInCache(*serviceInstance.Metadata.Labels[labelOwner], instance)
+				}
+			}
 
-		pager.NextPage(instanceOptions)
+			if !pager.HasNextPage() {
+				fmt.Printf("No more pages\n")
+				break
+			}
+
+			pager.NextPage(instanceOptions)
+		}
+		c.resourcesCache.SetLastCacheTime()
+		cfCache = c.resourcesCache
 	}
-
-	cfCache = c.resourcesCache
-	c.resourcesCache.SetLastCacheTime()
 	// TODO: Add for loop for bindings
 }

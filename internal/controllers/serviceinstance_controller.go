@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	cfv1alpha1 "github.com/sap/cf-service-operator/api/v1alpha1"
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
@@ -54,6 +55,7 @@ type ServiceInstanceReconciler struct {
 	Scheme                   *runtime.Scheme
 	ClusterResourceNamespace string
 	ClientBuilder            facade.SpaceClientBuilder
+	Config                   *config.Config
 }
 
 // RetryError is a special error to indicate that the operation should be retried.
@@ -182,7 +184,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Build cloud foundry client
 	var client facade.SpaceClient
 	if spaceGuid != "" {
-		client, err = r.ClientBuilder(spaceGuid, string(spaceSecret.Data["url"]), string(spaceSecret.Data["username"]), string(spaceSecret.Data["password"]))
+		client, err = r.ClientBuilder(spaceGuid, string(spaceSecret.Data["url"]), string(spaceSecret.Data["username"]), string(spaceSecret.Data["password"]), *r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the client from secret %s", spaceSecretName)
 		}

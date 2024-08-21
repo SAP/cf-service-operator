@@ -49,7 +49,7 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // The function add the parameter values to the orphan cf instance, so that can be adopted.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
 
-	if isResourceCacheEnabled {
+	if c.resourcesCache.GetResourceCacheEnabled() {
 		// Ensure resourcesCache is initialized
 		if c.resourcesCache == nil {
 			c.resourcesCache = facade.InitResourcesCache()

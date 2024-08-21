@@ -7,6 +7,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"strconv"
@@ -28,6 +29,7 @@ import (
 
 	cfv1alpha1 "github.com/sap/cf-service-operator/api/v1alpha1"
 	"github.com/sap/cf-service-operator/internal/cf"
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/controllers"
 	// +kubebuilder:scaffold:imports
 )
@@ -98,7 +100,11 @@ func main() {
 		setupLog.Error(err, "unable to parse webhook bind address", "controller", "Space")
 		os.Exit(1)
 	}
-
+	cfg, err := config.Load()
+	if err != nil {
+		fmt.Printf("failed to load config %v\n", err)
+		os.Exit(1)
+	}
 	options := ctrl.Options{
 		Scheme: scheme,
 		// TODO: disable cache for further resources (e.g. secrets) ?
@@ -160,6 +166,7 @@ func main() {
 		Scheme:                   mgr.GetScheme(),
 		ClusterResourceNamespace: clusterResourceNamespace,
 		ClientBuilder:            cf.NewSpaceClient,
+		Config:                   cfg,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceInstance")
 		os.Exit(1)
@@ -170,6 +177,7 @@ func main() {
 		ClusterResourceNamespace: clusterResourceNamespace,
 		EnableBindingMetadata:    enableBindingMetadata,
 		ClientBuilder:            cf.NewSpaceClient,
+		Config:                   cfg,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceBinding")
 		os.Exit(1)

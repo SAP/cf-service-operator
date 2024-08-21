@@ -8,10 +8,10 @@ package facade
 import (
 	"context"
 	"fmt"
-	"os"
-	"strconv"
 	"sync"
 	"time"
+
+	"github.com/sap/cf-service-operator/internal/config"
 )
 
 type Space struct {
@@ -105,7 +105,7 @@ type SpaceClient interface {
 	// GetBindingFromCache(key string) (*Binding, bool)
 }
 
-type SpaceClientBuilder func(string, string, string, string) (SpaceClient, error)
+type SpaceClientBuilder func(string, string, string, string, config.Config) (SpaceClient, error)
 
 // Cache is a simple in-memory cache to store spaces, instances, and bindings
 type Cache struct {
@@ -124,10 +124,8 @@ func InitResourcesCache() *Cache {
 		spaces:       make(map[string]*Space),
 		instances:    make(map[string]*Instance),
 		bindings:     make(map[string]*Binding),
-		cacheTimeOut: 1 * time.Minute,
+		cacheTimeOut: 5 * time.Minute,
 	}
-	cache.GetResourceCacheEnabledEnv()
-	cache.GetCacheTimeOut()
 	return cache
 }
 
@@ -143,62 +141,45 @@ func (c *Cache) GetCachedSpaces() map[string]*Space {
 	return c.spaces
 }
 
-// function to set the resource cache enabled flag from environment variable "RESOURCE_CACHE_ENABLED"
-func (c *Cache) GetResourceCacheEnabledEnv() {
-	enabled := false
-	isResourceCacheEnabled, err := strconv.ParseBool(os.Getenv("RESOURCE_CACHE_ENABLED"))
-	if err != nil {
-		isResourceCacheEnabled = enabled
-	}
-	c.setResourceCacheEnabled(isResourceCacheEnabled)
-}
-
-func (c *Cache) setResourceCacheEnabled(enabled bool) {
+// function to set the resource cache enabled flag from config
+func (c *Cache) SetResourceCacheEnabled(enabled bool) {
 	c.isResourceCacheEnabled = enabled
 }
-
-// function to is resource cache enabled
-func (c *Cache) IsResourceCacheEnabled() bool {
+func (c *Cache) GetResourceCacheEnabled() bool {
 	return c.isResourceCacheEnabled
 }
 
-func (c *Cache) GetLastCacheTime() time.Time {
-	return c.lastCacheTime
-}
-
+// Function to set the resource cache enabled flag from config
 func (c *Cache) GetCacheTimeOut() time.Duration {
 	return c.cacheTimeOut
 }
 
-// Function to set the resource cache enabled flag from environment variable "CACHE_TIMEOUT"
-func (c *Cache) GetCacheTimeOutEnv() {
-	timeOut := 1 * time.Minute // Default timeout value
-
-	cacheTimeOutStr := os.Getenv("CACHE_TIMEOUT")
-
-	cacheTimeOutInt, err := strconv.Atoi(cacheTimeOutStr)
+func (c *Cache) SetCacheTimeOut(timeOut string) {
+	cacheTimeOut, err := time.ParseDuration(timeOut)
 	if err != nil {
-		fmt.Printf("Invalid CACHE_TIMEOUT value, using default: %v", timeOut)
-		cacheTimeOutInt = int(timeOut.Minutes()) // converting to minutes as integer
+		fmt.Printf("Error parsing duration: %v\n", err)
+		return
 	}
-
-	cacheTimeOut := time.Duration(cacheTimeOutInt) * time.Minute
-	c.setCacheTimeOut(cacheTimeOut)
+	c.cacheTimeOut = cacheTimeOut
 }
 
-func (c *Cache) setCacheTimeOut(timeOut time.Duration) {
-	c.cacheTimeOut = timeOut
+// Function to set the Last cache time
+func (c *Cache) GetLastCacheTime() time.Time {
+	return c.lastCacheTime
 }
 
 func (c *Cache) IsCacheExpired() bool {
 
-	expiryTime := time.Until(c.lastCacheTime)
-
-	return expiryTime > c.cacheTimeOut
+	expirationTime := c.lastCacheTime.Add(c.cacheTimeOut)
+	//expiryTime := time.Until(c.lastCacheTime)
+	fmt.Printf("Expiry time: %v\n", expirationTime)
+	fmt.Printf("Cache timeout: %v\n", c.cacheTimeOut)
+	return time.Now().After(expirationTime)
 
 }
 func (c *Cache) SetLastCacheTime() {
 	c.lastCacheTime = time.Now()
+	fmt.Printf("Last cache time: %v\n", c.lastCacheTime)
 }
 
 // AddSpaceInCache stores a space in the cache
