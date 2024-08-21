@@ -52,14 +52,14 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 	if isResourceCacheEnabled {
 		// Ensure resourcesCache is initialized
 		if c.resourcesCache == nil {
-			c.resourcesCache = InitResourcesCache()
+			c.resourcesCache = facade.InitResourcesCache()
 		}
 
 		// Attempt to retrieve instance from Cache
 		var instanceInCache bool
 		var instance *facade.Instance
 
-		if len(c.resourcesCache.Instances) != 0 {
+		if len(c.resourcesCache.GetCachedInstances()) != 0 {
 			if c.resourcesCache.IsCacheExpired() {
 
 				c.populateResourcesCache()

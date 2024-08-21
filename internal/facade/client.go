@@ -7,6 +7,9 @@ package facade
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -106,12 +109,57 @@ type SpaceClientBuilder func(string, string, string, string) (SpaceClient, error
 
 // Cache is a simple in-memory cache to store spaces, instances, and bindings
 type Cache struct {
-	Spaces        map[string]*Space
-	Instances     map[string]*Instance
-	Bindings      map[string]*Binding
-	mutex         sync.RWMutex
-	lastCacheTime time.Time
-	CacheTimeOut  time.Duration
+	spaces                 map[string]*Space
+	instances              map[string]*Instance
+	bindings               map[string]*Binding
+	mutex                  sync.RWMutex
+	lastCacheTime          time.Time
+	cacheTimeOut           time.Duration
+	isResourceCacheEnabled bool
+}
+
+// InitResourcesCache initializes a new cache
+func InitResourcesCache() *Cache {
+	cache := &Cache{
+		spaces:       make(map[string]*Space),
+		instances:    make(map[string]*Instance),
+		bindings:     make(map[string]*Binding),
+		cacheTimeOut: 1 * time.Minute,
+	}
+	cache.GetResourceCacheEnabledEnv()
+	cache.GetCacheTimeOut()
+	return cache
+}
+
+func (c *Cache) GetCachedInstances() map[string]*Instance {
+	return c.instances
+}
+
+func (c *Cache) GetCachedBindings() map[string]*Binding {
+	return c.bindings
+}
+
+func (c *Cache) GetCachedSpaces() map[string]*Space {
+	return c.spaces
+}
+
+// function to set the resource cache enabled flag from environment variable "RESOURCE_CACHE_ENABLED"
+func (c *Cache) GetResourceCacheEnabledEnv() {
+	enabled := false
+	isResourceCacheEnabled, err := strconv.ParseBool(os.Getenv("RESOURCE_CACHE_ENABLED"))
+	if err != nil {
+		isResourceCacheEnabled = enabled
+	}
+	c.setResourceCacheEnabled(isResourceCacheEnabled)
+}
+
+func (c *Cache) setResourceCacheEnabled(enabled bool) {
+	c.isResourceCacheEnabled = enabled
+}
+
+// function to is resource cache enabled
+func (c *Cache) IsResourceCacheEnabled() bool {
+	return c.isResourceCacheEnabled
 }
 
 func (c *Cache) GetLastCacheTime() time.Time {
@@ -119,14 +167,34 @@ func (c *Cache) GetLastCacheTime() time.Time {
 }
 
 func (c *Cache) GetCacheTimeOut() time.Duration {
-	return c.CacheTimeOut
+	return c.cacheTimeOut
+}
+
+// Function to set the resource cache enabled flag from environment variable "CACHE_TIMEOUT"
+func (c *Cache) GetCacheTimeOutEnv() {
+	timeOut := 1 * time.Minute // Default timeout value
+
+	cacheTimeOutStr := os.Getenv("CACHE_TIMEOUT")
+
+	cacheTimeOutInt, err := strconv.Atoi(cacheTimeOutStr)
+	if err != nil {
+		fmt.Printf("Invalid CACHE_TIMEOUT value, using default: %v", timeOut)
+		cacheTimeOutInt = int(timeOut.Minutes()) // converting to minutes as integer
+	}
+
+	cacheTimeOut := time.Duration(cacheTimeOutInt) * time.Minute
+	c.setCacheTimeOut(cacheTimeOut)
+}
+
+func (c *Cache) setCacheTimeOut(timeOut time.Duration) {
+	c.cacheTimeOut = timeOut
 }
 
 func (c *Cache) IsCacheExpired() bool {
 
 	expiryTime := time.Until(c.lastCacheTime)
 
-	return expiryTime > c.CacheTimeOut
+	return expiryTime > c.cacheTimeOut
 
 }
 func (c *Cache) SetLastCacheTime() {
@@ -137,14 +205,14 @@ func (c *Cache) SetLastCacheTime() {
 func (c *Cache) AddSpaceInCache(key string, space *Space) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.Spaces[key] = space
+	c.spaces[key] = space
 }
 
 // GetSpaceFromCache retrieves a space from the cache
 func (c *Cache) GetSpaceFromCache(key string) (*Space, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	space, found := c.Spaces[key]
+	space, found := c.spaces[key]
 	return space, found
 }
 
@@ -152,14 +220,14 @@ func (c *Cache) GetSpaceFromCache(key string) (*Space, bool) {
 func (c *Cache) AddInstanceInCache(key string, instance *Instance) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.Instances[key] = instance
+	c.instances[key] = instance
 }
 
 // GetInstanceFromCache retrieves an instance from the cache
 func (c *Cache) GetInstanceFromCache(key string) (*Instance, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	instance, found := c.Instances[key]
+	instance, found := c.instances[key]
 	return instance, found
 }
 
@@ -167,13 +235,13 @@ func (c *Cache) GetInstanceFromCache(key string) (*Instance, bool) {
 func (c *Cache) AddBindingInCache(key string, binding *Binding) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.Bindings[key] = binding
+	c.bindings[key] = binding
 }
 
 // GetBindingFromCache retrieves a binding from the cache
 func (c *Cache) GetBindingFromCache(key string) (*Binding, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	binding, found := c.Bindings[key]
+	binding, found := c.bindings[key]
 	return binding, found
 }

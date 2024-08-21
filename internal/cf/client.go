@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfconfig "github.com/cloudfoundry-community/go-cfclient/v3/config"
@@ -93,7 +92,7 @@ func newOrganizationClient(organizationName string, url string, username string,
 	if err != nil {
 		return nil, err
 	}
-	// isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("ENABLE_RESOURCES_CACHE"))
+	// isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("RESOURCE_CACHE_ENABLED"))
 	// if isResourceCacheEnabled && c.resourcesCache == nil {
 	// 	c.resourcesCache = InitResourcesCache()
 	// 	c.populateResourcesCache()
@@ -197,9 +196,9 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 		}
 	}
 
-	//isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("ENABLE_RESOURCES_CACHE"))
+	//isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("RESOURCE_CACHE_ENABLED"))
 	if isResourceCacheEnabled && spcClient.resourcesCache == nil {
-		spcClient.resourcesCache = InitResourcesCache()
+		spcClient.resourcesCache = facade.InitResourcesCache()
 		spcClient.populateResourcesCache()
 	}
 
@@ -236,16 +235,6 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 	}
 
 	return client, err
-}
-
-// InitResourcesCache initializes a new cache
-func InitResourcesCache() *facade.Cache {
-	return &facade.Cache{
-		Spaces:       make(map[string]*facade.Space),
-		Instances:    make(map[string]*facade.Instance),
-		Bindings:     make(map[string]*facade.Binding),
-		CacheTimeOut: 1 * time.Minute,
-	}
 }
 
 func (c *spaceClient) populateResourcesCache() {
