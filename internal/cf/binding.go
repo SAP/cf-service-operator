@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"strconv"
 
-	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
-	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
+	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
+	cfresource "github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/pkg/errors"
 
 	"github.com/sap/cf-service-operator/internal/facade"
@@ -37,7 +37,8 @@ func (bn *bindingFilterName) getListOptions() *cfclient.ServiceCredentialBinding
 
 func (bo *bindingFilterOwner) getListOptions() *cfclient.ServiceCredentialBindingListOptions {
 	listOpts := cfclient.NewServiceCredentialBindingListOptions()
-	listOpts.LabelSelector.EqualTo(fmt.Sprintf("%s/%s=%s", labelPrefix, labelKeyOwner, bo.owner))
+	listOpts.LabelSel = make(map[string]cfclient.ExclusionFilter)
+	listOpts.LabelSel.EqualTo(fmt.Sprintf("%s/%s=%s", labelPrefix, labelKeyOwner, bo.owner))
 	return listOpts
 }
 
@@ -113,7 +114,7 @@ func (c *spaceClient) GetBinding(ctx context.Context, bindingOpts map[string]str
 
 	return &facade.Binding{
 		Guid:             guid,
-		Name:             name,
+		Name:             *name,
 		Owner:            bindingOpts["owner"],
 		Generation:       generation,
 		ParameterHash:    parameterHash,
@@ -161,5 +162,6 @@ func (c *spaceClient) UpdateBinding(ctx context.Context, guid string, generation
 }
 
 func (c *spaceClient) DeleteBinding(ctx context.Context, guid string) error {
-	return c.client.ServiceCredentialBindings.Delete(ctx, guid)
+	_ /*jobId*/, err := c.client.ServiceCredentialBindings.Delete(ctx, guid)
+	return err
 }

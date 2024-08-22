@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	cfResource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
+	cfResource "github.com/cloudfoundry/go-cfclient/v3/resource"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
@@ -112,11 +112,15 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		It("should create OrgClient", func() {
 			NewOrganizationClient(OrgName, url, Username, Password)
 
+			Expect(server.ReceivedRequests()).To(HaveLen(2))
+
 			// Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
 
-			Expect(server.ReceivedRequests()).To(HaveLen(1))
+			// Get new oAuth token
+			Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
+			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal("/uaa/oauth/token"))
 		})
 
 		It("should be able to query some org", func() {
@@ -124,6 +128,8 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(err).To(BeNil())
 
 			orgClient.GetSpace(ctx, Owner)
+
+			Expect(server.ReceivedRequests()).To(HaveLen(3))
 
 			// Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
@@ -134,8 +140,6 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// Get space
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(spacesURI))
-
-			Expect(server.ReceivedRequests()).To(HaveLen(3))
 
 			// verify metrics
 			metricsList, err := metrics.Registry.Gather()
@@ -160,6 +164,8 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(err).To(BeNil())
 			orgClient.GetSpace(ctx, Owner)
 
+			Expect(server.ReceivedRequests()).To(HaveLen(4))
+
 			// Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
@@ -173,8 +179,6 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// Get space
 			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[3].URL.Path).To(Equal(spacesURI))
-
-			Expect(server.ReceivedRequests()).To(HaveLen(4))
 		})
 
 		It("should be able to query two different orgs", func() {
@@ -226,11 +230,15 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		It("should create SpaceClient", func() {
 			NewSpaceClient(OrgName, url, Username, Password)
 
+			Expect(server.ReceivedRequests()).To(HaveLen(2))
+
 			// Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
 
-			Expect(server.ReceivedRequests()).To(HaveLen(1))
+			// Get new oAuth token
+			Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
+			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal("/uaa/oauth/token"))
 		})
 
 		It("should be able to query some space", func() {
@@ -238,6 +246,8 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(err).To(BeNil())
 
 			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
+
+			Expect(server.ReceivedRequests()).To(HaveLen(3))
 
 			// Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
@@ -248,8 +258,6 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// Get instance
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(serviceInstancesURI))
-
-			Expect(server.ReceivedRequests()).To(HaveLen(3))
 
 			// verify metrics
 			metricsList, err := metrics.Registry.Gather()
@@ -274,6 +282,8 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(err).To(BeNil())
 			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
 
+			Expect(server.ReceivedRequests()).To(HaveLen(4))
+
 			// Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
@@ -287,8 +297,6 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// Get instance
 			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[3].URL.Path).To(Equal(serviceInstancesURI))
-
-			Expect(server.ReceivedRequests()).To(HaveLen(4))
 		})
 
 		It("should be able to query two different spaces", func() {

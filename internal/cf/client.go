@@ -7,10 +7,11 @@ package cf
 
 import (
 	"fmt"
+	"net/http"
 	"sync"
 
-	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
-	cfconfig "github.com/cloudfoundry-community/go-cfclient/v3/config"
+	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
+	cfconfig "github.com/cloudfoundry/go-cfclient/v3/config"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/sap/cf-service-operator/internal/facade"
@@ -68,17 +69,24 @@ func newOrganizationClient(organizationName string, url string, username string,
 	if password == "" {
 		return nil, fmt.Errorf("missing or empty password")
 	}
-	config, err := cfconfig.NewUserPassword(url, username, password)
+
+	// prepare config
+	httpClient := &http.Client{}
+	config, err := cfconfig.New(url,
+		cfconfig.UserPassword(username, password),
+		cfconfig.HttpClient(httpClient))
 	if err != nil {
 		return nil, err
 	}
-	httpClient := config.HTTPClient()
+
+	// add metrics to HTTP client
 	transport, err := cfmetrics.AddMetricsToTransport(httpClient.Transport, metrics.Registry, "cf-api", url)
 	if err != nil {
 		return nil, err
 	}
 	httpClient.Transport = transport
-	config.WithHTTPClient(httpClient)
+
+	// create CF client
 	c, err := cfclient.New(config)
 	if err != nil {
 		return nil, err
@@ -99,17 +107,24 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	if password == "" {
 		return nil, fmt.Errorf("missing or empty password")
 	}
-	config, err := cfconfig.NewUserPassword(url, username, password)
+
+	// prepare config
+	httpClient := &http.Client{}
+	config, err := cfconfig.New(url,
+		cfconfig.UserPassword(username, password),
+		cfconfig.HttpClient(httpClient))
 	if err != nil {
 		return nil, err
 	}
-	httpClient := config.HTTPClient()
+
+	// add metrics to HTTP client
 	transport, err := cfmetrics.AddMetricsToTransport(httpClient.Transport, metrics.Registry, "cf-api", url)
 	if err != nil {
 		return nil, err
 	}
 	httpClient.Transport = transport
-	config.WithHTTPClient(httpClient)
+
+	// create CF client
 	c, err := cfclient.New(config)
 	if err != nil {
 		return nil, err
