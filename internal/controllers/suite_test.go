@@ -16,6 +16,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sap/cf-service-operator/api/v1alpha1"
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/facade"
 	"github.com/sap/cf-service-operator/internal/facade/facadefakes"
 
@@ -64,6 +65,15 @@ const (
 // timeout used for waiting on changes of custom resource
 // (overridden by environment variable TEST_TIMEOUT)
 var timeout = 5 * time.Minute
+
+// is resource cache enabled and cache timeout
+var resourceCacheEnabled = false
+var resourceCacheTimeout = 5 * time.Minute
+
+var cfg = &config.Config{
+	IsResourceCacheEnabled: resourceCacheEnabled,
+	CacheTimeOut:           resourceCacheTimeout.String(),
+}
 
 // interval used for polling custom resource
 var interval = 500 * time.Millisecond
@@ -218,9 +228,10 @@ func addControllers(k8sManager ctrl.Manager) {
 		Client:                   k8sManager.GetClient(),
 		Scheme:                   k8sManager.GetScheme(),
 		ClusterResourceNamespace: testK8sNamespace,
-		ClientBuilder: func(organizationName string, url string, username string, password string) (facade.SpaceClient, error) {
+		ClientBuilder: func(organizationName string, url string, username string, password string, config config.Config) (facade.SpaceClient, error) {
 			return fakeSpaceClient, nil
 		},
+		Config: cfg,
 	}
 	Expect(instanceReconciler.SetupWithManager(k8sManager)).To(Succeed())
 

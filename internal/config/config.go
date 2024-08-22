@@ -10,7 +10,7 @@ type Config struct {
 	//Resource cache is enabled or disabled
 	IsResourceCacheEnabled bool `env:"RESOURCE_CACHE_ENABLED" envDefault:"true"`
 
-	//cache timeout in seconds,minutes or hours for resource cache
+	//cache timeout in seconds,minutes or hours
 	CacheTimeOut string `env:"CACHE_TIMEOUT" envDefault:"1m"`
 }
 

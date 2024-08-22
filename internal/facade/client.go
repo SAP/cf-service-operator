@@ -79,6 +79,7 @@ type OrganizationClient interface {
 	AddDeveloper(ctx context.Context, guid string, username string) error
 	AddManager(ctx context.Context, guid string, username string) error
 
+	//TODO: Add methods for managing space
 	// AddSpaceInCache(key string, space *Space)
 	// GetSpaceFromCache(key string) (*Space, bool)
 }
@@ -99,6 +100,7 @@ type SpaceClient interface {
 
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
 
+	//TODO: Add methods for managing service keys
 	// AddInstanceInCache(key string, instance *Instance)
 	// GetInstanceFromCache(key string) (*Instance, bool)
 	// AddBindingInCache(key string, binding *Binding)
@@ -145,7 +147,10 @@ func (c *Cache) GetCachedSpaces() map[string]*Space {
 func (c *Cache) SetResourceCacheEnabled(enabled bool) {
 	c.isResourceCacheEnabled = enabled
 }
-func (c *Cache) GetResourceCacheEnabled() bool {
+func (c *Cache) IsResourceCacheEnabled() bool {
+	if c == nil {
+		return false
+	}
 	return c.isResourceCacheEnabled
 }
 

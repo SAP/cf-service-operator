@@ -14,6 +14,7 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/onsi/gomega/ghttp"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/sap/cf-service-operator/internal/config"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
@@ -47,6 +48,15 @@ type Token struct {
 func TestCFClient(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "CF Client Test Suite")
+}
+
+// is resource cache enabled and cache timeout
+var resourceCacheEnabled = false
+var resourceCacheTimeout = 5 * time.Minute
+
+var cfg = &config.Config{
+	IsResourceCacheEnabled: resourceCacheEnabled,
+	CacheTimeOut:           resourceCacheTimeout.String(),
 }
 
 // -----------------------------------------------------------------------------------------------
@@ -224,7 +234,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		})
 
 		It("should create SpaceClient", func() {
-			NewSpaceClient(OrgName, url, Username, Password)
+			NewSpaceClient(OrgName, url, Username, Password, *cfg)
 
 			// Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
@@ -234,7 +244,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		})
 
 		It("should be able to query some space", func() {
-			spaceClient, err := NewSpaceClient(OrgName, url, Username, Password)
+			spaceClient, err := NewSpaceClient(OrgName, url, Username, Password, *cfg)
 			Expect(err).To(BeNil())
 
 			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
@@ -266,11 +276,11 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		})
 
 		It("should be able to query some space twice", func() {
-			spaceClient, err := NewSpaceClient(OrgName, url, Username, Password)
+			spaceClient, err := NewSpaceClient(OrgName, url, Username, Password, *cfg)
 			Expect(err).To(BeNil())
 
 			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
-			spaceClient, err = NewSpaceClient(OrgName, url, Username, Password)
+			spaceClient, err = NewSpaceClient(OrgName, url, Username, Password, *cfg)
 			Expect(err).To(BeNil())
 			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
 
@@ -293,7 +303,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 
 		It("should be able to query two different spaces", func() {
 			// test space 1
-			spaceClient1, err1 := NewSpaceClient(SpaceName, url, Username, Password)
+			spaceClient1, err1 := NewSpaceClient(SpaceName, url, Username, Password, *cfg)
 			Expect(err1).To(BeNil())
 			spaceClient1.GetInstance(ctx, map[string]string{"owner": Owner})
 			// Discover UAA endpoint
@@ -307,7 +317,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(Owner))
 
 			// test space 2
-			spaceClient2, err2 := NewSpaceClient(SpaceName2, url, Username, Password)
+			spaceClient2, err2 := NewSpaceClient(SpaceName2, url, Username, Password, *cfg)
 			Expect(err2).To(BeNil())
 			spaceClient2.GetInstance(ctx, map[string]string{"owner": Owner2})
 			// no discovery of UAA endpoint or oAuth token here due to caching
@@ -336,7 +346,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		})
 
 		It("should register prometheus metrics for SpaceClient", func() {
-			spaceClient, err := NewSpaceClient(SpaceName, url, Username, Password)
+			spaceClient, err := NewSpaceClient(SpaceName, url, Username, Password, *cfg)
 			Expect(err).To(BeNil())
 			Expect(spaceClient).ToNot(BeNil())
 
