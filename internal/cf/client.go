@@ -34,13 +34,13 @@ const (
 type organizationClient struct {
 	organizationName string
 	client           cfclient.Client
-	//resourcesCache   *facade.Cache
+	//resourceCache   *facade.Cache
 }
 
 type spaceClient struct {
-	spaceGuid      string
-	client         cfclient.Client
-	resourcesCache *facade.Cache
+	spaceGuid     string
+	client        cfclient.Client
+	resourceCache *facade.ResourceCache
 }
 
 type clientIdentifier struct {
@@ -56,10 +56,10 @@ type clientCacheEntry struct {
 }
 
 var (
-	cacheMutex        = &sync.Mutex{}
-	clientCache       = make(map[clientIdentifier]*clientCacheEntry)
-	cfCache           *facade.Cache
-	refreshCacheMutex = &sync.Mutex{}
+	clientCacheMutex          = &sync.Mutex{}
+	clientCache               = make(map[clientIdentifier]*clientCacheEntry)
+	cfResourceCache           *facade.ResourceCache
+	refreshResourceCacheMutex = &sync.Mutex{}
 )
 
 func newOrganizationClient(organizationName string, url string, username string, password string) (*organizationClient, error) {
@@ -90,11 +90,7 @@ func newOrganizationClient(organizationName string, url string, username string,
 	if err != nil {
 		return nil, err
 	}
-	// isResourceCacheEnabled, _ := strconv.ParseBool(os.Getenv("RESOURCE_CACHE_ENABLED"))
-	// if isResourceCacheEnabled && c.resourcesCache == nil {
-	// 	c.resourcesCache = InitResourcesCache()
-	// 	c.populateResourcesCache()
-	// }
+	// TODO:Populate resource cache for ORg client
 
 	return &organizationClient{organizationName: organizationName, client: *c}, nil
 }
@@ -128,14 +124,12 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 		return nil, err
 	}
 
-	spcClient := &spaceClient{spaceGuid: spaceGuid, client: *c}
-
-	return spcClient, nil
+	return &spaceClient{spaceGuid: spaceGuid, client: *c}, nil
 }
 
 func NewOrganizationClient(organizationName string, url string, username string, password string) (facade.OrganizationClient, error) {
-	cacheMutex.Lock()
-	defer cacheMutex.Unlock()
+	clientCacheMutex.Lock()
+	defer clientCacheMutex.Unlock()
 
 	// look up CF client in cache
 	identifier := clientIdentifier{url: url, username: username}
@@ -166,18 +160,18 @@ func NewOrganizationClient(organizationName string, url string, username string,
 }
 
 func NewSpaceClient(spaceGuid string, url string, username string, password string, config config.Config) (facade.SpaceClient, error) {
-	cacheMutex.Lock()
-	defer cacheMutex.Unlock()
+	clientCacheMutex.Lock()
+	defer clientCacheMutex.Unlock()
 
 	// look up CF client in cache
 	identifier := clientIdentifier{url: url, username: username}
 	cacheEntry, isInCache := clientCache[identifier]
 
 	var err error = nil
-	var spcClient *spaceClient = nil
+	var client *spaceClient = nil
 	if isInCache {
 		// re-use CF client from cache and wrap it as spaceClient
-		spcClient = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client, resourcesCache: cfCache}
+		client = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client, resourceCache: cfResourceCache}
 		if cacheEntry.password != password {
 			// password was rotated => delete client from cache and create a new one below
 			delete(clientCache, identifier)
@@ -187,27 +181,27 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 
 	if !isInCache {
 		// create new CF client and wrap it as spaceClient
-		spcClient, err = newSpaceClient(spaceGuid, url, username, password)
+		client, err = newSpaceClient(spaceGuid, url, username, password)
 		if err == nil {
 			// add CF client to cache
-			clientCache[identifier] = &clientCacheEntry{url: url, username: username, password: password, client: spcClient.client}
+			clientCache[identifier] = &clientCacheEntry{url: url, username: username, password: password, client: client.client}
 		}
 	}
 
-	if config.IsResourceCacheEnabled && spcClient.resourcesCache == nil {
-		spcClient.resourcesCache = facade.InitResourcesCache()
-		spcClient.resourcesCache.SetResourceCacheEnabled(config.IsResourceCacheEnabled)
-		spcClient.resourcesCache.SetCacheTimeOut(config.CacheTimeOut)
-		spcClient.populateResourcesCache()
+	if config.IsResourceCacheEnabled && client.resourceCache == nil {
+		client.resourceCache = facade.InitResourceCache()
+		client.resourceCache.SetResourceCacheEnabled(config.IsResourceCacheEnabled)
+		client.resourceCache.SetCacheTimeOut(config.CacheTimeOut)
+		client.populateResourceCache()
 	}
 
-	return spcClient, err
+	return client, err
 
 }
 
 func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
-	cacheMutex.Lock()
-	defer cacheMutex.Unlock()
+	clientCacheMutex.Lock()
+	defer clientCacheMutex.Unlock()
 
 	// look up CF client in cache
 	identifier := clientIdentifier{url: url, username: username}
@@ -237,12 +231,12 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 	return client, err
 }
 
-func (c *spaceClient) populateResourcesCache() {
+func (c *spaceClient) populateResourceCache() {
 	// TODO: Create the space options
 	// TODO: Add for loop for space
-	refreshCacheMutex.Lock()
-	defer refreshCacheMutex.Unlock()
-	if c.resourcesCache.IsCacheExpired() {
+	refreshResourceCacheMutex.Lock()
+	defer refreshResourceCacheMutex.Unlock()
+	if c.resourceCache.IsCacheExpired() {
 		instanceOptions := cfclient.NewServiceInstanceListOptions()
 		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 		instanceOptions.Page = 1
@@ -263,7 +257,7 @@ func (c *spaceClient) populateResourcesCache() {
 				instance, err := InitInstance(serviceInstance)
 				// instance is added to cache only if error is nil
 				if err == nil {
-					c.resourcesCache.AddInstanceInCache(*serviceInstance.Metadata.Labels[labelOwner], instance)
+					c.resourceCache.AddInstanceInCache(*serviceInstance.Metadata.Labels[labelOwner], instance)
 				}
 			}
 
@@ -274,8 +268,8 @@ func (c *spaceClient) populateResourcesCache() {
 
 			pager.NextPage(instanceOptions)
 		}
-		c.resourcesCache.SetLastCacheTime()
-		cfCache = c.resourcesCache
+		c.resourceCache.SetLastCacheTime()
+		cfResourceCache = c.resourceCache
 	}
 	// TODO: Add for loop for bindings
 }

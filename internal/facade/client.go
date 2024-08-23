@@ -91,7 +91,7 @@ type SpaceClient interface {
 	GetInstance(ctx context.Context, instanceOpts map[string]string) (*Instance, error)
 	CreateInstance(ctx context.Context, name string, servicePlanGuid string, parameters map[string]interface{}, tags []string, owner string, generation int64) error
 	UpdateInstance(ctx context.Context, guid string, name string, servicePlanGuid string, parameters map[string]interface{}, tags []string, generation int64) error
-	DeleteInstance(ctx context.Context, guid string) error
+	DeleteInstance(ctx context.Context, guid string, owner string) error
 
 	GetBinding(ctx context.Context, bindingOpts map[string]string) (*Binding, error)
 	CreateBinding(ctx context.Context, name string, serviceInstanceGuid string, parameters map[string]interface{}, owner string, generation int64) error
@@ -101,16 +101,16 @@ type SpaceClient interface {
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
 
 	//TODO: Add methods for managing service keys
-	// AddInstanceInCache(key string, instance *Instance)
-	// GetInstanceFromCache(key string) (*Instance, bool)
-	// AddBindingInCache(key string, binding *Binding)
-	// GetBindingFromCache(key string) (*Binding, bool)
+	// AddInstanceToResourceCache(key string, instance *Instance)
+	// GetInstanceFromResourceCache(key string) (*Instance, bool)
+	// AddBindingToResourceCache(key string, binding *Binding)
+	// GetBindingFromResourceCache(key string) (*Binding, bool)
 }
 
 type SpaceClientBuilder func(string, string, string, string, config.Config) (SpaceClient, error)
 
 // Cache is a simple in-memory cache to store spaces, instances, and bindings
-type Cache struct {
+type ResourceCache struct {
 	spaces                 map[string]*Space
 	instances              map[string]*Instance
 	bindings               map[string]*Binding
@@ -121,8 +121,8 @@ type Cache struct {
 }
 
 // InitResourcesCache initializes a new cache
-func InitResourcesCache() *Cache {
-	cache := &Cache{
+func InitResourceCache() *ResourceCache {
+	cache := &ResourceCache{
 		spaces:       make(map[string]*Space),
 		instances:    make(map[string]*Instance),
 		bindings:     make(map[string]*Binding),
@@ -131,23 +131,23 @@ func InitResourcesCache() *Cache {
 	return cache
 }
 
-func (c *Cache) GetCachedInstances() map[string]*Instance {
+func (c *ResourceCache) GetCachedInstances() map[string]*Instance {
 	return c.instances
 }
 
-func (c *Cache) GetCachedBindings() map[string]*Binding {
+func (c *ResourceCache) GetCachedBindings() map[string]*Binding {
 	return c.bindings
 }
 
-func (c *Cache) GetCachedSpaces() map[string]*Space {
+func (c *ResourceCache) GetCachedSpaces() map[string]*Space {
 	return c.spaces
 }
 
 // function to set the resource cache enabled flag from config
-func (c *Cache) SetResourceCacheEnabled(enabled bool) {
+func (c *ResourceCache) SetResourceCacheEnabled(enabled bool) {
 	c.isResourceCacheEnabled = enabled
 }
-func (c *Cache) IsResourceCacheEnabled() bool {
+func (c *ResourceCache) IsResourceCacheEnabled() bool {
 	if c == nil {
 		return false
 	}
@@ -155,11 +155,11 @@ func (c *Cache) IsResourceCacheEnabled() bool {
 }
 
 // Function to set the resource cache enabled flag from config
-func (c *Cache) GetCacheTimeOut() time.Duration {
+func (c *ResourceCache) GetCacheTimeOut() time.Duration {
 	return c.cacheTimeOut
 }
 
-func (c *Cache) SetCacheTimeOut(timeOut string) {
+func (c *ResourceCache) SetCacheTimeOut(timeOut string) {
 	cacheTimeOut, err := time.ParseDuration(timeOut)
 	if err != nil {
 		fmt.Printf("Error parsing duration: %v\n", err)
@@ -168,12 +168,8 @@ func (c *Cache) SetCacheTimeOut(timeOut string) {
 	c.cacheTimeOut = cacheTimeOut
 }
 
-// Function to set the Last cache time
-func (c *Cache) GetLastCacheTime() time.Time {
-	return c.lastCacheTime
-}
-
-func (c *Cache) IsCacheExpired() bool {
+// Function to check if the cache is expired
+func (c *ResourceCache) IsCacheExpired() bool {
 
 	expirationTime := c.lastCacheTime.Add(c.cacheTimeOut)
 	//expiryTime := time.Until(c.lastCacheTime)
@@ -182,20 +178,22 @@ func (c *Cache) IsCacheExpired() bool {
 	return time.Now().After(expirationTime)
 
 }
-func (c *Cache) SetLastCacheTime() {
+
+// Function to set the last cache time
+func (c *ResourceCache) SetLastCacheTime() {
 	c.lastCacheTime = time.Now()
 	fmt.Printf("Last cache time: %v\n", c.lastCacheTime)
 }
 
 // AddSpaceInCache stores a space in the cache
-func (c *Cache) AddSpaceInCache(key string, space *Space) {
+func (c *ResourceCache) AddSpaceInCache(key string, space *Space) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.spaces[key] = space
 }
 
 // GetSpaceFromCache retrieves a space from the cache
-func (c *Cache) GetSpaceFromCache(key string) (*Space, bool) {
+func (c *ResourceCache) GetSpaceFromCache(key string) (*Space, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	space, found := c.spaces[key]
@@ -203,29 +201,43 @@ func (c *Cache) GetSpaceFromCache(key string) (*Space, bool) {
 }
 
 // AddInstanceInCache stores an instance in the cache
-func (c *Cache) AddInstanceInCache(key string, instance *Instance) {
+func (c *ResourceCache) AddInstanceInCache(key string, instance *Instance) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.instances[key] = instance
 }
 
 // GetInstanceFromCache retrieves an instance from the cache
-func (c *Cache) GetInstanceFromCache(key string) (*Instance, bool) {
+func (c *ResourceCache) GetInstanceFromCache(key string) (*Instance, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	instance, found := c.instances[key]
 	return instance, found
 }
 
+// RemoveInstanceFromCache removes an instance from the cache
+// This is used when an instance is deleted
+// The instance is removed from the cache to avoid stale data
+// The instance is removed from the cache only if the instance is found in the cache
+func (c *ResourceCache) RemoveInstanceFromCache(key string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	_, found := c.instances[key]
+	if found {
+		delete(c.instances, key)
+	}
+
+}
+
 // AddBindingInCache stores a binding in the cache
-func (c *Cache) AddBindingInCache(key string, binding *Binding) {
+func (c *ResourceCache) AddBindingInCache(key string, binding *Binding) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.bindings[key] = binding
 }
 
 // GetBindingFromCache retrieves a binding from the cache
-func (c *Cache) GetBindingFromCache(key string) (*Binding, bool) {
+func (c *ResourceCache) GetBindingFromCache(key string) (*Binding, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	binding, found := c.bindings[key]

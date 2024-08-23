@@ -58,11 +58,12 @@ type FakeSpaceClient struct {
 	deleteBindingReturnsOnCall map[int]struct {
 		result1 error
 	}
-	DeleteInstanceStub        func(context.Context, string) error
+	DeleteInstanceStub        func(context.Context, string, string) error
 	deleteInstanceMutex       sync.RWMutex
 	deleteInstanceArgsForCall []struct {
 		arg1 context.Context
 		arg2 string
+		arg3 string
 	}
 	deleteInstanceReturns struct {
 		result1 error
@@ -349,19 +350,20 @@ func (fake *FakeSpaceClient) DeleteBindingReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeSpaceClient) DeleteInstance(arg1 context.Context, arg2 string) error {
+func (fake *FakeSpaceClient) DeleteInstance(arg1 context.Context, arg2 string, arg3 string) error {
 	fake.deleteInstanceMutex.Lock()
 	ret, specificReturn := fake.deleteInstanceReturnsOnCall[len(fake.deleteInstanceArgsForCall)]
 	fake.deleteInstanceArgsForCall = append(fake.deleteInstanceArgsForCall, struct {
 		arg1 context.Context
 		arg2 string
-	}{arg1, arg2})
+		arg3 string
+	}{arg1, arg2, arg3})
 	stub := fake.DeleteInstanceStub
 	fakeReturns := fake.deleteInstanceReturns
-	fake.recordInvocation("DeleteInstance", []interface{}{arg1, arg2})
+	fake.recordInvocation("DeleteInstance", []interface{}{arg1, arg2, arg3})
 	fake.deleteInstanceMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1
@@ -375,17 +377,17 @@ func (fake *FakeSpaceClient) DeleteInstanceCallCount() int {
 	return len(fake.deleteInstanceArgsForCall)
 }
 
-func (fake *FakeSpaceClient) DeleteInstanceCalls(stub func(context.Context, string) error) {
+func (fake *FakeSpaceClient) DeleteInstanceCalls(stub func(context.Context, string, string) error) {
 	fake.deleteInstanceMutex.Lock()
 	defer fake.deleteInstanceMutex.Unlock()
 	fake.DeleteInstanceStub = stub
 }
 
-func (fake *FakeSpaceClient) DeleteInstanceArgsForCall(i int) (context.Context, string) {
+func (fake *FakeSpaceClient) DeleteInstanceArgsForCall(i int) (context.Context, string, string) {
 	fake.deleteInstanceMutex.RLock()
 	defer fake.deleteInstanceMutex.RUnlock()
 	argsForCall := fake.deleteInstanceArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeSpaceClient) DeleteInstanceReturns(result1 error) {

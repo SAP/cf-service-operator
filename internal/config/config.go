@@ -13,6 +13,7 @@ import (
 type Config struct {
 
 	//Resource cache is enabled or disabled
+	//TODO change it back to false after testing
 	IsResourceCacheEnabled bool `env:"RESOURCE_CACHE_ENABLED" envDefault:"true"`
 
 	//cache timeout in seconds,minutes or hours

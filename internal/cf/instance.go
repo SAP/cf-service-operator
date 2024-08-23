@@ -49,23 +49,23 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // The function add the parameter values to the orphan cf instance, so that can be adopted.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
 
-	if c.resourcesCache.IsResourceCacheEnabled() {
+	if c.resourceCache.IsResourceCacheEnabled() {
 		// Ensure resourcesCache is initialized
-		if c.resourcesCache == nil {
-			c.resourcesCache = facade.InitResourcesCache()
+		if c.resourceCache == nil {
+			c.resourceCache = facade.InitResourceCache()
 		}
 
 		// Attempt to retrieve instance from Cache
 		var instanceInCache bool
 		var instance *facade.Instance
 
-		if len(c.resourcesCache.GetCachedInstances()) != 0 {
-			if c.resourcesCache.IsCacheExpired() {
+		if len(c.resourceCache.GetCachedInstances()) != 0 {
+			if c.resourceCache.IsCacheExpired() {
 
-				c.populateResourcesCache()
+				c.populateResourceCache()
 			}
 
-			instance, instanceInCache = c.resourcesCache.GetInstanceFromCache(instanceOpts["owner"])
+			instance, instanceInCache = c.resourceCache.GetInstanceFromCache(instanceOpts["owner"])
 		}
 
 		if instanceInCache {
@@ -163,9 +163,10 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 	return err
 }
 
-func (c *spaceClient) DeleteInstance(ctx context.Context, guid string) error {
+func (c *spaceClient) DeleteInstance(ctx context.Context, guid string, owner string) error {
 	// TODO: return jobGUID to enable querying the job deletion status
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
+	c.resourceCache.RemoveInstanceFromCache(owner)
 	return err
 }
 

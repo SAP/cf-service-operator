@@ -315,7 +315,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			} else if recreateOnCreationFailure && (cfinstance.State == facade.InstanceStateCreatedFailed || cfinstance.State == facade.InstanceStateDeleteFailed) {
 				// Re-create instance
 				log.V(1).Info("Deleting instance for later re-creation")
-				if err := client.DeleteInstance(ctx, cfinstance.Guid); err != nil {
+				if err := client.DeleteInstance(ctx, cfinstance.Guid, cfinstance.Owner); err != nil {
 					return ctrl.Result{}, RetryError
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
@@ -425,7 +425,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		} else {
 			if cfinstance.State != facade.InstanceStateDeleting {
 				log.V(1).Info("Deleting instance")
-				if err := client.DeleteInstance(ctx, cfinstance.Guid); err != nil {
+				if err := client.DeleteInstance(ctx, cfinstance.Guid, cfinstance.Owner); err != nil {
 					return ctrl.Result{}, err
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]

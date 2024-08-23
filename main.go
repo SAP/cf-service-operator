@@ -7,7 +7,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"net"
 	"os"
 	"strconv"
@@ -102,7 +101,7 @@ func main() {
 	}
 	cfg, err := config.Load()
 	if err != nil {
-		fmt.Printf("failed to load config %v\n", err)
+		setupLog.Error(err, "failed to load config")
 		os.Exit(1)
 	}
 	options := ctrl.Options{
