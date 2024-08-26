@@ -254,7 +254,7 @@ func (c *spaceClient) populateResourceCache() {
 			// Cache the service instance
 			for _, serviceInstance := range srvInstanes {
 				// ... some caching logic
-				instance, err := InitInstance(serviceInstance)
+				instance, err := InitInstance(serviceInstance, nil)
 				// instance is added to cache only if error is nil
 				if err == nil {
 					c.resourceCache.AddInstanceInCache(*serviceInstance.Metadata.Labels[labelOwner], instance)

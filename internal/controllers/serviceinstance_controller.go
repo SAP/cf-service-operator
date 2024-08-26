@@ -208,34 +208,39 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-
-			//Add parameters to adopt the orphaned instance
-			var parameterObjects []map[string]interface{}
-			paramMap := make(map[string]interface{})
-			paramMap["parameter-hash"] = cfinstance.ParameterHash
-			paramMap["owner"] = cfinstance.Owner
-			parameterObjects = append(parameterObjects, paramMap)
-			parameters, err := mergeObjects(parameterObjects...)
-			if err != nil {
-				return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
+			if cfinstance != nil {
+				//Add parameters to adopt the orphaned instance
+				var parameterObjects []map[string]interface{}
+				paramMap := make(map[string]interface{})
+				// Ensure cfinstance.ParameterHash is not nil
+				if cfinstance.ParameterHash == "" {
+					return ctrl.Result{}, errors.Wrap(err, "ParameterHash is nil")
+				}
+				paramMap["parameter-hash"] = cfinstance.ParameterHash
+				paramMap["owner"] = cfinstance.Owner
+				parameterObjects = append(parameterObjects, paramMap)
+				parameters, err := mergeObjects(parameterObjects...)
+				if err != nil {
+					return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
+				}
+				// update the orphaned cloud foundry instance
+				log.V(1).Info("Updating instance")
+				if err := client.UpdateInstance(
+					ctx,
+					cfinstance.Guid,
+					spec.Name,
+					"",
+					parameters,
+					nil,
+					serviceInstance.Generation,
+				); err != nil {
+					return ctrl.Result{}, err
+				}
+				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
+				// return the reconcile function to requeue inmediatly after the update
+				serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfinstance.State), cfinstance.StateDescription)
+				return ctrl.Result{Requeue: true}, nil
 			}
-			// update the orphaned cloud foundry instance
-			log.V(1).Info("Updating instance")
-			if err := client.UpdateInstance(
-				ctx,
-				cfinstance.Guid,
-				spec.Name,
-				"",
-				parameters,
-				nil,
-				serviceInstance.Generation,
-			); err != nil {
-				return ctrl.Result{}, err
-			}
-			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
-			// return the reconcile function to requeue inmediatly after the update
-			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfinstance.State), cfinstance.StateDescription)
-			return ctrl.Result{Requeue: true}, nil
 		}
 	}
 

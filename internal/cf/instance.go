@@ -101,7 +101,7 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		serviceInstance.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
 	}
 
-	return InitInstance(serviceInstance)
+	return InitInstance(serviceInstance, instanceOpts)
 }
 
 // Required parameters (may not be initial): name, servicePlanGuid, owner, generation
@@ -170,7 +170,7 @@ func (c *spaceClient) DeleteInstance(ctx context.Context, guid string, owner str
 	return err
 }
 
-func InitInstance(serviceInstance *cfresource.ServiceInstance) (*facade.Instance, error) {
+func InitInstance(serviceInstance *cfresource.ServiceInstance, instanceOpts map[string]string) (*facade.Instance, error) {
 	guid := serviceInstance.GUID
 	name := serviceInstance.Name
 	servicePlanGuid := serviceInstance.Relationships.ServicePlan.Data.GUID
@@ -203,12 +203,19 @@ func InitInstance(serviceInstance *cfresource.ServiceInstance) (*facade.Instance
 		state = facade.InstanceStateUnknown
 	}
 	stateDescription := serviceInstance.LastOperation.Description
+	//if (instanceOpts["owner"] not nil then owner = instanceOpts["owner"] else owner = serviceInstance.Metadata.Labels[labelOwner]
+	owner := instanceOpts["owner"]
+	if owner == "" {
+		owner = *serviceInstance.Metadata.Labels[labelOwner]
+	}
 
 	return &facade.Instance{
-		Guid:             guid,
-		Name:             name,
-		ServicePlanGuid:  servicePlanGuid,
-		Owner:            *serviceInstance.Metadata.Labels[labelOwner],
+		Guid:            guid,
+		Name:            name,
+		ServicePlanGuid: servicePlanGuid,
+		//if (instanceOpts["owner"] not nil then owner = instanceOpts["owner"] else owner = serviceInstance.Metadata.Labels[labelOwner]
+		Owner: owner,
+
 		Generation:       generation,
 		ParameterHash:    parameterHash,
 		State:            state,
