@@ -32,9 +32,9 @@ const (
 	Owner      = "testOwner"
 	Owner2     = "testOwner2"
 
-	spacesURI           = "/v3/spaces"
-	serviceInstancesURI = "/v3/service_instances"
-	uaaURI              = "/uaa/oauth/token"
+	spacesURI    = "/v3/spaces"
+	instancesURI = "/v3/service_instances"
+	uaaURI       = "/uaa/oauth/token"
 )
 
 type Token struct {
@@ -85,12 +85,13 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		}
 		By("creating space CR")
 	})
+
 	AfterAll(func() {
 		// Shutdown the server after tests
 		server.Close()
 	})
 
-	Describe("NewOrganizationClient", func() {
+	Describe("OrganizationClient", func() {
 		BeforeEach(func() {
 			// Reset some entities to enable tests to run independently
 			clientCache = make(map[clientIdentifier]*clientCacheEntry)
@@ -120,7 +121,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 
 			// Get new oAuth token
 			Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
-			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal("/uaa/oauth/token"))
+			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
 		})
 
 		It("should be able to query some org", func() {
@@ -208,7 +209,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 
 	})
 
-	Describe("NewSpaceClient", func() {
+	Describe("SpaceClient", func() {
 		BeforeEach(func() {
 			// Reset some entities to enable tests to run independently
 			clientCache = make(map[clientIdentifier]*clientCacheEntry)
@@ -219,7 +220,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			server.RouteToHandler("GET", "/", ghttp.CombineHandlers(
 				ghttp.RespondWithJSONEncodedPtr(&statusCode, &rootResult),
 			))
-			server.RouteToHandler("GET", serviceInstancesURI, ghttp.CombineHandlers(
+			server.RouteToHandler("GET", instancesURI, ghttp.CombineHandlers(
 				ghttp.RespondWithJSONEncodedPtr(&statusCode, &rootResult),
 			))
 			server.RouteToHandler("POST", uaaURI, ghttp.CombineHandlers(
@@ -238,7 +239,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 
 			// Get new oAuth token
 			Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
-			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal("/uaa/oauth/token"))
+			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
 		})
 
 		It("should be able to query some space", func() {
@@ -257,7 +258,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
 			// Get instance
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(serviceInstancesURI))
+			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(instancesURI))
 
 			// verify metrics
 			metricsList, err := metrics.Registry.Gather()
@@ -292,11 +293,11 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
 			// Get instance
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(serviceInstancesURI))
+			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(instancesURI))
 
 			// Get instance
 			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[3].URL.Path).To(Equal(serviceInstancesURI))
+			Expect(server.ReceivedRequests()[3].URL.Path).To(Equal(instancesURI))
 		})
 
 		It("should be able to query two different spaces", func() {
