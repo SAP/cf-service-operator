@@ -70,16 +70,8 @@ func newOrganizationClient(organizationName string, url string, username string,
 		return nil, fmt.Errorf("missing or empty password")
 	}
 
-	// prepare config
+	// prepare HTTP client with metrics
 	httpClient := &http.Client{}
-	config, err := cfconfig.New(url,
-		cfconfig.UserPassword(username, password),
-		cfconfig.HttpClient(httpClient))
-	if err != nil {
-		return nil, err
-	}
-
-	// add metrics to HTTP client
 	transport, err := cfmetrics.AddMetricsToTransport(httpClient.Transport, metrics.Registry, "cf-api", url)
 	if err != nil {
 		return nil, err
@@ -87,6 +79,12 @@ func newOrganizationClient(organizationName string, url string, username string,
 	httpClient.Transport = transport
 
 	// create CF client
+	config, err := cfconfig.New(url,
+		cfconfig.UserPassword(username, password),
+		cfconfig.HttpClient(httpClient))
+	if err != nil {
+		return nil, err
+	}
 	c, err := cfclient.New(config)
 	if err != nil {
 		return nil, err
@@ -108,16 +106,8 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 		return nil, fmt.Errorf("missing or empty password")
 	}
 
-	// prepare config
-	httpClient := &http.Client{}
-	config, err := cfconfig.New(url,
-		cfconfig.UserPassword(username, password),
-		cfconfig.HttpClient(httpClient))
-	if err != nil {
-		return nil, err
-	}
-
 	// add metrics to HTTP client
+	httpClient := &http.Client{}
 	transport, err := cfmetrics.AddMetricsToTransport(httpClient.Transport, metrics.Registry, "cf-api", url)
 	if err != nil {
 		return nil, err
@@ -125,6 +115,12 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	httpClient.Transport = transport
 
 	// create CF client
+	config, err := cfconfig.New(url,
+		cfconfig.UserPassword(username, password),
+		cfconfig.HttpClient(httpClient))
+	if err != nil {
+		return nil, err
+	}
 	c, err := cfclient.New(config)
 	if err != nil {
 		return nil, err
