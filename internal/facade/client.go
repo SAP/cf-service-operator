@@ -90,7 +90,7 @@ type OrganizationClientBuilder func(string, string, string, string) (Organizatio
 type SpaceClient interface {
 	GetInstance(ctx context.Context, instanceOpts map[string]string) (*Instance, error)
 	CreateInstance(ctx context.Context, name string, servicePlanGuid string, parameters map[string]interface{}, tags []string, owner string, generation int64) error
-	UpdateInstance(ctx context.Context, guid string, name string, servicePlanGuid string, parameters map[string]interface{}, tags []string, generation int64) error
+	UpdateInstance(ctx context.Context, guid string, name string, owner string, servicePlanGuid string, parameters map[string]interface{}, tags []string, generation int64) error
 	DeleteInstance(ctx context.Context, guid string, owner string) error
 
 	GetBinding(ctx context.Context, bindingOpts map[string]string) (*Binding, error)
@@ -226,6 +226,40 @@ func (c *ResourceCache) RemoveInstanceFromCache(key string) {
 	if found {
 		delete(c.instances, key)
 	}
+
+}
+
+// update the instance in the cache
+func (c *ResourceCache) UpdateInstanceInCache(guid string, name string, owner string, servicePlanGuid string, parameters map[string]interface{}, generation int64) (status bool) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	//update if the instance is found in the cache
+	//update all the struct variables if they are not nil or empty
+	instance, found := c.instances[owner]
+	if found {
+		if guid != "" {
+			instance.Guid = guid
+		}
+		if name != "" {
+			instance.Name = name
+		}
+		if servicePlanGuid != "" {
+			instance.ServicePlanGuid = servicePlanGuid
+		}
+		if parameters != nil {
+			instance.ParameterHash = ObjectHash(parameters)
+		}
+		if owner != "" {
+			instance.Owner = owner
+		}
+		instance.Generation = generation
+		c.instances[owner] = instance
+		return true
+
+	}
+	//TODO:remove later: print all the instances in cache
+	fmt.Printf("Instances in cache: %v\n", c.instances)
+	return false
 
 }
 

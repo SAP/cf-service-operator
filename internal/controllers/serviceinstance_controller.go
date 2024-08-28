@@ -208,14 +208,10 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			if err != nil {
 				return ctrl.Result{}, err
 			}
-			if cfinstance != nil {
+			if cfinstance != nil && cfinstance.State == facade.InstanceStateReady {
 				//Add parameters to adopt the orphaned instance
 				var parameterObjects []map[string]interface{}
 				paramMap := make(map[string]interface{})
-				// Ensure cfinstance.ParameterHash is not nil
-				if cfinstance.ParameterHash == "" {
-					return ctrl.Result{}, errors.Wrap(err, "ParameterHash is nil")
-				}
 				paramMap["parameter-hash"] = cfinstance.ParameterHash
 				paramMap["owner"] = cfinstance.Owner
 				parameterObjects = append(parameterObjects, paramMap)
@@ -223,13 +219,22 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				if err != nil {
 					return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
 				}
+				servicePlanGuid := cfinstance.ServicePlanGuid
+				if servicePlanGuid == "" {
+					log.V(1).Info("Searching service plan")
+					servicePlanGuid, err = client.FindServicePlan(ctx, spec.ServiceOfferingName, spec.ServicePlanName, spaceGuid)
+					if err != nil {
+						return ctrl.Result{}, err
+					}
+				}
 				// update the orphaned cloud foundry instance
 				log.V(1).Info("Updating instance")
 				if err := client.UpdateInstance(
 					ctx,
 					cfinstance.Guid,
 					spec.Name,
-					"",
+					string(serviceInstance.UID),
+					servicePlanGuid,
 					parameters,
 					nil,
 					serviceInstance.Generation,
@@ -240,7 +245,11 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				// return the reconcile function to requeue inmediatly after the update
 				serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfinstance.State), cfinstance.StateDescription)
 				return ctrl.Result{Requeue: true}, nil
+			} else if cfinstance != nil && cfinstance.State != facade.InstanceStateReady {
+				//return the reconcile function to not reconcile and error message
+				return ctrl.Result{}, fmt.Errorf("orphaned instance is not ready to be adopted")
 			}
+
 		}
 	}
 
@@ -357,6 +366,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 					ctx,
 					cfinstance.Guid,
 					updateName,
+					string(serviceInstance.UID),
 					updateServicePlanGuid,
 					updateParameters,
 					updateTags,

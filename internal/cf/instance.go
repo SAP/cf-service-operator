@@ -58,17 +58,25 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		// Attempt to retrieve instance from Cache
 		var instanceInCache bool
 		var instance *facade.Instance
+		//TODO recheck this logic later
+		if c.resourceCache.IsCacheExpired() {
 
+			c.populateResourceCache()
+		}
 		if len(c.resourceCache.GetCachedInstances()) != 0 {
-			if c.resourceCache.IsCacheExpired() {
-
-				c.populateResourceCache()
-			}
 
 			instance, instanceInCache = c.resourceCache.GetInstanceFromCache(instanceOpts["owner"])
+			//TODO:remove later: get all instances and print
+			instances := c.resourceCache.GetCachedInstances()
+			for key, value := range instances {
+				fmt.Printf("Key: %s, Value: %v\n", key, value)
+			}
+
 		}
 
 		if instanceInCache {
+			// TODO remove this printf later
+			fmt.Printf("Got the instance from Cache")
 			return instance, nil
 		}
 	}
@@ -131,7 +139,7 @@ func (c *spaceClient) CreateInstance(ctx context.Context, name string, servicePl
 
 // Required parameters (may not be initial): guid, generation
 // Optional parameters (may be initial): name, servicePlanGuid, parameters, tags
-func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name string, servicePlanGuid string, parameters map[string]interface{}, tags []string, generation int64) error {
+func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name string, owner string, servicePlanGuid string, parameters map[string]interface{}, tags []string, generation int64) error {
 	req := cfresource.NewServiceInstanceManagedUpdate()
 	if name != "" {
 		req.WithName(name)
@@ -160,13 +168,39 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 	}
 
 	_, _, err := c.client.ServiceInstances.UpdateManaged(ctx, guid, req)
+	if err == nil && c.resourceCache.IsResourceCacheEnabled() {
+		isUpdated := c.resourceCache.UpdateInstanceInCache(guid, name, owner, servicePlanGuid, parameters, generation)
+
+		if !isUpdated {
+			//add instance to cache in case of orphan instance
+			instance := &facade.Instance{
+				Guid:             guid,
+				Name:             name,
+				ServicePlanGuid:  servicePlanGuid,
+				Owner:            owner,
+				Generation:       generation,
+				ParameterHash:    facade.ObjectHash(parameters),
+				State:            facade.InstanceStateReady,
+				StateDescription: "",
+			}
+			c.resourceCache.AddInstanceInCache(owner, instance)
+
+		}
+	}
+	//TODO:remove later: get all instances and print
+	instances := c.resourceCache.GetCachedInstances()
+	for key, value := range instances {
+		fmt.Printf("Key: %s, Value: %v\n", key, value)
+	}
 	return err
 }
 
 func (c *spaceClient) DeleteInstance(ctx context.Context, guid string, owner string) error {
 	// TODO: return jobGUID to enable querying the job deletion status
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
-	c.resourceCache.RemoveInstanceFromCache(owner)
+	if err == nil && c.resourceCache.IsResourceCacheEnabled() {
+		c.resourceCache.RemoveInstanceFromCache(owner)
+	}
 	return err
 }
 
