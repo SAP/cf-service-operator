@@ -60,26 +60,25 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		var instance *facade.Instance
 		//TODO recheck this logic later
 		if c.resourceCache.IsCacheExpired() {
-
+			//TODO: remove later:Print cache is expited
+			fmt.Println("Cache is expired")
 			c.populateResourceCache()
 		}
 		if len(c.resourceCache.GetCachedInstances()) != 0 {
 
 			instance, instanceInCache = c.resourceCache.GetInstanceFromCache(instanceOpts["owner"])
-			//TODO:remove later: get all instances and print
-			instances := c.resourceCache.GetCachedInstances()
-			for key, value := range instances {
-				fmt.Printf("Key: %s, Value: %v\n", key, value)
-			}
+			//TODO: remove later: print length of cache
+			fmt.Printf("Length of cache: %d\n", len(c.resourceCache.GetCachedInstances()))
 
 		}
 
 		if instanceInCache {
-			// TODO remove this printf later
-			fmt.Printf("Got the instance from Cache")
 			return instance, nil
 		}
 	}
+	//TODO:remove later:Print not found in cache or cache is empty or instance not found
+	fmt.Println("Not found in cache or cache is empty or instance not found in cf")
+
 	// Attempt to retrieve instance from Cloud Foundry
 	var serviceInstance *cfresource.ServiceInstance
 
@@ -186,12 +185,10 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 			c.resourceCache.AddInstanceInCache(owner, instance)
 
 		}
+		//TODO:remove later: print instance added in cache and print the instance
+		fmt.Println("Instance added or updated in cache from update instance function")
 	}
-	//TODO:remove later: get all instances and print
-	instances := c.resourceCache.GetCachedInstances()
-	for key, value := range instances {
-		fmt.Printf("Key: %s, Value: %v\n", key, value)
-	}
+
 	return err
 }
 
@@ -199,7 +196,7 @@ func (c *spaceClient) DeleteInstance(ctx context.Context, guid string, owner str
 	// TODO: return jobGUID to enable querying the job deletion status
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
 	if err == nil && c.resourceCache.IsResourceCacheEnabled() {
-		c.resourceCache.RemoveInstanceFromCache(owner)
+		c.resourceCache.DeleteInstanceFromCache(owner)
 	}
 	return err
 }

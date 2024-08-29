@@ -172,7 +172,6 @@ func (c *ResourceCache) SetCacheTimeOut(timeOut string) {
 func (c *ResourceCache) IsCacheExpired() bool {
 
 	expirationTime := c.lastCacheTime.Add(c.cacheTimeOut)
-	//expiryTime := time.Until(c.lastCacheTime)
 	fmt.Printf("Expiry time: %v\n", expirationTime)
 	fmt.Printf("Cache timeout: %v\n", c.cacheTimeOut)
 	return time.Now().After(expirationTime)
@@ -205,6 +204,8 @@ func (c *ResourceCache) AddInstanceInCache(key string, instance *Instance) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.instances[key] = instance
+	// TODO :remove later:addedinstance to cache and print the instance
+	fmt.Printf("Added instance to cache: %v\n", instance)
 }
 
 // GetInstanceFromCache retrieves an instance from the cache
@@ -212,6 +213,8 @@ func (c *ResourceCache) GetInstanceFromCache(key string) (*Instance, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	instance, found := c.instances[key]
+	// TODO :remove later: remove this printf later
+	fmt.Printf("Got the instance from Cache: %v", instance)
 	return instance, found
 }
 
@@ -219,13 +222,17 @@ func (c *ResourceCache) GetInstanceFromCache(key string) (*Instance, bool) {
 // This is used when an instance is deleted
 // The instance is removed from the cache to avoid stale data
 // The instance is removed from the cache only if the instance is found in the cache
-func (c *ResourceCache) RemoveInstanceFromCache(key string) {
+func (c *ResourceCache) DeleteInstanceFromCache(key string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	_, found := c.instances[key]
 	if found {
 		delete(c.instances, key)
+		//TODO:remove later: print cache found and deleted
+		fmt.Println("Cache found and deleted")
 	}
+	//TODO:remove later: print cache not found
+	fmt.Println("Cache not found to delete")
 
 }
 
@@ -254,11 +261,13 @@ func (c *ResourceCache) UpdateInstanceInCache(guid string, name string, owner st
 		}
 		instance.Generation = generation
 		c.instances[owner] = instance
+		//TODO:remove later:print updated instance
+		fmt.Printf("Updated cache instance: %v\n", instance)
 		return true
 
 	}
-	//TODO:remove later: print all the instances in cache
-	fmt.Printf("Instances in cache: %v\n", c.instances)
+	//TODO:remove later: print cache not found
+	fmt.Println("Cache not found to update")
 	return false
 
 }

@@ -237,6 +237,8 @@ func (c *spaceClient) populateResourceCache() {
 	refreshResourceCacheMutex.Lock()
 	defer refreshResourceCacheMutex.Unlock()
 	if c.resourceCache.IsCacheExpired() {
+		//print cache is expired and populate the cache
+		fmt.Println("For the first or Cache is expired and populating the cache")
 		instanceOptions := cfclient.NewServiceInstanceListOptions()
 		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 		instanceOptions.Page = 1
@@ -248,6 +250,7 @@ func (c *spaceClient) populateResourceCache() {
 		for {
 			srvInstanes, pager, err := c.client.ServiceInstances.List(ctx, instanceOptions)
 			if err != nil {
+				//TODO:revisit to see how to handle if error occurs
 				log.Fatalf("Error listing service instances: %s", err)
 			}
 
