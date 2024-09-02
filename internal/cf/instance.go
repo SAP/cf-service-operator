@@ -253,3 +253,7 @@ func InitInstance(serviceInstance *cfresource.ServiceInstance, instanceOpts map[
 		StateDescription: stateDescription,
 	}, nil
 }
+
+func (c *spaceClient) GetResourceCache() *facade.ResourceCache {
+	return c.resourceCache
+}

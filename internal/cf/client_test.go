@@ -36,6 +36,7 @@ const (
 	spacesURI           = "/v3/spaces"
 	serviceInstancesURI = "/v3/service_instances"
 	uaaURI              = "/uaa/oauth/token"
+	label_selector      = "service-operator.cf.cs.sap.com"
 )
 
 type Token struct {
@@ -51,7 +52,7 @@ func TestCFClient(t *testing.T) {
 }
 
 // is resource cache enabled and cache timeout
-var resourceCacheEnabled = false
+var resourceCacheEnabled = true
 var resourceCacheTimeout = 5 * time.Minute
 
 var cfg = &config.Config{
@@ -240,7 +241,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
 
-			Expect(server.ReceivedRequests()).To(HaveLen(1))
+			Expect(server.ReceivedRequests()).To(HaveLen(3))
 		})
 
 		It("should be able to query some space", func() {
@@ -259,7 +260,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(serviceInstancesURI))
 
-			Expect(server.ReceivedRequests()).To(HaveLen(3))
+			Expect(server.ReceivedRequests()).To(HaveLen(4))
 
 			// verify metrics
 			metricsList, err := metrics.Registry.Gather()
@@ -298,7 +299,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[3].URL.Path).To(Equal(serviceInstancesURI))
 
-			Expect(server.ReceivedRequests()).To(HaveLen(4))
+			Expect(server.ReceivedRequests()).To(HaveLen(5))
 		})
 
 		It("should be able to query two different spaces", func() {
@@ -314,7 +315,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
 			// Get instance
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(Owner))
+			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(label_selector))
 
 			// test space 2
 			spaceClient2, err2 := NewSpaceClient(SpaceName2, url, Username, Password, *cfg)
@@ -323,7 +324,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// no discovery of UAA endpoint or oAuth token here due to caching
 			// Get instance
 			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[3].RequestURI).To(ContainSubstring(Owner2))
+			Expect(server.ReceivedRequests()[3].RequestURI).To(ContainSubstring(label_selector))
 		})
 
 		It("should register prometheus metrics for OrgClient", func() {
@@ -365,6 +366,32 @@ var _ = Describe("CF Client tests", Ordered, func() {
 
 			// for debugging: write metrics to file
 			// prometheus.WriteToTextfile("metrics.txt", metrics.Registry)
+		})
+		It("should initialize resource cache and populate cache", func() {
+			// Enable resource cache in config
+			cfg.IsResourceCacheEnabled = true
+
+			spaceClient, err := NewSpaceClient(SpaceName, url, Username, Password, *cfg)
+			Expect(err).To(BeNil())
+			Expect(spaceClient).ToNot(BeNil())
+
+			// Discover UAA endpoint
+			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
+			// Get new oAuth token
+			Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
+			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
+			// Populate cache
+			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(label_selector))
+			// Verify that the cache is initialized
+			cache := spaceClient.GetResourceCache()
+			Expect(cache).ToNot(BeNil())
+			Expect(cache.IsResourceCacheEnabled()).To(BeTrue())
+
+			// Verify that no additional requests are made to the server
+			Expect(server.ReceivedRequests()).To(HaveLen(3))
+
 		})
 
 	})

@@ -34,6 +34,7 @@ const (
 type organizationClient struct {
 	organizationName string
 	client           cfclient.Client
+	// TODO: for org client
 	//resourceCache   *facade.Cache
 }
 
