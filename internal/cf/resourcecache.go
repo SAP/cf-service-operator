@@ -13,7 +13,9 @@ import (
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
-// Cache is a simple in-memory cache to store spaces, instances, and bindings
+// Cache is a simple in-memory cache to store spaces, instances, and bindings using a map with a mutex
+// The cache is used to store the resources to avoid making multiple calls to the CF API
+// key is the owner of the instance which is kubernetes UID and value is the instance
 type resourceCache struct {
 	spaces                 map[string]*facade.Space
 	instances              map[string]*facade.Instance
@@ -35,39 +37,7 @@ func initResourceCache() *resourceCache {
 	return cache
 }
 
-// Get resource cache
-func (c *resourceCache) getresourceCache() *resourceCache {
-	return c
-}
-
-func (c *resourceCache) getCachedInstances() map[string]*facade.Instance {
-	return c.instances
-}
-
-func (c *resourceCache) getCachedBindings() map[string]*facade.Binding {
-	return c.bindings
-}
-
-func (c *resourceCache) getCachedSpaces() map[string]*facade.Space {
-	return c.spaces
-}
-
-// function to set the resource cache enabled flag from config
-func (c *resourceCache) setResourceCacheEnabled(enabled bool) {
-	c.isResourceCacheEnabled = enabled
-}
-func (c *resourceCache) checkResourceCacheEnabled() bool {
-	if c == nil {
-		return false
-	}
-	return c.isResourceCacheEnabled
-}
-
-// Function to set the resource cache enabled flag from config
-func (c *resourceCache) getCacheTimeOut() time.Duration {
-	return c.cacheTimeOut
-}
-
+// Function to set the resource cache timeout from config
 func (c *resourceCache) setCacheTimeOut(timeOut string) {
 	cacheTimeOut, err := time.ParseDuration(timeOut)
 	if err != nil {
@@ -93,19 +63,15 @@ func (c *resourceCache) setLastCacheTime() {
 	fmt.Printf("Last cache time: %v\n", c.lastCacheTime)
 }
 
-// AddSpaceInCache stores a space in the cache
-func (c *resourceCache) addSpaceInCache(key string, space *facade.Space) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	c.spaces[key] = space
+// function to set the resource cache enabled flag from config
+func (c *resourceCache) setResourceCacheEnabled(enabled bool) {
+	c.isResourceCacheEnabled = enabled
 }
-
-// GetSpaceFromCache retrieves a space from the cache
-func (c *resourceCache) getSpaceFromCache(key string) (*facade.Space, bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	space, found := c.spaces[key]
-	return space, found
+func (c *resourceCache) checkResourceCacheEnabled() bool {
+	if c == nil {
+		return false
+	}
+	return c.isResourceCacheEnabled
 }
 
 // AddInstanceInCache stores an instance in the cache
@@ -134,12 +100,9 @@ func (c *resourceCache) getInstanceFromCache(key string) (*facade.Instance, bool
 func (c *resourceCache) deleteInstanceFromCache(key string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	_, found := c.instances[key]
-	if found {
-		delete(c.instances, key)
-		//TODO:remove later: print cache found and deleted
-		fmt.Println("Cache found and deleted")
-	}
+	delete(c.instances, key)
+	// TODO :remove later: remove this printf later
+	fmt.Println("Cache found and deleted")
 
 }
 
@@ -179,17 +142,50 @@ func (c *resourceCache) updateInstanceInCache(guid string, name string, owner st
 
 }
 
-// AddBindingInCache stores a binding in the cache
-func (c *resourceCache) addBindingInCache(key string, binding *facade.Binding) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	c.bindings[key] = binding
+func (c *resourceCache) getCachedInstances() map[string]*facade.Instance {
+	return c.instances
 }
 
-// GetBindingFromCache retrieves a binding from the cache
-func (c *resourceCache) getBindingFromCache(key string) (*facade.Binding, bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	binding, found := c.bindings[key]
-	return binding, found
-}
+//TODO:Uncomment on functionality completion
+// // AddSpaceInCache stores a space in the cache
+// func (c *resourceCache) addSpaceInCache(key string, space *facade.Space) {
+// 	c.mutex.Lock()
+// 	defer c.mutex.Unlock()
+// 	c.spaces[key] = space
+// }
+
+// // GetSpaceFromCache retrieves a space from the cache
+// func (c *resourceCache) getSpaceFromCache(key string) (*facade.Space, bool) {
+// 	c.mutex.RLock()
+// 	defer c.mutex.RUnlock()
+// 	space, found := c.spaces[key]
+// 	return space, found
+// }
+
+// // AddBindingInCache stores a binding in the cache
+// func (c *resourceCache) addBindingInCache(key string, binding *facade.Binding) {
+// 	c.mutex.Lock()
+// 	defer c.mutex.Unlock()
+// 	c.bindings[key] = binding
+// }
+
+// // GetBindingFromCache retrieves a binding from the cache
+// func (c *resourceCache) getBindingFromCache(key string) (*facade.Binding, bool) {
+// 	c.mutex.RLock()
+// 	defer c.mutex.RUnlock()
+// 	binding, found := c.bindings[key]
+// 	return binding, found
+// }
+
+// // Get resource cache
+// func (c *resourceCache) getresourceCache() *resourceCache {
+// 	return c
+// }
+
+// func (c *resourceCache) getCachedBindings() map[string]*facade.Binding {
+// 	return c.bindings
+// }
+
+// func (c *resourceCache) getCachedSpaces() map[string]*facade.Space {
+// 	return c.spaces
+// }

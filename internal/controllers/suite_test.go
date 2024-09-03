@@ -67,13 +67,7 @@ const (
 var timeout = 5 * time.Minute
 
 // is resource cache enabled and cache timeout
-var resourceCacheEnabled = false
-var resourceCacheTimeout = 5 * time.Minute
-
-var cfg = &config.Config{
-	IsResourceCacheEnabled: resourceCacheEnabled,
-	CacheTimeOut:           resourceCacheTimeout.String(),
-}
+var cfg = &config.Config{}
 
 // interval used for polling custom resource
 var interval = 500 * time.Millisecond

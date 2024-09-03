@@ -56,9 +56,6 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		}
 
 		// Attempt to retrieve instance from Cache
-		var instanceInCache bool
-		var instance *facade.Instance
-		//TODO recheck this logic later
 		if c.resourceCache.isCacheExpired() {
 			//TODO: remove later:Print cache is expited
 			fmt.Println("Cache is expired")
@@ -66,15 +63,16 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		}
 		if len(c.resourceCache.getCachedInstances()) != 0 {
 
-			instance, instanceInCache = c.resourceCache.getInstanceFromCache(instanceOpts["owner"])
-			//TODO: remove later: print length of cache
+			instance, instanceInCache := c.resourceCache.getInstanceFromCache(instanceOpts["owner"])
+			// TODO: remove later: print length of cache
 			fmt.Printf("Length of cache: %d\n", len(c.resourceCache.getCachedInstances()))
 
+			if instanceInCache {
+				return instance, nil
+			}
+
 		}
 
-		if instanceInCache {
-			return instance, nil
-		}
 	}
 	//TODO:remove later:Print not found in cache or cache is empty or instance not found
 	fmt.Println("Not found in cache or cache is empty or instance not found in cf")

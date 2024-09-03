@@ -75,10 +75,6 @@ type OrganizationClient interface {
 	AddAuditor(ctx context.Context, guid string, username string) error
 	AddDeveloper(ctx context.Context, guid string, username string) error
 	AddManager(ctx context.Context, guid string, username string) error
-
-	//TODO: Add methods for managing space
-	// AddSpaceInCache(key string, space *Space)
-	// GetSpaceFromCache(key string) (*Space, bool)
 }
 
 type OrganizationClientBuilder func(string, string, string, string) (OrganizationClient, error)
@@ -96,12 +92,6 @@ type SpaceClient interface {
 	DeleteBinding(ctx context.Context, guid string) error
 
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
-
-	//TODO: Add methods for managing service keys
-	// AddInstanceToResourceCache(key string, instance *Instance)
-	// GetInstanceFromResourceCache(key string) (*Instance, bool)
-	// AddBindingToResourceCache(key string, binding *Binding)
-	// GetBindingFromResourceCache(key string) (*Binding, bool)
 }
 
 type SpaceClientBuilder func(string, string, string, string, config.Config) (SpaceClient, error)
