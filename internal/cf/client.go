@@ -34,14 +34,14 @@ const (
 type organizationClient struct {
 	organizationName string
 	client           cfclient.Client
-	// TODO: for org client
+	// TP
 	//resourceCache   *facade.Cache
 }
 
 type spaceClient struct {
 	spaceGuid     string
 	client        cfclient.Client
-	resourceCache *facade.ResourceCache
+	resourceCache *resourceCache
 }
 
 type clientIdentifier struct {
@@ -59,7 +59,7 @@ type clientCacheEntry struct {
 var (
 	clientCacheMutex          = &sync.Mutex{}
 	clientCache               = make(map[clientIdentifier]*clientCacheEntry)
-	cfResourceCache           *facade.ResourceCache
+	cfResourceCache           *resourceCache
 	refreshResourceCacheMutex = &sync.Mutex{}
 )
 
@@ -190,9 +190,9 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 	}
 
 	if config.IsResourceCacheEnabled && client.resourceCache == nil {
-		client.resourceCache = facade.InitResourceCache()
-		client.resourceCache.SetResourceCacheEnabled(config.IsResourceCacheEnabled)
-		client.resourceCache.SetCacheTimeOut(config.CacheTimeOut)
+		client.resourceCache = initResourceCache()
+		client.resourceCache.setResourceCacheEnabled(config.IsResourceCacheEnabled)
+		client.resourceCache.setCacheTimeOut(config.CacheTimeOut)
 		client.populateResourceCache()
 	}
 
@@ -237,7 +237,7 @@ func (c *spaceClient) populateResourceCache() {
 	// TODO: Add for loop for space
 	refreshResourceCacheMutex.Lock()
 	defer refreshResourceCacheMutex.Unlock()
-	if c.resourceCache.IsCacheExpired() {
+	if c.resourceCache.isCacheExpired() {
 		//print cache is expired and populate the cache
 		fmt.Println("For the first or Cache is expired and populating the cache")
 		instanceOptions := cfclient.NewServiceInstanceListOptions()
@@ -261,7 +261,7 @@ func (c *spaceClient) populateResourceCache() {
 				instance, err := InitInstance(serviceInstance, nil)
 				// instance is added to cache only if error is nil
 				if err == nil {
-					c.resourceCache.AddInstanceInCache(*serviceInstance.Metadata.Labels[labelOwner], instance)
+					c.resourceCache.addInstanceInCache(*serviceInstance.Metadata.Labels[labelOwner], instance)
 				}
 			}
 
@@ -272,7 +272,7 @@ func (c *spaceClient) populateResourceCache() {
 
 			pager.NextPage(instanceOptions)
 		}
-		c.resourceCache.SetLastCacheTime()
+		c.resourceCache.setLastCacheTime()
 		cfResourceCache = c.resourceCache
 	}
 	// TODO: Add for loop for bindings
