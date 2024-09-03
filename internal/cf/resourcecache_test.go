@@ -3,7 +3,7 @@ SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and cf-service-o
 SPDX-License-Identifier: Apache-2.0
 */
 
-package facade
+package cf
 
 import (
 	"strconv"
@@ -12,22 +12,23 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/sap/cf-service-operator/internal/facade"
 )
 
 func TestFacade(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Facade Suite")
+	RunSpecs(t, "ResourceCache Suite")
 }
 
 var _ = Describe("ResourceCache", func() {
-	var cache *ResourceCache
-	var instance *Instance
+	var cache *resourceCache
+	var instance *facade.Instance
 	var wg sync.WaitGroup
 	concurrencyLevel := 100
 
 	BeforeEach(func() {
-		cache = InitResourceCache()
-		instance = &Instance{
+		cache = initResourceCache()
+		instance = &facade.Instance{
 			Guid:            "guid1",
 			Name:            "name1",
 			Owner:           "owner1",
@@ -41,15 +42,15 @@ var _ = Describe("ResourceCache", func() {
 		It("should add, get, update, and delete an instance in the cache", func() {
 			// Add instance
 			Ownerkey := "owner1"
-			cache.AddInstanceInCache(Ownerkey, instance)
+			cache.addInstanceInCache(Ownerkey, instance)
 
 			// Get instance
-			retrievedInstance, found := cache.GetInstanceFromCache(Ownerkey)
+			retrievedInstance, found := cache.getInstanceFromCache(Ownerkey)
 			Expect(found).To(BeTrue())
 			Expect(retrievedInstance).To(Equal(instance))
 
 			// Update instance
-			updatedInstance := &Instance{
+			updatedInstance := &facade.Instance{
 				Guid:            "guid1",
 				Name:            "updatedName",
 				Owner:           "owner1",
@@ -57,36 +58,36 @@ var _ = Describe("ResourceCache", func() {
 				ParameterHash:   "hash1",
 				Generation:      2,
 			}
-			cache.UpdateInstanceInCache("guid1", "updatedName", "owner1", "updatedPlan", nil, 2)
-			retrievedInstance, found = cache.GetInstanceFromCache(Ownerkey)
+			cache.updateInstanceInCache("guid1", "updatedName", "owner1", "updatedPlan", nil, 2)
+			retrievedInstance, found = cache.getInstanceFromCache(Ownerkey)
 			Expect(found).To(BeTrue())
 			Expect(retrievedInstance).To(Equal(updatedInstance))
 
 			// Delete instance
-			cache.DeleteInstanceFromCache(Ownerkey)
-			_, found = cache.GetInstanceFromCache(Ownerkey)
+			cache.deleteInstanceFromCache(Ownerkey)
+			_, found = cache.getInstanceFromCache(Ownerkey)
 			Expect(found).To(BeFalse())
 		})
 	})
 
 	Context("edge cases", func() {
 		It("should handle adding an instance with an existing key", func() {
-			cache.AddInstanceInCache("owner1", instance)
-			cache.AddInstanceInCache("owner1", instance)
-			retrievedInstance, found := cache.GetInstanceFromCache("owner1")
+			cache.addInstanceInCache("owner1", instance)
+			cache.addInstanceInCache("owner1", instance)
+			retrievedInstance, found := cache.getInstanceFromCache("owner1")
 			Expect(found).To(BeTrue())
 			Expect(retrievedInstance).To(Equal(instance))
 		})
 
 		It("should handle updating a non-existent instance", func() {
-			cache.UpdateInstanceInCache("nonExistentGuid", "name", "owner", "plan", nil, 1)
-			_, found := cache.GetInstanceFromCache("nonExistentGuid")
+			cache.updateInstanceInCache("nonExistentGuid", "name", "owner", "plan", nil, 1)
+			_, found := cache.getInstanceFromCache("nonExistentGuid")
 			Expect(found).To(BeFalse())
 		})
 
 		It("should handle deleting a non-existent instance", func() {
-			cache.DeleteInstanceFromCache("nonExistentKey")
-			_, found := cache.GetInstanceFromCache("nonExistentKey")
+			cache.deleteInstanceFromCache("nonExistentKey")
+			_, found := cache.getInstanceFromCache("nonExistentKey")
 			Expect(found).To(BeFalse())
 		})
 	})
@@ -97,7 +98,7 @@ var _ = Describe("ResourceCache", func() {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					cache.AddInstanceInCache("key"+strconv.Itoa(i), instance)
+					cache.addInstanceInCache("key"+strconv.Itoa(i), instance)
 				}(i)
 			}
 			wg.Wait()
@@ -108,7 +109,7 @@ var _ = Describe("ResourceCache", func() {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					cache.GetInstanceFromCache("key" + strconv.Itoa(i))
+					cache.getInstanceFromCache("key" + strconv.Itoa(i))
 				}(i)
 			}
 			wg.Wait()
@@ -119,7 +120,7 @@ var _ = Describe("ResourceCache", func() {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					cache.UpdateInstanceInCache("guid"+strconv.Itoa(i), "name"+strconv.Itoa(i), "owner1", "plan"+strconv.Itoa(i), nil, int64(i))
+					cache.updateInstanceInCache("guid"+strconv.Itoa(i), "name"+strconv.Itoa(i), "owner1", "plan"+strconv.Itoa(i), nil, int64(i))
 				}(i)
 			}
 			wg.Wait()
@@ -130,14 +131,14 @@ var _ = Describe("ResourceCache", func() {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					cache.DeleteInstanceFromCache("key" + strconv.Itoa(i))
+					cache.deleteInstanceFromCache("key" + strconv.Itoa(i))
 				}(i)
 			}
 			wg.Wait()
 
 			// Verify final state
 			for i := 0; i < concurrencyLevel; i++ {
-				_, found := cache.GetInstanceFromCache("key" + strconv.Itoa(i))
+				_, found := cache.getInstanceFromCache("key" + strconv.Itoa(i))
 				Expect(found).To(BeFalse(), "Expected instance to be deleted from cache")
 			}
 		})
@@ -149,7 +150,7 @@ var _ = Describe("ResourceCache", func() {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					cache.AddInstanceInCache("key"+strconv.Itoa(i), instance)
+					cache.addInstanceInCache("key"+strconv.Itoa(i), instance)
 				}(i)
 			}
 
@@ -159,7 +160,7 @@ var _ = Describe("ResourceCache", func() {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					cache.GetInstanceFromCache("key" + strconv.Itoa(i))
+					cache.getInstanceFromCache("key" + strconv.Itoa(i))
 				}(i)
 			}
 
@@ -169,7 +170,7 @@ var _ = Describe("ResourceCache", func() {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					cache.DeleteInstanceFromCache("key" + strconv.Itoa(i))
+					cache.deleteInstanceFromCache("key" + strconv.Itoa(i))
 				}(i)
 			}
 
@@ -177,7 +178,7 @@ var _ = Describe("ResourceCache", func() {
 
 			// Verify final state
 			for i := 0; i < highLoadLevel; i++ {
-				_, found := cache.GetInstanceFromCache("key" + strconv.Itoa(i))
+				_, found := cache.getInstanceFromCache("key" + strconv.Itoa(i))
 				Expect(found).To(BeFalse(), "Expected instance to be deleted from cache")
 			}
 		})
@@ -187,7 +188,7 @@ var _ = Describe("ResourceCache", func() {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					cache.AddInstanceInCache("key"+strconv.Itoa(i), instance)
+					cache.addInstanceInCache("key"+strconv.Itoa(i), instance)
 				}(i)
 			}
 
@@ -197,7 +198,7 @@ var _ = Describe("ResourceCache", func() {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					retrievedInstance, found := cache.GetInstanceFromCache("key" + strconv.Itoa(i))
+					retrievedInstance, found := cache.getInstanceFromCache("key" + strconv.Itoa(i))
 					Expect(found).To(BeTrue())
 					Expect(retrievedInstance).To(Equal(instance))
 				}(i)

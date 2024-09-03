@@ -115,16 +115,6 @@ type FakeSpaceClient struct {
 		result1 *facade.Instance
 		result2 error
 	}
-	GetResourceCacheStub        func() *facade.ResourceCache
-	getResourceCacheMutex       sync.RWMutex
-	getResourceCacheArgsForCall []struct {
-	}
-	getResourceCacheReturns struct {
-		result1 *facade.ResourceCache
-	}
-	getResourceCacheReturnsOnCall map[int]struct {
-		result1 *facade.ResourceCache
-	}
 	UpdateBindingStub        func(context.Context, string, int64, map[string]interface{}) error
 	updateBindingMutex       sync.RWMutex
 	updateBindingArgsForCall []struct {
@@ -621,59 +611,6 @@ func (fake *FakeSpaceClient) GetInstanceReturnsOnCall(i int, result1 *facade.Ins
 	}{result1, result2}
 }
 
-func (fake *FakeSpaceClient) GetResourceCache() *facade.ResourceCache {
-	fake.getResourceCacheMutex.Lock()
-	ret, specificReturn := fake.getResourceCacheReturnsOnCall[len(fake.getResourceCacheArgsForCall)]
-	fake.getResourceCacheArgsForCall = append(fake.getResourceCacheArgsForCall, struct {
-	}{})
-	stub := fake.GetResourceCacheStub
-	fakeReturns := fake.getResourceCacheReturns
-	fake.recordInvocation("GetResourceCache", []interface{}{})
-	fake.getResourceCacheMutex.Unlock()
-	if stub != nil {
-		return stub()
-	}
-	if specificReturn {
-		return ret.result1
-	}
-	return fakeReturns.result1
-}
-
-func (fake *FakeSpaceClient) GetResourceCacheCallCount() int {
-	fake.getResourceCacheMutex.RLock()
-	defer fake.getResourceCacheMutex.RUnlock()
-	return len(fake.getResourceCacheArgsForCall)
-}
-
-func (fake *FakeSpaceClient) GetResourceCacheCalls(stub func() *facade.ResourceCache) {
-	fake.getResourceCacheMutex.Lock()
-	defer fake.getResourceCacheMutex.Unlock()
-	fake.GetResourceCacheStub = stub
-}
-
-func (fake *FakeSpaceClient) GetResourceCacheReturns(result1 *facade.ResourceCache) {
-	fake.getResourceCacheMutex.Lock()
-	defer fake.getResourceCacheMutex.Unlock()
-	fake.GetResourceCacheStub = nil
-	fake.getResourceCacheReturns = struct {
-		result1 *facade.ResourceCache
-	}{result1}
-}
-
-func (fake *FakeSpaceClient) GetResourceCacheReturnsOnCall(i int, result1 *facade.ResourceCache) {
-	fake.getResourceCacheMutex.Lock()
-	defer fake.getResourceCacheMutex.Unlock()
-	fake.GetResourceCacheStub = nil
-	if fake.getResourceCacheReturnsOnCall == nil {
-		fake.getResourceCacheReturnsOnCall = make(map[int]struct {
-			result1 *facade.ResourceCache
-		})
-	}
-	fake.getResourceCacheReturnsOnCall[i] = struct {
-		result1 *facade.ResourceCache
-	}{result1}
-}
-
 func (fake *FakeSpaceClient) UpdateBinding(arg1 context.Context, arg2 string, arg3 int64, arg4 map[string]interface{}) error {
 	fake.updateBindingMutex.Lock()
 	ret, specificReturn := fake.updateBindingReturnsOnCall[len(fake.updateBindingArgsForCall)]
@@ -828,8 +765,6 @@ func (fake *FakeSpaceClient) Invocations() map[string][][]interface{} {
 	defer fake.getBindingMutex.RUnlock()
 	fake.getInstanceMutex.RLock()
 	defer fake.getInstanceMutex.RUnlock()
-	fake.getResourceCacheMutex.RLock()
-	defer fake.getResourceCacheMutex.RUnlock()
 	fake.updateBindingMutex.RLock()
 	defer fake.updateBindingMutex.RUnlock()
 	fake.updateInstanceMutex.RLock()

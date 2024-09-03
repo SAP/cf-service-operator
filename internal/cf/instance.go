@@ -49,26 +49,26 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // The function add the parameter values to the orphan cf instance, so that can be adopted.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
 
-	if c.resourceCache.IsResourceCacheEnabled() {
+	if c.resourceCache.checkResourceCacheEnabled() {
 		// Ensure resourcesCache is initialized
 		if c.resourceCache == nil {
-			c.resourceCache = facade.InitResourceCache()
+			c.resourceCache = initResourceCache()
 		}
 
 		// Attempt to retrieve instance from Cache
 		var instanceInCache bool
 		var instance *facade.Instance
 		//TODO recheck this logic later
-		if c.resourceCache.IsCacheExpired() {
+		if c.resourceCache.isCacheExpired() {
 			//TODO: remove later:Print cache is expited
 			fmt.Println("Cache is expired")
 			c.populateResourceCache()
 		}
-		if len(c.resourceCache.GetCachedInstances()) != 0 {
+		if len(c.resourceCache.getCachedInstances()) != 0 {
 
-			instance, instanceInCache = c.resourceCache.GetInstanceFromCache(instanceOpts["owner"])
+			instance, instanceInCache = c.resourceCache.getInstanceFromCache(instanceOpts["owner"])
 			//TODO: remove later: print length of cache
-			fmt.Printf("Length of cache: %d\n", len(c.resourceCache.GetCachedInstances()))
+			fmt.Printf("Length of cache: %d\n", len(c.resourceCache.getCachedInstances()))
 
 		}
 
@@ -167,8 +167,8 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 	}
 
 	_, _, err := c.client.ServiceInstances.UpdateManaged(ctx, guid, req)
-	if err == nil && c.resourceCache.IsResourceCacheEnabled() {
-		isUpdated := c.resourceCache.UpdateInstanceInCache(guid, name, owner, servicePlanGuid, parameters, generation)
+	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
+		isUpdated := c.resourceCache.updateInstanceInCache(guid, name, owner, servicePlanGuid, parameters, generation)
 
 		if !isUpdated {
 			//add instance to cache in case of orphan instance
@@ -182,7 +182,7 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 				State:            facade.InstanceStateReady,
 				StateDescription: "",
 			}
-			c.resourceCache.AddInstanceInCache(owner, instance)
+			c.resourceCache.addInstanceInCache(owner, instance)
 
 		}
 		//TODO:remove later: print instance added in cache and print the instance
@@ -195,8 +195,8 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 func (c *spaceClient) DeleteInstance(ctx context.Context, guid string, owner string) error {
 	// TODO: return jobGUID to enable querying the job deletion status
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
-	if err == nil && c.resourceCache.IsResourceCacheEnabled() {
-		c.resourceCache.DeleteInstanceFromCache(owner)
+	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
+		c.resourceCache.deleteInstanceFromCache(owner)
 	}
 	return err
 }
@@ -252,8 +252,4 @@ func InitInstance(serviceInstance *cfresource.ServiceInstance, instanceOpts map[
 		State:            state,
 		StateDescription: stateDescription,
 	}, nil
-}
-
-func (c *spaceClient) GetResourceCache() *facade.ResourceCache {
-	return c.resourceCache
 }

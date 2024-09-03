@@ -384,10 +384,6 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// Populate cache
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(label_selector))
-			// Verify that the cache is initialized
-			cache := spaceClient.GetResourceCache()
-			Expect(cache).ToNot(BeNil())
-			Expect(cache.IsResourceCacheEnabled()).To(BeTrue())
 
 			// Verify that no additional requests are made to the server
 			Expect(server.ReceivedRequests()).To(HaveLen(3))

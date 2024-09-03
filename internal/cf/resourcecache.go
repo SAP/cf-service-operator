@@ -3,19 +3,21 @@ SPDX-FileCopyrightText: 2024 SAP SE or an SAP affiliate company and cf-service-o
 SPDX-License-Identifier: Apache-2.0
 */
 
-package facade
+package cf
 
 import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/sap/cf-service-operator/internal/facade"
 )
 
 // Cache is a simple in-memory cache to store spaces, instances, and bindings
-type ResourceCache struct {
-	spaces                 map[string]*Space
-	instances              map[string]*Instance
-	bindings               map[string]*Binding
+type resourceCache struct {
+	spaces                 map[string]*facade.Space
+	instances              map[string]*facade.Instance
+	bindings               map[string]*facade.Binding
 	mutex                  sync.RWMutex
 	lastCacheTime          time.Time
 	cacheTimeOut           time.Duration
@@ -23,38 +25,38 @@ type ResourceCache struct {
 }
 
 // InitResourcesCache initializes a new cache
-func InitResourceCache() *ResourceCache {
-	cache := &ResourceCache{
-		spaces:       make(map[string]*Space),
-		instances:    make(map[string]*Instance),
-		bindings:     make(map[string]*Binding),
+func initResourceCache() *resourceCache {
+	cache := &resourceCache{
+		spaces:       make(map[string]*facade.Space),
+		instances:    make(map[string]*facade.Instance),
+		bindings:     make(map[string]*facade.Binding),
 		cacheTimeOut: 5 * time.Minute,
 	}
 	return cache
 }
 
 // Get resource cache
-func (c *ResourceCache) GetResourceCache() *ResourceCache {
+func (c *resourceCache) getresourceCache() *resourceCache {
 	return c
 }
 
-func (c *ResourceCache) GetCachedInstances() map[string]*Instance {
+func (c *resourceCache) getCachedInstances() map[string]*facade.Instance {
 	return c.instances
 }
 
-func (c *ResourceCache) GetCachedBindings() map[string]*Binding {
+func (c *resourceCache) getCachedBindings() map[string]*facade.Binding {
 	return c.bindings
 }
 
-func (c *ResourceCache) GetCachedSpaces() map[string]*Space {
+func (c *resourceCache) getCachedSpaces() map[string]*facade.Space {
 	return c.spaces
 }
 
 // function to set the resource cache enabled flag from config
-func (c *ResourceCache) SetResourceCacheEnabled(enabled bool) {
+func (c *resourceCache) setResourceCacheEnabled(enabled bool) {
 	c.isResourceCacheEnabled = enabled
 }
-func (c *ResourceCache) IsResourceCacheEnabled() bool {
+func (c *resourceCache) checkResourceCacheEnabled() bool {
 	if c == nil {
 		return false
 	}
@@ -62,11 +64,11 @@ func (c *ResourceCache) IsResourceCacheEnabled() bool {
 }
 
 // Function to set the resource cache enabled flag from config
-func (c *ResourceCache) GetCacheTimeOut() time.Duration {
+func (c *resourceCache) getCacheTimeOut() time.Duration {
 	return c.cacheTimeOut
 }
 
-func (c *ResourceCache) SetCacheTimeOut(timeOut string) {
+func (c *resourceCache) setCacheTimeOut(timeOut string) {
 	cacheTimeOut, err := time.ParseDuration(timeOut)
 	if err != nil {
 		fmt.Printf("Error parsing duration: %v\n", err)
@@ -76,7 +78,7 @@ func (c *ResourceCache) SetCacheTimeOut(timeOut string) {
 }
 
 // Function to check if the cache is expired
-func (c *ResourceCache) IsCacheExpired() bool {
+func (c *resourceCache) isCacheExpired() bool {
 
 	expirationTime := c.lastCacheTime.Add(c.cacheTimeOut)
 	fmt.Printf("Expiry time: %v\n", expirationTime)
@@ -86,20 +88,20 @@ func (c *ResourceCache) IsCacheExpired() bool {
 }
 
 // Function to set the last cache time
-func (c *ResourceCache) SetLastCacheTime() {
+func (c *resourceCache) setLastCacheTime() {
 	c.lastCacheTime = time.Now()
 	fmt.Printf("Last cache time: %v\n", c.lastCacheTime)
 }
 
 // AddSpaceInCache stores a space in the cache
-func (c *ResourceCache) AddSpaceInCache(key string, space *Space) {
+func (c *resourceCache) addSpaceInCache(key string, space *facade.Space) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.spaces[key] = space
 }
 
 // GetSpaceFromCache retrieves a space from the cache
-func (c *ResourceCache) GetSpaceFromCache(key string) (*Space, bool) {
+func (c *resourceCache) getSpaceFromCache(key string) (*facade.Space, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	space, found := c.spaces[key]
@@ -107,7 +109,7 @@ func (c *ResourceCache) GetSpaceFromCache(key string) (*Space, bool) {
 }
 
 // AddInstanceInCache stores an instance in the cache
-func (c *ResourceCache) AddInstanceInCache(key string, instance *Instance) {
+func (c *resourceCache) addInstanceInCache(key string, instance *facade.Instance) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.instances[key] = instance
@@ -116,7 +118,7 @@ func (c *ResourceCache) AddInstanceInCache(key string, instance *Instance) {
 }
 
 // GetInstanceFromCache retrieves an instance from the cache
-func (c *ResourceCache) GetInstanceFromCache(key string) (*Instance, bool) {
+func (c *resourceCache) getInstanceFromCache(key string) (*facade.Instance, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	instance, found := c.instances[key]
@@ -129,7 +131,7 @@ func (c *ResourceCache) GetInstanceFromCache(key string) (*Instance, bool) {
 // This is used when an instance is deleted
 // The instance is removed from the cache to avoid stale data
 // The instance is removed from the cache only if the instance is found in the cache
-func (c *ResourceCache) DeleteInstanceFromCache(key string) {
+func (c *resourceCache) deleteInstanceFromCache(key string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	_, found := c.instances[key]
@@ -144,7 +146,7 @@ func (c *ResourceCache) DeleteInstanceFromCache(key string) {
 }
 
 // update the instance in the cache
-func (c *ResourceCache) UpdateInstanceInCache(guid string, name string, owner string, servicePlanGuid string, parameters map[string]interface{}, generation int64) (status bool) {
+func (c *resourceCache) updateInstanceInCache(guid string, name string, owner string, servicePlanGuid string, parameters map[string]interface{}, generation int64) (status bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	//update if the instance is found in the cache
@@ -161,7 +163,7 @@ func (c *ResourceCache) UpdateInstanceInCache(guid string, name string, owner st
 			instance.ServicePlanGuid = servicePlanGuid
 		}
 		if parameters != nil {
-			instance.ParameterHash = ObjectHash(parameters)
+			instance.ParameterHash = facade.ObjectHash(parameters)
 		}
 		if owner != "" {
 			instance.Owner = owner
@@ -180,14 +182,14 @@ func (c *ResourceCache) UpdateInstanceInCache(guid string, name string, owner st
 }
 
 // AddBindingInCache stores a binding in the cache
-func (c *ResourceCache) AddBindingInCache(key string, binding *Binding) {
+func (c *resourceCache) addBindingInCache(key string, binding *facade.Binding) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.bindings[key] = binding
 }
 
 // GetBindingFromCache retrieves a binding from the cache
-func (c *ResourceCache) GetBindingFromCache(key string) (*Binding, bool) {
+func (c *resourceCache) getBindingFromCache(key string) (*facade.Binding, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	binding, found := c.bindings[key]

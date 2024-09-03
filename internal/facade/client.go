@@ -97,7 +97,6 @@ type SpaceClient interface {
 
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
 
-	GetResourceCache() *ResourceCache
 	//TODO: Add methods for managing service keys
 	// AddInstanceToResourceCache(key string, instance *Instance)
 	// GetInstanceFromResourceCache(key string) (*Instance, bool)
