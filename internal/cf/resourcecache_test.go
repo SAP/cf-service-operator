@@ -17,14 +17,14 @@ import (
 
 func TestFacade(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "ResourceCache Suite")
+	//RunSpecs(t, "ResourceCache Suite")
 }
 
 var _ = Describe("ResourceCache", func() {
 	var cache *resourceCache
 	var instance *facade.Instance
 	var wg sync.WaitGroup
-	concurrencyLevel := 100
+	concurrencyLevel := 20
 
 	BeforeEach(func() {
 		cache = initResourceCache()

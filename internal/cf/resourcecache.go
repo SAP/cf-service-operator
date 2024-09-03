@@ -140,8 +140,6 @@ func (c *resourceCache) deleteInstanceFromCache(key string) {
 		//TODO:remove later: print cache found and deleted
 		fmt.Println("Cache found and deleted")
 	}
-	//TODO:remove later: print cache not found
-	fmt.Println("Cache not found to delete")
 
 }
 

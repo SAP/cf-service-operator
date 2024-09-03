@@ -243,8 +243,7 @@ func (c *spaceClient) populateResourceCache() {
 		instanceOptions := cfclient.NewServiceInstanceListOptions()
 		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 		instanceOptions.Page = 1
-		instanceOptions.PerPage = 500
-		//instanceOptions.OrganizationGUIDs.EqualTo("21dc8fd6-ea17-49df-99e9-cacf57b479fc")
+		instanceOptions.PerPage = 5000
 
 		ctx := context.Background()
 		// populate instance cache

@@ -6,6 +6,7 @@ package cf
 
 import (
 	"context"
+	"net/http"
 	"testing"
 	"time"
 
@@ -36,7 +37,7 @@ const (
 	spacesURI           = "/v3/spaces"
 	serviceInstancesURI = "/v3/service_instances"
 	uaaURI              = "/uaa/oauth/token"
-	label_selector      = "service-operator.cf.cs.sap.com"
+	labelSelector       = "service-operator.cf.cs.sap.com"
 )
 
 type Token struct {
@@ -51,13 +52,46 @@ func TestCFClient(t *testing.T) {
 	RunSpecs(t, "CF Client Test Suite")
 }
 
-// is resource cache enabled and cache timeout
-var resourceCacheEnabled = true
-var resourceCacheTimeout = 5 * time.Minute
+func String(s string) *string {
+	return &s
+}
 
+// is resource cache enabled and cache timeout
 var cfg = &config.Config{
-	IsResourceCacheEnabled: resourceCacheEnabled,
-	CacheTimeOut:           resourceCacheTimeout.String(),
+	IsResourceCacheEnabled: false,
+	CacheTimeOut:           "5m",
+}
+
+// Fake response for service instances
+var fakeServiceInstances = cfResource.ServiceInstanceList{
+	Resources: []*cfResource.ServiceInstance{
+		{
+			GUID: "test-instance-guid-1",
+			Name: "test-instance-name-1",
+			Tags: []string{},
+			LastOperation: cfResource.LastOperation{
+				Type:        "create",
+				State:       "succeeded",
+				Description: "",
+			},
+			Relationships: cfResource.ServiceInstanceRelationships{
+				ServicePlan: &cfResource.ToOneRelationship{
+					Data: &cfResource.Relationship{
+						GUID: "test-instance-service_plan-1",
+					},
+				},
+			},
+			Metadata: &cfResource.Metadata{
+				Labels: map[string]*string{
+					"service-operator.cf.cs.sap.com/owner": String("testOwner"),
+				},
+				Annotations: map[string]*string{
+					"service-operator.cf.cs.sap.com/generation":     String("1"),
+					"service-operator.cf.cs.sap.com/parameter-hash": String("74234e98afe7498fb5daf1f36ac2d78acc339464f950703b8c019892f982b90b"),
+				},
+			},
+		},
+	},
 }
 
 // -----------------------------------------------------------------------------------------------
@@ -222,6 +256,11 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			metrics.Registry = prometheus.NewRegistry()
 			server.Reset()
 
+			// Create a new configuration for each test
+			cfg = &config.Config{
+				IsResourceCacheEnabled: false,
+				CacheTimeOut:           "5m",
+			}
 			// Register handlers
 			server.RouteToHandler("GET", "/", ghttp.CombineHandlers(
 				ghttp.RespondWithJSONEncodedPtr(&statusCode, &rootResult),
@@ -241,7 +280,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
 
-			Expect(server.ReceivedRequests()).To(HaveLen(3))
+			Expect(server.ReceivedRequests()).To(HaveLen(1))
 		})
 
 		It("should be able to query some space", func() {
@@ -260,7 +299,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(serviceInstancesURI))
 
-			Expect(server.ReceivedRequests()).To(HaveLen(4))
+			Expect(server.ReceivedRequests()).To(HaveLen(3))
 
 			// verify metrics
 			metricsList, err := metrics.Registry.Gather()
@@ -299,7 +338,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[3].URL.Path).To(Equal(serviceInstancesURI))
 
-			Expect(server.ReceivedRequests()).To(HaveLen(5))
+			Expect(server.ReceivedRequests()).To(HaveLen(4))
 		})
 
 		It("should be able to query two different spaces", func() {
@@ -315,7 +354,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
 			// Get instance
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(label_selector))
+			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(Owner))
 
 			// test space 2
 			spaceClient2, err2 := NewSpaceClient(SpaceName2, url, Username, Password, *cfg)
@@ -324,7 +363,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// no discovery of UAA endpoint or oAuth token here due to caching
 			// Get instance
 			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[3].RequestURI).To(ContainSubstring(label_selector))
+			Expect(server.ReceivedRequests()[3].RequestURI).To(ContainSubstring(Owner2))
 		})
 
 		It("should register prometheus metrics for OrgClient", func() {
@@ -367,28 +406,122 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// for debugging: write metrics to file
 			// prometheus.WriteToTextfile("metrics.txt", metrics.Registry)
 		})
-		It("should initialize resource cache and populate cache", func() {
-			// Enable resource cache in config
-			cfg.IsResourceCacheEnabled = true
 
-			spaceClient, err := NewSpaceClient(SpaceName, url, Username, Password, *cfg)
-			Expect(err).To(BeNil())
-			Expect(spaceClient).ToNot(BeNil())
+		Context("Populate resource cache tests", func() {
 
-			// Discover UAA endpoint
-			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
-			// Get new oAuth token
-			Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
-			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
-			// Populate cache
-			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(label_selector))
+			It("should initialize resource cache for the first time and populate resource cache again on cache expiry", func() {
+				// Enable resource cache in config
+				cfg.IsResourceCacheEnabled = true
+				cfg.CacheTimeOut = "5s"
 
-			// Verify that no additional requests are made to the server
-			Expect(server.ReceivedRequests()).To(HaveLen(3))
+				server.RouteToHandler("GET", serviceInstancesURI, ghttp.CombineHandlers(
+					ghttp.RespondWithJSONEncodedPtr(&statusCode, &fakeServiceInstances),
+				))
 
+				spaceClient, err := NewSpaceClient(SpaceName, url, Username, Password, *cfg)
+				Expect(err).To(BeNil())
+				Expect(spaceClient).ToNot(BeNil())
+
+				// Verify resource cache used and no additional requests expected
+				spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
+
+				// Make another request after cache expired and verify that cache is repopulated
+				time.Sleep(10 * time.Second)
+				spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
+				Expect(server.ReceivedRequests()).To(HaveLen(4))
+
+				// Discover UAA endpoint
+				Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
+				Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
+				// Get new oAuth token
+				Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
+				Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
+				// Populate cache
+				Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
+				Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(serviceInstancesURI))
+				// Populate cache on expiry
+				Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
+				Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(serviceInstancesURI))
+				Expect(server.ReceivedRequests()[2].RequestURI).NotTo(ContainSubstring(Owner))
+
+			})
+
+			It("should not initialize resource cache if disabled in config", func() {
+				// Enable resource cache in config
+				cfg.IsResourceCacheEnabled = false
+
+				server.RouteToHandler("GET", serviceInstancesURI, ghttp.CombineHandlers(
+					ghttp.RespondWithJSONEncodedPtr(&statusCode, &fakeServiceInstances),
+				))
+
+				spaceClient, err := NewSpaceClient(SpaceName, url, Username, Password, *cfg)
+				Expect(err).To(BeNil())
+				Expect(spaceClient).ToNot(BeNil())
+
+				// Verify resource cache not used and request expected
+				spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
+
+				Expect(server.ReceivedRequests()).To(HaveLen(3))
+
+				// Discover UAA endpoint
+				Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
+				Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
+				// Get new oAuth token
+				Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
+				Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
+				// Get instance
+				Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
+				Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(Owner))
+			})
+
+			It("Delete instance from cache", func() {
+				// Enable resource cache in config
+				cfg.IsResourceCacheEnabled = true
+				cfg.CacheTimeOut = "5m"
+
+				// Route to handler for GET request
+				server.RouteToHandler("GET", serviceInstancesURI, ghttp.CombineHandlers(
+					ghttp.RespondWithJSONEncodedPtr(&statusCode, &fakeServiceInstances),
+				))
+
+				// Route to handler for DELETE request
+				server.RouteToHandler("DELETE", serviceInstancesURI+"/test-instance-guid-1", ghttp.CombineHandlers(
+					ghttp.RespondWith(http.StatusAccepted, nil),
+				))
+
+				spaceClient, err := NewSpaceClient(SpaceName, url, Username, Password, *cfg)
+				Expect(err).To(BeNil())
+				Expect(spaceClient).ToNot(BeNil())
+
+				// Verify resource cache used and no additional requests expected
+				spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
+
+				// Delete instance from cache
+				err = spaceClient.DeleteInstance(ctx, "test-instance-guid-1", Owner)
+				Expect(err).To(BeNil())
+
+				// Get instance from cache should return empty
+				spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
+				Expect(server.ReceivedRequests()).To(HaveLen(5))
+
+				// Discover UAA endpoint
+				Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
+				Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
+				// Get new oAuth token
+				Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
+				Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
+				// populate cache
+				Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
+				Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(serviceInstancesURI))
+				Expect(server.ReceivedRequests()[2].RequestURI).NotTo(ContainSubstring(Owner))
+				//Delete instance from cache
+				Expect(server.ReceivedRequests()[3].Method).To(Equal("DELETE"))
+				Expect(server.ReceivedRequests()[3].RequestURI).To(ContainSubstring("test-instance-guid-1"))
+				//get instance from cache
+				Expect(server.ReceivedRequests()[4].Method).To(Equal("GET"))
+				Expect(server.ReceivedRequests()[4].RequestURI).To(ContainSubstring(Owner))
+
+			})
 		})
-
 	})
 })
