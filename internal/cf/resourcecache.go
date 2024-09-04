@@ -7,6 +7,7 @@ package cf
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
@@ -41,7 +42,8 @@ func initResourceCache() *resourceCache {
 func (c *resourceCache) setCacheTimeOut(timeOut string) {
 	cacheTimeOut, err := time.ParseDuration(timeOut)
 	if err != nil {
-		fmt.Printf("Error parsing duration: %v\n", err)
+		log.Printf("Error parsing duration: %v\n", err)
+		c.cacheTimeOut = 1 * time.Minute
 		return
 	}
 	c.cacheTimeOut = cacheTimeOut
@@ -51,8 +53,6 @@ func (c *resourceCache) setCacheTimeOut(timeOut string) {
 func (c *resourceCache) isCacheExpired() bool {
 
 	expirationTime := c.lastCacheTime.Add(c.cacheTimeOut)
-	fmt.Printf("Expiry time: %v\n", expirationTime)
-	fmt.Printf("Cache timeout: %v\n", c.cacheTimeOut)
 	return time.Now().After(expirationTime)
 
 }
@@ -60,7 +60,7 @@ func (c *resourceCache) isCacheExpired() bool {
 // Function to set the last cache time
 func (c *resourceCache) setLastCacheTime() {
 	c.lastCacheTime = time.Now()
-	fmt.Printf("Last cache time: %v\n", c.lastCacheTime)
+	log.Printf("Last cache time: %v\n", c.lastCacheTime)
 }
 
 // function to set the resource cache enabled flag from config
@@ -69,6 +69,7 @@ func (c *resourceCache) setResourceCacheEnabled(enabled bool) {
 }
 func (c *resourceCache) checkResourceCacheEnabled() bool {
 	if c == nil {
+		log.Println("Resource cache is nil")
 		return false
 	}
 	return c.isResourceCacheEnabled
@@ -79,8 +80,6 @@ func (c *resourceCache) addInstanceInCache(key string, instance *facade.Instance
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.instances[key] = instance
-	// TODO :remove later:addedinstance to cache and print the instance
-	fmt.Printf("Added instance to cache: %v\n", instance)
 }
 
 // GetInstanceFromCache retrieves an instance from the cache
@@ -88,21 +87,16 @@ func (c *resourceCache) getInstanceFromCache(key string) (*facade.Instance, bool
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	instance, found := c.instances[key]
-	// TODO :remove later: remove this printf later
+	// TODO :remove After internal review
 	fmt.Printf("Got the instance from Cache: %v", instance)
 	return instance, found
 }
 
-// RemoveInstanceFromCache removes an instance from the cache
-// This is used when an instance is deleted
-// The instance is removed from the cache to avoid stale data
-// The instance is removed from the cache only if the instance is found in the cache
+// delete the instance from the cache
 func (c *resourceCache) deleteInstanceFromCache(key string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	delete(c.instances, key)
-	// TODO :remove later: remove this printf later
-	fmt.Println("Cache found and deleted")
 
 }
 
@@ -131,13 +125,9 @@ func (c *resourceCache) updateInstanceInCache(guid string, name string, owner st
 		}
 		instance.Generation = generation
 		c.instances[owner] = instance
-		//TODO:remove later:print updated instance
-		fmt.Printf("Updated cache instance: %v\n", instance)
 		return true
 
 	}
-	//TODO:remove later: print cache not found
-	fmt.Println("Cache not found to update")
 	return false
 
 }

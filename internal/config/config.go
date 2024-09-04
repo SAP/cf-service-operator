@@ -6,6 +6,8 @@ SPDX-License-Identifier: Apache-2.0
 package config
 
 import (
+	"log"
+
 	"github.com/caarlos0/env/v11"
 )
 
@@ -23,6 +25,7 @@ type Config struct {
 func Load() (*Config, error) {
 	cfg := &Config{}
 	if err := env.Parse(cfg); err != nil {
+		log.Printf("Error parsing environment variables: %v\n", err)
 		return nil, err
 	}
 

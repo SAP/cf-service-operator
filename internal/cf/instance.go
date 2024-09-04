@@ -44,27 +44,22 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // GetInstance returns the instance with the given instanceOpts["owner"] or instanceOpts["name"].
 // If instanceOpts["name"] is empty, the instance with the given instanceOpts["owner"] is returned.
 // If instanceOpts["name"] is not empty, the instance with the given Name is returned for orphan instances.
-// If no instance is found, nil is returned.
-// If multiple instances are found, an error is returned.
-// The function add the parameter values to the orphan cf instance, so that can be adopted.
+// If resource cache is enabled, the instance is first searched in the cache.
+// If the instance is not found in the cache, it is searched in Cloud Foundry.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
 
 	if c.resourceCache.checkResourceCacheEnabled() {
-		// Ensure resourcesCache is initialized
-		if c.resourceCache == nil {
-			c.resourceCache = initResourceCache()
-		}
 
 		// Attempt to retrieve instance from Cache
 		if c.resourceCache.isCacheExpired() {
-			//TODO: remove later:Print cache is expited
+			//TODO: remove after internal review
 			fmt.Println("Cache is expired")
 			c.populateResourceCache()
 		}
 		if len(c.resourceCache.getCachedInstances()) != 0 {
 
 			instance, instanceInCache := c.resourceCache.getInstanceFromCache(instanceOpts["owner"])
-			// TODO: remove later: print length of cache
+			//TODO: remove after internal review
 			fmt.Printf("Length of cache: %d\n", len(c.resourceCache.getCachedInstances()))
 
 			if instanceInCache {
@@ -74,8 +69,6 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		}
 
 	}
-	//TODO:remove later:Print not found in cache or cache is empty or instance not found
-	fmt.Println("Not found in cache or cache is empty or instance not found in cf")
 
 	// Attempt to retrieve instance from Cloud Foundry
 	var serviceInstance *cfresource.ServiceInstance
@@ -165,6 +158,8 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 	}
 
 	_, _, err := c.client.ServiceInstances.UpdateManaged(ctx, guid, req)
+
+	// Update instance in cache
 	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
 		isUpdated := c.resourceCache.updateInstanceInCache(guid, name, owner, servicePlanGuid, parameters, generation)
 
@@ -183,8 +178,6 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 			c.resourceCache.addInstanceInCache(owner, instance)
 
 		}
-		//TODO:remove later: print instance added in cache and print the instance
-		fmt.Println("Instance added or updated in cache from update instance function")
 	}
 
 	return err
@@ -193,6 +186,8 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 func (c *spaceClient) DeleteInstance(ctx context.Context, guid string, owner string) error {
 	// TODO: return jobGUID to enable querying the job deletion status
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
+
+	// Delete instance from cache
 	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
 		c.resourceCache.deleteInstanceFromCache(owner)
 	}
@@ -232,7 +227,7 @@ func InitInstance(serviceInstance *cfresource.ServiceInstance, instanceOpts map[
 		state = facade.InstanceStateUnknown
 	}
 	stateDescription := serviceInstance.LastOperation.Description
-	//if (instanceOpts["owner"] not nil then owner = instanceOpts["owner"] else owner = serviceInstance.Metadata.Labels[labelOwner]
+
 	owner := instanceOpts["owner"]
 	if owner == "" {
 		owner = *serviceInstance.Metadata.Labels[labelOwner]
@@ -242,8 +237,7 @@ func InitInstance(serviceInstance *cfresource.ServiceInstance, instanceOpts map[
 		Guid:            guid,
 		Name:            name,
 		ServicePlanGuid: servicePlanGuid,
-		//if (instanceOpts["owner"] not nil then owner = instanceOpts["owner"] else owner = serviceInstance.Metadata.Labels[labelOwner]
-		Owner: owner,
+		Owner:           owner,
 
 		Generation:       generation,
 		ParameterHash:    parameterHash,

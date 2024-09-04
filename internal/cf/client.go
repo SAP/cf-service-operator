@@ -13,6 +13,7 @@ import (
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfconfig "github.com/cloudfoundry-community/go-cfclient/v3/config"
+	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/sap/cf-service-operator/internal/config"
@@ -232,47 +233,55 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 	return client, err
 }
 
+// populateResourceCache populates the resource cache by fetching All service instances matching the owner label key
+// from the Cloud Foundry API and storing them in an in-memory cache. This function
+// ensures that the cache is refreshed if it is expired. It uses concurrency to
+// initialize and cache service instances efficiently.
+// TODO: Extend logic to cache space and bindings
 func (c *spaceClient) populateResourceCache() {
-	// TODO: Create the space options
-	// TODO: Add for loop for space
+
 	refreshResourceCacheMutex.Lock()
 	defer refreshResourceCacheMutex.Unlock()
+
 	if c.resourceCache.isCacheExpired() {
-		//print cache is expired and populate the cache
-		fmt.Println("For the first or Cache is expired and populating the cache")
 		instanceOptions := cfclient.NewServiceInstanceListOptions()
 		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
-		instanceOptions.Page = 1
-		instanceOptions.PerPage = 5000
 
 		ctx := context.Background()
-		// populate instance cache
-		for {
-			srvInstanes, pager, err := c.client.ServiceInstances.List(ctx, instanceOptions)
-			if err != nil {
-				//TODO:revisit to see how to handle if error occurs
-				log.Fatalf("Error listing service instances: %s", err)
-			}
+		//TODO:check if List method with paging option can be used instead of ListAll if in case of large number of instances/performance issues
+		srvInstances, err := c.client.ServiceInstances.ListAll(ctx, instanceOptions)
+		if err != nil {
+			// reset the cache to nil in case of error
+			log.Printf("Error listing service instances: %s", err)
+			c.resourceCache.instances = make(map[string]*facade.Instance)
+			c.resourceCache.setLastCacheTime()
+			cfResourceCache = c.resourceCache
+			return
+		}
 
-			// Cache the service instance
-			for _, serviceInstance := range srvInstanes {
-				// ... some caching logic
+		var wg sync.WaitGroup
+
+		// Cache the service instance
+		for _, serviceInstance := range srvInstances {
+			wg.Add(1)
+			go func(serviceInstance *cfresource.ServiceInstance) {
+				defer wg.Done()
 				instance, err := InitInstance(serviceInstance, nil)
 				// instance is added to cache only if error is nil
 				if err == nil {
 					c.resourceCache.addInstanceInCache(*serviceInstance.Metadata.Labels[labelOwner], instance)
+				} else {
+					log.Printf("Error initializing instance: %s", err)
 				}
-			}
-
-			if !pager.HasNextPage() {
-				fmt.Printf("No more pages\n")
-				break
-			}
-
-			pager.NextPage(instanceOptions)
+			}(serviceInstance)
 		}
+
+		// Wait for all goroutines to finish
+		wg.Wait()
+
 		c.resourceCache.setLastCacheTime()
 		cfResourceCache = c.resourceCache
+
 	}
-	// TODO: Add for loop for bindings
+
 }
