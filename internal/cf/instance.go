@@ -47,55 +47,46 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // If resource cache is enabled, the instance is first searched in the cache.
 // If the instance is not found in the cache, it is searched in Cloud Foundry.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
-
 	if c.resourceCache.checkResourceCacheEnabled() {
-
-		// Attempt to retrieve instance from Cache
+		// Attempt to retrieve instance from cache
 		if c.resourceCache.isCacheExpired() {
 			//TODO: remove after internal review
 			fmt.Println("Cache is expired")
 			c.populateResourceCache()
 		}
 		if len(c.resourceCache.getCachedInstances()) != 0 {
-
 			instance, instanceInCache := c.resourceCache.getInstanceFromCache(instanceOpts["owner"])
 			//TODO: remove after internal review
 			fmt.Printf("Length of cache: %d\n", len(c.resourceCache.getCachedInstances()))
-
 			if instanceInCache {
 				return instance, nil
 			}
-
 		}
-
 	}
 
 	// Attempt to retrieve instance from Cloud Foundry
-	var serviceInstance *cfresource.ServiceInstance
-
 	var filterOpts instanceFilter
 	if instanceOpts["name"] != "" {
 		filterOpts = &instanceFilterName{name: instanceOpts["name"]}
 	} else {
 		filterOpts = &instanceFilterOwner{owner: instanceOpts["owner"]}
 	}
-	listOpts := filterOpts.getListOptions()
-	serviceInstances, err := c.client.ServiceInstances.ListAll(ctx, listOpts)
+	serviceInstances, err := c.client.ServiceInstances.ListAll(ctx, filterOpts.getListOptions())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list service instances: %w", err)
 	}
 	if len(serviceInstances) == 0 {
-		return nil, nil
+		return nil, nil // instance not found
 	} else if len(serviceInstances) > 1 {
 		return nil, errors.New(fmt.Sprintf("found multiple service instances with owner: %s", instanceOpts["owner"]))
 	}
-	serviceInstance = serviceInstances[0]
+	serviceInstance := serviceInstances[0]
 
 	// add parameter values to the orphan cf instance
 	if instanceOpts["name"] != "" {
 		generationvalue := "0"
-		serviceInstance.Metadata.Annotations[annotationGeneration] = &generationvalue
 		parameterHashValue := "0"
+		serviceInstance.Metadata.Annotations[annotationGeneration] = &generationvalue
 		serviceInstance.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
 	}
 
@@ -164,7 +155,7 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 		isUpdated := c.resourceCache.updateInstanceInCache(guid, name, owner, servicePlanGuid, parameters, generation)
 
 		if !isUpdated {
-			//add instance to cache in case of orphan instance
+			// add instance to cache in case of orphan instance
 			instance := &facade.Instance{
 				Guid:             guid,
 				Name:             name,
@@ -176,7 +167,6 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 				StateDescription: "",
 			}
 			c.resourceCache.addInstanceInCache(owner, instance)
-
 		}
 	}
 
@@ -191,18 +181,22 @@ func (c *spaceClient) DeleteInstance(ctx context.Context, guid string, owner str
 	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
 		c.resourceCache.deleteInstanceFromCache(owner)
 	}
+
 	return err
 }
 
+// InitInstance wraps cfclient.ServiceInstance as a facade.Instance.
 func InitInstance(serviceInstance *cfresource.ServiceInstance, instanceOpts map[string]string) (*facade.Instance, error) {
-	guid := serviceInstance.GUID
-	name := serviceInstance.Name
-	servicePlanGuid := serviceInstance.Relationships.ServicePlan.Data.GUID
 	generation, err := strconv.ParseInt(*serviceInstance.Metadata.Annotations[annotationGeneration], 10, 64)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing service instance generation")
 	}
-	parameterHash := *serviceInstance.Metadata.Annotations[annotationParameterHash]
+
+	owner := instanceOpts["owner"]
+	if owner == "" {
+		owner = *serviceInstance.Metadata.Labels[labelOwner]
+	}
+
 	var state facade.InstanceState
 	switch serviceInstance.LastOperation.Type + ":" + serviceInstance.LastOperation.State {
 	case "create:in progress":
@@ -226,22 +220,15 @@ func InitInstance(serviceInstance *cfresource.ServiceInstance, instanceOpts map[
 	default:
 		state = facade.InstanceStateUnknown
 	}
-	stateDescription := serviceInstance.LastOperation.Description
-
-	owner := instanceOpts["owner"]
-	if owner == "" {
-		owner = *serviceInstance.Metadata.Labels[labelOwner]
-	}
 
 	return &facade.Instance{
-		Guid:            guid,
-		Name:            name,
-		ServicePlanGuid: servicePlanGuid,
-		Owner:           owner,
-
+		Guid:             serviceInstance.GUID,
+		Name:             serviceInstance.Name,
+		ServicePlanGuid:  serviceInstance.Relationships.ServicePlan.Data.GUID,
+		Owner:            owner,
 		Generation:       generation,
-		ParameterHash:    parameterHash,
+		ParameterHash:    *serviceInstance.Metadata.Annotations[annotationParameterHash],
 		State:            state,
-		StateDescription: stateDescription,
+		StateDescription: serviceInstance.LastOperation.Description,
 	}, nil
 }
