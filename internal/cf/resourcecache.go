@@ -14,9 +14,11 @@ import (
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
-// Cache is a simple in-memory cache to store spaces, instances, and bindings using a map with a mutex
-// The cache is used to store the resources to avoid making multiple calls to the CF API
-// key is the owner of the instance which is kubernetes UID and value is the instance
+// The resource cache is a simple in-memory cache to store CF resources like spaces, instances and
+// bindings using a map protected by a mutex.
+// The resource cache is used to avoid making multiple calls to the CF API and avoid rate limits.
+// The map uses the owner of the instance (which is Kubernetes UID) as key and the service instance
+// as value.
 type resourceCache struct {
 	spaces                 map[string]*facade.Space
 	instances              map[string]*facade.Instance
@@ -38,7 +40,7 @@ func initResourceCache() *resourceCache {
 	return cache
 }
 
-// Function to set the resource cache timeout from config
+// setCacheTimeOut sets the timeout used for expiration of the cache
 func (c *resourceCache) setCacheTimeOut(timeOut string) {
 	cacheTimeOut, err := time.ParseDuration(timeOut)
 	if err != nil {
@@ -49,24 +51,24 @@ func (c *resourceCache) setCacheTimeOut(timeOut string) {
 	c.cacheTimeOut = cacheTimeOut
 }
 
-// Function to check if the cache is expired
+// isCacheExpired checks if the cache is already expired
 func (c *resourceCache) isCacheExpired() bool {
-
 	expirationTime := c.lastCacheTime.Add(c.cacheTimeOut)
 	return time.Now().After(expirationTime)
-
 }
 
-// Function to set the last cache time
+// setLastCacheTime sets the time of the last cache expiration re-population
 func (c *resourceCache) setLastCacheTime() {
 	c.lastCacheTime = time.Now()
 	log.Printf("Last cache time: %v\n", c.lastCacheTime)
 }
 
-// function to set the resource cache enabled flag from config
+// setResourceCacheEnabled enables or disables the resource cahce
 func (c *resourceCache) setResourceCacheEnabled(enabled bool) {
 	c.isResourceCacheEnabled = enabled
 }
+
+// checkResourceCacheEnabled checks if the resource cache is enabled (object might be nil)
 func (c *resourceCache) checkResourceCacheEnabled() bool {
 	if c == nil {
 		log.Println("Resource cache is nil")
@@ -75,14 +77,14 @@ func (c *resourceCache) checkResourceCacheEnabled() bool {
 	return c.isResourceCacheEnabled
 }
 
-// AddInstanceInCache stores an instance in the cache
+// addInstanceInCache stores an instance in the cache
 func (c *resourceCache) addInstanceInCache(key string, instance *facade.Instance) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.instances[key] = instance
 }
 
-// GetInstanceFromCache retrieves an instance from the cache
+// getInstanceFromCache retrieves an instance from the cache
 func (c *resourceCache) getInstanceFromCache(key string) (*facade.Instance, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
@@ -92,7 +94,7 @@ func (c *resourceCache) getInstanceFromCache(key string) (*facade.Instance, bool
 	return instance, found
 }
 
-// delete the instance from the cache
+// deleteInstanceFromCache deletes an instance from the cache
 func (c *resourceCache) deleteInstanceFromCache(key string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -100,7 +102,7 @@ func (c *resourceCache) deleteInstanceFromCache(key string) {
 
 }
 
-// update the instance in the cache
+// updateInstanceInCache updates an instance in the cache
 func (c *resourceCache) updateInstanceInCache(guid string, name string, owner string, servicePlanGuid string, parameters map[string]interface{}, generation int64) (status bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
