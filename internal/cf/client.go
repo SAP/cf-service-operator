@@ -233,13 +233,12 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 	return client, err
 }
 
-// populateResourceCache populates the resource cache by fetching All service instances matching the owner label key
-// from the Cloud Foundry API and storing them in an in-memory cache. This function
-// ensures that the cache is refreshed if it is expired. It uses concurrency to
-// initialize and cache service instances efficiently.
+// populateResourceCache populates the resource cache by fetching All service instances matching
+// the owner label key from the Cloud Foundry API and storing them in an in-memory cache.
+// This function ensures that the cache is refreshed if it is expired.
+// It uses concurrency to initialize and cache service instances efficiently.
 // TODO: Extend logic to cache space and bindings
 func (c *spaceClient) populateResourceCache() {
-
 	refreshResourceCacheMutex.Lock()
 	defer refreshResourceCacheMutex.Unlock()
 
@@ -249,7 +248,7 @@ func (c *spaceClient) populateResourceCache() {
 
 		ctx := context.Background()
 		//TODO:check if List method with paging option can be used instead of ListAll if in case of large number of instances/performance issues
-		srvInstances, err := c.client.ServiceInstances.ListAll(ctx, instanceOptions)
+		cfInstances, err := c.client.ServiceInstances.ListAll(ctx, instanceOptions)
 		if err != nil {
 			// reset the cache to nil in case of error
 			log.Printf("Error listing service instances: %s", err)
@@ -259,29 +258,23 @@ func (c *spaceClient) populateResourceCache() {
 			return
 		}
 
-		var wg sync.WaitGroup
-
-		// Cache the service instance
-		for _, serviceInstance := range srvInstances {
-			wg.Add(1)
-			go func(serviceInstance *cfresource.ServiceInstance) {
-				defer wg.Done()
-				instance, err := InitInstance(serviceInstance, nil)
-				// instance is added to cache only if error is nil
-				if err == nil {
-					c.resourceCache.addInstanceInCache(*serviceInstance.Metadata.Labels[labelOwner], instance)
+		// add service instances to cache concurrently
+		var waitGroup sync.WaitGroup
+		for _, cfInstance := range cfInstances {
+			waitGroup.Add(1)
+			go func(cfInstance *cfresource.ServiceInstance) {
+				defer waitGroup.Done()
+				if instance, err := InitInstance(cfInstance, nil); err == nil {
+					c.resourceCache.addInstanceInCache(*cfInstance.Metadata.Labels[labelOwner], instance)
 				} else {
 					log.Printf("Error initializing instance: %s", err)
 				}
-			}(serviceInstance)
+			}(cfInstance)
 		}
-
-		// Wait for all goroutines to finish
-		wg.Wait()
+		waitGroup.Wait()
 
 		c.resourceCache.setLastCacheTime()
 		cfResourceCache = c.resourceCache
-
 	}
 
 }
