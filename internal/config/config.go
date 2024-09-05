@@ -13,11 +13,10 @@ import (
 
 // Config defines the configuration keys
 type Config struct {
-
-	//Resource cache is enabled or disabled
+	// Resource cache is enabled or disabled
 	IsResourceCacheEnabled bool `env:"RESOURCE_CACHE_ENABLED" envDefault:"false"`
 
-	//cache timeout in seconds,minutes or hours
+	// Timeout for resource cache in seconds, minutes or hours
 	CacheTimeOut string `env:"CACHE_TIMEOUT" envDefault:"1m"`
 }
 
