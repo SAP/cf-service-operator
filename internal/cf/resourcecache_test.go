@@ -72,16 +72,24 @@ var _ = Describe("ResourceCache", func() {
 
 	Context("edge cases", func() {
 		It("should handle adding an instance with an existing key", func() {
+			instance2 := &facade.Instance{
+				Guid:            "guid2",
+				Name:            "name2",
+				Owner:           "owner1",
+				ServicePlanGuid: "plan1",
+				ParameterHash:   "hash1",
+				Generation:      1,
+			}
 			cache.addInstanceInCache("owner1", instance)
-			cache.addInstanceInCache("owner1", instance)
+			cache.addInstanceInCache("owner1", instance2)
 			retrievedInstance, found := cache.getInstanceFromCache("owner1")
 			Expect(found).To(BeTrue())
-			Expect(retrievedInstance).To(Equal(instance))
+			Expect(retrievedInstance).To(Equal(instance2))
 		})
 
 		It("should handle updating a non-existent instance", func() {
 			cache.updateInstanceInCache("nonExistentGuid", "name", "owner", "plan", nil, 1)
-			_, found := cache.getInstanceFromCache("nonExistentGuid")
+			_, found := cache.getInstanceFromCache("owner")
 			Expect(found).To(BeFalse())
 		})
 
@@ -92,41 +100,74 @@ var _ = Describe("ResourceCache", func() {
 		})
 	})
 
-	Context("concurrent operations", func() {
-		It("should handle concurrent AddInstanceInCache", func() {
+	Context("concurrent CRUD operations, data integrity and load test", func() {
+		It("should handle concurrent ", func() {
 			for i := 0; i < concurrencyLevel; i++ {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
+					instance := &facade.Instance{
+						Guid:            "guid" + strconv.Itoa(i),
+						Name:            "name" + strconv.Itoa(i),
+						Owner:           "key" + strconv.Itoa(i),
+						ServicePlanGuid: "plan" + strconv.Itoa(i),
+						ParameterHash:   "hash",
+						Generation:      1,
+					}
 					cache.addInstanceInCache("key"+strconv.Itoa(i), instance)
 				}(i)
 			}
 			wg.Wait()
-		})
 
-		It("should handle concurrent GetInstanceFromCache", func() {
+			// Verify that all instances have been added to the cache
 			for i := 0; i < concurrencyLevel; i++ {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					cache.getInstanceFromCache("key" + strconv.Itoa(i))
+					key := "key" + strconv.Itoa(i)
+					instance := &facade.Instance{
+						Guid:            "guid" + strconv.Itoa(i),
+						Name:            "name" + strconv.Itoa(i),
+						Owner:           "key" + strconv.Itoa(i),
+						ServicePlanGuid: "plan" + strconv.Itoa(i),
+						ParameterHash:   "hash",
+						Generation:      1,
+					}
+					retrievedInstance, found := cache.getInstanceFromCache(key)
+					Expect(found).To(BeTrue(), "Instance should be found in cache for key: %s", key)
+					Expect(retrievedInstance).To(Equal(instance), "Retrieved instance should match the added instance for key: %s", key)
 				}(i)
 			}
 			wg.Wait()
-		})
 
-		It("should handle concurrent UpdateInstanceInCache", func() {
+			// Concurrently update instances in the cache
 			for i := 0; i < concurrencyLevel; i++ {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					cache.updateInstanceInCache("guid"+strconv.Itoa(i), "name"+strconv.Itoa(i), "owner1", "plan"+strconv.Itoa(i), nil, int64(i))
+					cache.updateInstanceInCache("guid"+strconv.Itoa(i), "updatedInstance"+strconv.Itoa(i), "key"+strconv.Itoa(i), "plan"+strconv.Itoa(i), nil, 1)
 				}(i)
 			}
 			wg.Wait()
-		})
 
-		It("should handle concurrent DeleteInstanceFromCache", func() {
+			// Verify that all instances have been updated in the cache
+			for i := 0; i < concurrencyLevel; i++ {
+				key := "key" + strconv.Itoa(i)
+				expectedInstance := &facade.Instance{
+					Guid:            "guid" + strconv.Itoa(i),
+					Name:            "updatedInstance" + strconv.Itoa(i),
+					Owner:           key,
+					ServicePlanGuid: "plan" + strconv.Itoa(i),
+					ParameterHash:   "hash",
+					Generation:      1,
+				}
+				retrievedInstance, found := cache.getInstanceFromCache(key)
+
+				Expect(found).To(BeTrue(), "Instance should be found in cache for key: %s", key)
+				Expect(retrievedInstance).To(Equal(expectedInstance), "Retrieved instance should match the updated instance for key: %s", key)
+			}
+
+			// Concurrently delete instances from the cache
 			for i := 0; i < concurrencyLevel; i++ {
 				wg.Add(1)
 				go func(i int) {
@@ -141,70 +182,6 @@ var _ = Describe("ResourceCache", func() {
 				_, found := cache.getInstanceFromCache("key" + strconv.Itoa(i))
 				Expect(found).To(BeFalse(), "Expected instance to be deleted from cache")
 			}
-		})
-
-		It("should handle high load", func() {
-			highLoadLevel := 1000
-
-			for i := 0; i < highLoadLevel; i++ {
-				wg.Add(1)
-				go func(i int) {
-					defer wg.Done()
-					cache.addInstanceInCache("key"+strconv.Itoa(i), instance)
-				}(i)
-			}
-
-			wg.Wait()
-
-			for i := 0; i < highLoadLevel; i++ {
-				wg.Add(1)
-				go func(i int) {
-					defer wg.Done()
-					cache.getInstanceFromCache("key" + strconv.Itoa(i))
-				}(i)
-			}
-
-			wg.Wait()
-
-			for i := 0; i < highLoadLevel; i++ {
-				wg.Add(1)
-				go func(i int) {
-					defer wg.Done()
-					cache.deleteInstanceFromCache("key" + strconv.Itoa(i))
-				}(i)
-			}
-
-			wg.Wait()
-
-			// Verify final state
-			for i := 0; i < highLoadLevel; i++ {
-				_, found := cache.getInstanceFromCache("key" + strconv.Itoa(i))
-				Expect(found).To(BeFalse(), "Expected instance to be deleted from cache")
-			}
-		})
-
-		It("should maintain data integrity during concurrent operations", func() {
-			for i := 0; i < concurrencyLevel; i++ {
-				wg.Add(1)
-				go func(i int) {
-					defer wg.Done()
-					cache.addInstanceInCache("key"+strconv.Itoa(i), instance)
-				}(i)
-			}
-
-			wg.Wait()
-
-			for i := 0; i < concurrencyLevel; i++ {
-				wg.Add(1)
-				go func(i int) {
-					defer wg.Done()
-					retrievedInstance, found := cache.getInstanceFromCache("key" + strconv.Itoa(i))
-					Expect(found).To(BeTrue())
-					Expect(retrievedInstance).To(Equal(instance))
-				}(i)
-			}
-
-			wg.Wait()
 		})
 	})
 })
