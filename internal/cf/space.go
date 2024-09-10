@@ -147,6 +147,10 @@ func InitSpace(space *cfresource.Space, owner string) (*facade.Space, error) {
 		return nil, err
 	}
 
+	if owner == "" {
+		owner = *space.Metadata.Labels[labelOwner]
+	}
+
 	return &facade.Space{
 		Guid:       guid,
 		Name:       name,

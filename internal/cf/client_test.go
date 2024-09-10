@@ -158,7 +158,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		})
 
 		It("should create OrgClient", func() {
-			NewOrganizationClient(OrgName, url, Username, Password)
+			NewOrganizationClient(OrgName, url, Username, Password, *clientConfig)
 
 			// Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
@@ -168,7 +168,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		})
 
 		It("should be able to query some org", func() {
-			orgClient, err := NewOrganizationClient(OrgName, url, Username, Password)
+			orgClient, err := NewOrganizationClient(OrgName, url, Username, Password, *clientConfig)
 			Expect(err).To(BeNil())
 
 			orgClient.GetSpace(ctx, Owner)
@@ -200,11 +200,11 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		})
 
 		It("should be able to query some org twice", func() {
-			orgClient, err := NewOrganizationClient(OrgName, url, Username, Password)
+			orgClient, err := NewOrganizationClient(OrgName, url, Username, Password, *clientConfig)
 			Expect(err).To(BeNil())
 
 			orgClient.GetSpace(ctx, Owner)
-			orgClient, err = NewOrganizationClient(OrgName, url, Username, Password)
+			orgClient, err = NewOrganizationClient(OrgName, url, Username, Password, *clientConfig)
 			Expect(err).To(BeNil())
 			orgClient.GetSpace(ctx, Owner)
 
@@ -227,7 +227,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 
 		It("should be able to query two different orgs", func() {
 			// test org 1
-			orgClient1, err1 := NewOrganizationClient(OrgName, url, Username, Password)
+			orgClient1, err1 := NewOrganizationClient(OrgName, url, Username, Password, *clientConfig)
 			Expect(err1).To(BeNil())
 			orgClient1.GetSpace(ctx, Owner)
 			// Discover UAA endpoint
@@ -241,7 +241,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(Owner))
 
 			// test org 2
-			orgClient2, err2 := NewOrganizationClient(OrgName2, url, Username, Password)
+			orgClient2, err2 := NewOrganizationClient(OrgName2, url, Username, Password, *clientConfig)
 			Expect(err2).To(BeNil())
 			orgClient2.GetSpace(ctx, Owner2)
 			// no discovery of UAA endpoint or oAuth token here due to caching
@@ -374,7 +374,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		})
 
 		It("should register prometheus metrics for OrgClient", func() {
-			orgClient, err := NewOrganizationClient(OrgName, url, Username, Password)
+			orgClient, err := NewOrganizationClient(OrgName, url, Username, Password, *clientConfig)
 			Expect(err).To(BeNil())
 			Expect(orgClient).ToNot(BeNil())
 

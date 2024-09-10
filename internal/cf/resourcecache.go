@@ -31,22 +31,24 @@ type resourceCache struct {
 	isResourceCacheEnabled       bool
 }
 
-var (
-	cacheInstance     *resourceCache
-	cacheInstanceOnce sync.Once
+type cacheResourceType string
+
+const (
+	serviceInstances cacheResourceType = "serviceInstances"
+	spaces           cacheResourceType = "spaces"
+	serviceBindings  cacheResourceType = "serviceBindings"
 )
 
 // InitResourcesCache initializes a new cache
 func initResourceCache() *resourceCache {
-	cacheInstanceOnce.Do(func() {
-		cacheInstance = &resourceCache{
-			spaces:       make(map[string]*facade.Space),
-			instances:    make(map[string]*facade.Instance),
-			bindings:     make(map[string]*facade.Binding),
-			cacheTimeOut: 5 * time.Minute,
-		}
-	})
-	return cacheInstance
+
+	cache := &resourceCache{
+		spaces:    make(map[string]*facade.Space),
+		instances: make(map[string]*facade.Instance),
+		bindings:  make(map[string]*facade.Binding),
+	}
+
+	return cache
 }
 
 // setCacheTimeOut sets the timeout used for expiration of the cache
@@ -66,14 +68,14 @@ func (c *resourceCache) setCacheTimeOut(timeOut string) {
 //		expirationTime := c.lastCacheTime.Add(c.cacheTimeOut)
 //		return time.Now().After(expirationTime)
 //	}
-func (c *resourceCache) isCacheExpired(resourceType string) bool {
+func (c *resourceCache) isCacheExpired(resourceType cacheResourceType) bool {
 	var expirationTime time.Time
 	switch resourceType {
-	case "serviceInstances":
+	case serviceInstances:
 		expirationTime = c.lastServiceInstanceCacheTime.Add(c.cacheTimeOut)
-	case "spaces":
+	case spaces:
 		expirationTime = c.lastSpaceCacheTime.Add(c.cacheTimeOut)
-	case "serviceBindings":
+	case serviceBindings:
 		expirationTime = c.lastServiceBindingCacheTime.Add(c.cacheTimeOut)
 	default:
 		return true
@@ -95,10 +97,6 @@ func (c *resourceCache) setLastCacheTime(resourceType string) {
 	case "spaces":
 		c.lastSpaceCacheTime = now
 	case "serviceBindings":
-		c.lastServiceBindingCacheTime = now
-	default:
-		c.lastServiceInstanceCacheTime = now
-		c.lastSpaceCacheTime = now
 		c.lastServiceBindingCacheTime = now
 	}
 	log.Printf("Last cache time for %s: %v\n", resourceType, now)
@@ -272,19 +270,17 @@ func (c *resourceCache) getCachedSpaces() map[string]*facade.Space {
 // }
 
 // reset cache of a specific resource type and last cache time
-func (c *resourceCache) resetCache(resourceType string) {
+func (c *resourceCache) resetCache(resourceType cacheResourceType) {
 	switch resourceType {
-	case "serviceInstances":
+	case serviceInstances:
 		c.instances = make(map[string]*facade.Instance)
 		c.lastServiceInstanceCacheTime = time.Now()
-	case "spaces":
+	case spaces:
 		c.spaces = make(map[string]*facade.Space)
 		c.lastSpaceCacheTime = time.Now()
-	case "serviceBindings":
+	case serviceBindings:
 		c.bindings = make(map[string]*facade.Binding)
 		c.lastServiceBindingCacheTime = time.Now()
-	default:
-		log.Printf("Unknown resource type: %s", resourceType)
 
 	}
 }
