@@ -194,32 +194,38 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err != nil {
 				return ctrl.Result{}, err
 			}
+			if cfbinding != nil && cfbinding.State == facade.BindingStateReady {
+				//Add parameters to adopt the orphaned binding
+				var parameterObjects []map[string]interface{}
+				paramMap := make(map[string]interface{})
+				paramMap["parameter-hash"] = cfbinding.ParameterHash
+				paramMap["owner"] = cfbinding.Owner
+				parameterObjects = append(parameterObjects, paramMap)
+				parameters, err := mergeObjects(parameterObjects...)
+				if err != nil {
+					return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
+				}
+				// update the orphaned cloud foundry service binding
+				log.V(1).Info("Updating binding")
+				if err := client.UpdateBinding(
+					ctx,
+					cfbinding.Guid,
+					cfbinding.Owner,
+					serviceBinding.Generation,
+					parameters,
+				); err != nil {
+					return ctrl.Result{}, err
+				}
+				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
 
-			//Add parameters to adopt the orphaned binding
-			var parameterObjects []map[string]interface{}
-			paramMap := make(map[string]interface{})
-			paramMap["parameter-hash"] = cfbinding.ParameterHash
-			paramMap["owner"] = cfbinding.Owner
-			parameterObjects = append(parameterObjects, paramMap)
-			parameters, err := mergeObjects(parameterObjects...)
-			if err != nil {
-				return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
-			}
-			// update the orphaned cloud foundry service binding
-			log.V(1).Info("Updating binding")
-			if err := client.UpdateBinding(
-				ctx,
-				cfbinding.Guid,
-				serviceBinding.Generation,
-				parameters,
-			); err != nil {
-				return ctrl.Result{}, err
-			}
-			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
+				// return the reconcile function to requeue inmediatly after the update
+				serviceBinding.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfbinding.State), cfbinding.StateDescription)
+				return ctrl.Result{Requeue: true}, nil
+			} else if cfbinding != nil && cfbinding.State != facade.BindingStateReady {
 
-			// return the reconcile function to requeue inmediatly after the update
-			serviceBinding.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfbinding.State), cfbinding.StateDescription)
-			return ctrl.Result{Requeue: true}, nil
+				//return the reconcile function to not reconcile and error message
+				return ctrl.Result{}, fmt.Errorf("orphaned instance is not ready to be adopted")
+			}
 		}
 	}
 
@@ -298,7 +304,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				cfbinding.State == facade.BindingStateCreatedFailed || cfbinding.State == facade.BindingStateDeleteFailed {
 				// Re-create binding (unfortunately, cloud foundry does not support binding updates, other than metadata)
 				log.V(1).Info("Deleting binding for later re-creation")
-				if err := client.DeleteBinding(ctx, cfbinding.Guid); err != nil {
+				if err := client.DeleteBinding(ctx, cfbinding.Guid, cfbinding.Owner); err != nil {
 					return ctrl.Result{}, err
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
@@ -311,6 +317,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				if err := client.UpdateBinding(
 					ctx,
 					cfbinding.Guid,
+					cfbinding.Owner,
 					serviceBinding.Generation,
 					nil,
 				); err != nil {
@@ -404,7 +411,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		} else {
 			if cfbinding.State != facade.BindingStateDeleting {
 				log.V(1).Info("Deleting binding")
-				if err := client.DeleteBinding(ctx, cfbinding.Guid); err != nil {
+				if err := client.DeleteBinding(ctx, cfbinding.Guid, cfbinding.Owner); err != nil {
 					return ctrl.Result{}, err
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]

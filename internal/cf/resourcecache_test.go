@@ -52,13 +52,13 @@ var _ = Describe("ResourceCache", func() {
 			// Update instance
 			updatedInstance := &facade.Instance{
 				Guid:            "guid1",
-				Name:            "updatedName",
+				Name:            "name1",
 				Owner:           "owner1",
 				ServicePlanGuid: "updatedPlan",
 				ParameterHash:   "hash1",
 				Generation:      2,
 			}
-			cache.updateInstanceInCache("guid1", "updatedName", "owner1", "updatedPlan", nil, 2)
+			cache.updateInstanceInCache("owner1", "updatedPlan", nil, 2)
 			retrievedInstance, found = cache.getInstanceFromCache(Ownerkey)
 			Expect(found).To(BeTrue())
 			Expect(retrievedInstance).To(Equal(updatedInstance))
@@ -88,7 +88,7 @@ var _ = Describe("ResourceCache", func() {
 		})
 
 		It("should handle updating a non-existent instance", func() {
-			cache.updateInstanceInCache("nonExistentGuid", "name", "owner", "plan", nil, 1)
+			cache.updateInstanceInCache("owner", "plan", nil, 1)
 			_, found := cache.getInstanceFromCache("owner")
 			Expect(found).To(BeFalse())
 		})
@@ -145,7 +145,7 @@ var _ = Describe("ResourceCache", func() {
 				wg.Add(1)
 				go func(i int) {
 					defer wg.Done()
-					cache.updateInstanceInCache("guid"+strconv.Itoa(i), "updatedInstance"+strconv.Itoa(i), "key"+strconv.Itoa(i), "plan"+strconv.Itoa(i), nil, 1)
+					cache.updateInstanceInCache("key"+strconv.Itoa(i), "plan"+strconv.Itoa(i), nil, 1)
 				}(i)
 			}
 			wg.Wait()
@@ -155,7 +155,7 @@ var _ = Describe("ResourceCache", func() {
 				key := "key" + strconv.Itoa(i)
 				expectedInstance := &facade.Instance{
 					Guid:            "guid" + strconv.Itoa(i),
-					Name:            "updatedInstance" + strconv.Itoa(i),
+					Name:            "name" + strconv.Itoa(i),
 					Owner:           key,
 					ServicePlanGuid: "plan" + strconv.Itoa(i),
 					ParameterHash:   "hash",

@@ -145,6 +145,7 @@ func main() {
 		ClusterResourceNamespace: clusterResourceNamespace,
 		ClientBuilder:            cf.NewOrganizationClient,
 		HealthCheckerBuilder:     cf.NewSpaceHealthChecker,
+		Config:                   cfg,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Space")
 		os.Exit(1)
@@ -156,6 +157,7 @@ func main() {
 		ClusterResourceNamespace: clusterResourceNamespace,
 		ClientBuilder:            cf.NewOrganizationClient,
 		HealthCheckerBuilder:     cf.NewSpaceHealthChecker,
+		Config:                   cfg,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterSpace")
 		os.Exit(1)

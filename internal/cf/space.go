@@ -12,12 +12,29 @@ import (
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
-	"github.com/pkg/errors"
 
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
 func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facade.Space, error) {
+	if c.resourceCache.checkResourceCacheEnabled() {
+		// Attempt to retrieve space from cache
+		if c.resourceCache.isCacheExpired("spaces") {
+			//TODO: remove after internal review
+			fmt.Println("Cache is expired")
+			populateResourceCache[*organizationClient](c, "spaces")
+		}
+		if len(c.resourceCache.getCachedSpaces()) != 0 {
+			space, spaceInCache := c.resourceCache.getSpaceFromCache(owner)
+			//TODO: remove after internal review
+			fmt.Printf("Length of cache: %d\n", len(c.resourceCache.getCachedSpaces()))
+			if spaceInCache {
+				return space, nil
+			}
+		}
+	}
+
+	//Attempt to retrieve space from Cloud Foundry
 	listOpts := cfclient.NewSpaceListOptions()
 	listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
 	spaces, err := c.client.Spaces.ListAll(ctx, listOpts)
@@ -31,20 +48,7 @@ func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facad
 		return nil, fmt.Errorf("found multiple spaces with owner: %s", owner)
 	}
 	space := spaces[0]
-
-	guid := space.GUID
-	name := space.Name
-	generation, err := strconv.ParseInt(*space.Metadata.Annotations[annotationGeneration], 10, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "error parsing space generation")
-	}
-
-	return &facade.Space{
-		Guid:       guid,
-		Name:       name,
-		Owner:      owner,
-		Generation: generation,
-	}, nil
+	return InitSpace(space, owner)
 }
 
 // Required parameters (may not be initial): name, owner, generation
@@ -88,6 +92,11 @@ func (c *organizationClient) UpdateSpace(ctx context.Context, guid string, name 
 
 func (c *organizationClient) DeleteSpace(ctx context.Context, guid string) error {
 	_, err := c.client.Spaces.Delete(ctx, guid)
+
+	// Delete space from cache
+	if c.resourceCache.checkResourceCacheEnabled() {
+		c.resourceCache.deleteSpaceFromCache(guid)
+	}
 	return err
 }
 
@@ -126,4 +135,22 @@ func (c *organizationClient) AddDeveloper(ctx context.Context, guid string, user
 
 func (c *organizationClient) AddManager(ctx context.Context, guid string, username string) error {
 	return nil
+}
+
+// Initspace wraps cfclient.Space as a facade.Space
+func InitSpace(space *cfresource.Space, owner string) (*facade.Space, error) {
+
+	guid := space.GUID
+	name := space.Name
+	generation, err := strconv.ParseInt(*space.Metadata.Annotations[annotationGeneration], 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	return &facade.Space{
+		Guid:       guid,
+		Name:       name,
+		Owner:      owner,
+		Generation: generation,
+	}, err
 }

@@ -48,6 +48,24 @@ func (bo *bindingFilterOwner) getListOptions() *cfclient.ServiceCredentialBindin
 // If multiple bindings are found, an error is returned.
 // The function add the parameter values to the orphan cf binding, so that can be adopted.
 func (c *spaceClient) GetBinding(ctx context.Context, bindingOpts map[string]string) (*facade.Binding, error) {
+	if c.resourceCache.checkResourceCacheEnabled() {
+		// Attempt to retrieve binding from cache
+		if c.resourceCache.isCacheExpired("serviceBindings") {
+			//TODO: remove after internal review
+			fmt.Println("Cache is expired")
+			populateResourceCache[*spaceClient](c, "serviceBindings")
+		}
+		if len(c.resourceCache.getCachedBindings()) != 0 {
+			binding, bindingInCache := c.resourceCache.getBindingFromCache(bindingOpts["owner"])
+			//TODO: remove after internal review
+			fmt.Printf("Length of cache: %d\n", len(c.resourceCache.getCachedBindings()))
+			if bindingInCache {
+				return binding, nil
+			}
+		}
+	}
+
+	// Attempt to retrieve binding from Cloud Foundry
 	var filterOpts bindingFilter
 	if bindingOpts["name"] != "" {
 		filterOpts = &bindingFilterName{name: bindingOpts["name"]}
@@ -75,6 +93,73 @@ func (c *spaceClient) GetBinding(ctx context.Context, bindingOpts map[string]str
 		parameterHashValue := "0"
 		serviceBinding.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
 	}
+	return c.InitBinding(ctx, serviceBinding, bindingOpts)
+}
+
+// Required parameters (may not be initial): name, serviceInstanceGuid, owner, generation
+// Optional parameters (may be initial): parameters
+func (c *spaceClient) CreateBinding(ctx context.Context, name string, serviceInstanceGuid string, parameters map[string]interface{}, owner string, generation int64) error {
+	req := cfresource.NewServiceCredentialBindingCreateKey(serviceInstanceGuid, name)
+	if parameters != nil {
+		jsonParameters, err := json.Marshal(parameters)
+		if err != nil {
+			return err
+		}
+		req.WithJSONParameters(string(jsonParameters))
+	}
+	req.Metadata = cfresource.NewMetadata().
+		WithLabel(labelPrefix, labelKeyOwner, owner).
+		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10)).
+		WithAnnotation(annotationPrefix, annotationKeyParameterHash, facade.ObjectHash(parameters))
+
+	_, _, err := c.client.ServiceCredentialBindings.Create(ctx, req)
+	return err
+}
+
+// Required parameters (may not be initial): guid, generation
+func (c *spaceClient) UpdateBinding(ctx context.Context, guid string, owner string, generation int64, parameters map[string]interface{}) error {
+	// TODO: why is there no cfresource.NewServiceCredentialBindingUpdate() method ?
+	req := &cfresource.ServiceCredentialBindingUpdate{}
+	req.Metadata = cfresource.NewMetadata().
+		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
+
+	if parameters != nil {
+		req.Metadata.WithAnnotation(annotationPrefix, annotationKeyParameterHash, facade.ObjectHash(parameters))
+		if parameters["owner"] != nil {
+			req.Metadata.WithLabel(labelPrefix, labelKeyOwner, parameters["owner"].(string))
+		}
+	}
+	_, err := c.client.ServiceCredentialBindings.Update(ctx, guid, req)
+	// Update binding in cache
+	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
+		isUpdated := c.resourceCache.updateBindingInCache(owner, parameters, generation)
+
+		if !isUpdated {
+			//add the binding to cache if it is not found
+			binding, err := c.GetBinding(ctx, map[string]string{"owner": owner})
+			if err != nil {
+				return err
+			}
+			c.resourceCache.addBindingInCache(owner, binding)
+		}
+
+	}
+	return err
+}
+
+func (c *spaceClient) DeleteBinding(ctx context.Context, guid string, owner string) error {
+
+	err := c.client.ServiceCredentialBindings.Delete(ctx, guid)
+
+	// Delete binding from cache
+	if c.resourceCache.checkResourceCacheEnabled() {
+		c.resourceCache.deleteBindingFromCache(owner)
+	}
+
+	return err
+}
+
+func (c *spaceClient) InitBinding(ctx context.Context, serviceBinding *cfresource.ServiceCredentialBinding, bindingOpts map[string]string) (*facade.Binding, error) {
 
 	guid := serviceBinding.GUID
 	name := serviceBinding.Name
@@ -110,56 +195,19 @@ func (c *spaceClient) GetBinding(ctx context.Context, bindingOpts map[string]str
 		}
 		credentials = details.Credentials
 	}
+	owner := bindingOpts["owner"]
+	if owner == "" {
+		owner = *serviceBinding.Metadata.Labels[labelOwner]
+	}
 
 	return &facade.Binding{
 		Guid:             guid,
 		Name:             name,
-		Owner:            bindingOpts["owner"],
+		Owner:            owner,
 		Generation:       generation,
 		ParameterHash:    parameterHash,
 		State:            state,
 		StateDescription: stateDescription,
 		Credentials:      credentials,
 	}, nil
-}
-
-// Required parameters (may not be initial): name, serviceInstanceGuid, owner, generation
-// Optional parameters (may be initial): parameters
-func (c *spaceClient) CreateBinding(ctx context.Context, name string, serviceInstanceGuid string, parameters map[string]interface{}, owner string, generation int64) error {
-	req := cfresource.NewServiceCredentialBindingCreateKey(serviceInstanceGuid, name)
-	if parameters != nil {
-		jsonParameters, err := json.Marshal(parameters)
-		if err != nil {
-			return err
-		}
-		req.WithJSONParameters(string(jsonParameters))
-	}
-	req.Metadata = cfresource.NewMetadata().
-		WithLabel(labelPrefix, labelKeyOwner, owner).
-		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10)).
-		WithAnnotation(annotationPrefix, annotationKeyParameterHash, facade.ObjectHash(parameters))
-
-	_, _, err := c.client.ServiceCredentialBindings.Create(ctx, req)
-	return err
-}
-
-// Required parameters (may not be initial): guid, generation
-func (c *spaceClient) UpdateBinding(ctx context.Context, guid string, generation int64, parameters map[string]interface{}) error {
-	// TODO: why is there no cfresource.NewServiceCredentialBindingUpdate() method ?
-	req := &cfresource.ServiceCredentialBindingUpdate{}
-	req.Metadata = cfresource.NewMetadata().
-		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
-
-	if parameters != nil {
-		req.Metadata.WithAnnotation(annotationPrefix, annotationKeyParameterHash, facade.ObjectHash(parameters))
-		if parameters["owner"] != nil {
-			req.Metadata.WithLabel(labelPrefix, labelKeyOwner, parameters["owner"].(string))
-		}
-	}
-	_, err := c.client.ServiceCredentialBindings.Update(ctx, guid, req)
-	return err
-}
-
-func (c *spaceClient) DeleteBinding(ctx context.Context, guid string) error {
-	return c.client.ServiceCredentialBindings.Delete(ctx, guid)
 }

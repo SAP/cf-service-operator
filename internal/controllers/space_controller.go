@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	cfv1alpha1 "github.com/sap/cf-service-operator/api/v1alpha1"
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
@@ -46,6 +47,7 @@ type SpaceReconciler struct {
 	ClusterResourceNamespace string
 	ClientBuilder            facade.OrganizationClientBuilder
 	HealthCheckerBuilder     facade.SpaceHealthCheckerBuilder
+	Config                   *config.Config
 }
 
 // +kubebuilder:rbac:groups=cf.cs.sap.com,resources=clusterspaces,verbs=get;list;watch;update
@@ -147,7 +149,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			password = string(secret.Data["password"])
 		}
 
-		client, err = r.ClientBuilder(spec.OrganizationName, url, username, password)
+		client, err = r.ClientBuilder(spec.OrganizationName, url, username, password, *r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the client from secret %s", secretName)
 		}

@@ -49,10 +49,10 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
 	if c.resourceCache.checkResourceCacheEnabled() {
 		// Attempt to retrieve instance from cache
-		if c.resourceCache.isCacheExpired() {
+		if c.resourceCache.isCacheExpired("serviceInstances") {
 			//TODO: remove after internal review
 			fmt.Println("Cache is expired")
-			c.populateResourceCache()
+			populateResourceCache[*spaceClient](c, "serviceInstances")
 		}
 		if len(c.resourceCache.getCachedInstances()) != 0 {
 			instance, instanceInCache := c.resourceCache.getInstanceFromCache(instanceOpts["owner"])
@@ -152,7 +152,7 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 
 	// Update instance in cache
 	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
-		isUpdated := c.resourceCache.updateInstanceInCache(guid, name, owner, servicePlanGuid, parameters, generation)
+		isUpdated := c.resourceCache.updateInstanceInCache(owner, servicePlanGuid, parameters, generation)
 
 		if !isUpdated {
 			// add instance to cache in case of orphan instance
@@ -178,7 +178,7 @@ func (c *spaceClient) DeleteInstance(ctx context.Context, guid string, owner str
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
 
 	// Delete instance from cache
-	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
+	if c.resourceCache.checkResourceCacheEnabled() {
 		c.resourceCache.deleteInstanceFromCache(owner)
 	}
 

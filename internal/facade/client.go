@@ -77,7 +77,7 @@ type OrganizationClient interface {
 	AddManager(ctx context.Context, guid string, username string) error
 }
 
-type OrganizationClientBuilder func(string, string, string, string) (OrganizationClient, error)
+type OrganizationClientBuilder func(string, string, string, string, config.Config) (OrganizationClient, error)
 
 //counterfeiter:generate . SpaceClient
 type SpaceClient interface {
@@ -88,8 +88,8 @@ type SpaceClient interface {
 
 	GetBinding(ctx context.Context, bindingOpts map[string]string) (*Binding, error)
 	CreateBinding(ctx context.Context, name string, serviceInstanceGuid string, parameters map[string]interface{}, owner string, generation int64) error
-	UpdateBinding(ctx context.Context, guid string, generation int64, parameters map[string]interface{}) error
-	DeleteBinding(ctx context.Context, guid string) error
+	UpdateBinding(ctx context.Context, guid string, owner string, generation int64, parameters map[string]interface{}) error
+	DeleteBinding(ctx context.Context, guid string, owner string) error
 
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
 }
