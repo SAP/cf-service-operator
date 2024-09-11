@@ -65,6 +65,9 @@ func (c *spaceClient) GetBinding(ctx context.Context, bindingOpts map[string]str
 		}
 	}
 
+	// TODO :remove After internal review
+	fmt.Println("get binding from CF only in case of cache is of or binding not found in cache or creation case")
+
 	// Attempt to retrieve binding from Cloud Foundry
 	var filterOpts bindingFilter
 	if bindingOpts["name"] != "" {

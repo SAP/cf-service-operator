@@ -77,7 +77,7 @@ type OrganizationClient interface {
 	AddManager(ctx context.Context, guid string, username string) error
 }
 
-type OrganizationClientBuilder func(string, string, string, string, config.Config) (OrganizationClient, error)
+type OrganizationClientBuilder func(string, string, string, string, *config.Config) (OrganizationClient, error)
 
 //counterfeiter:generate . SpaceClient
 type SpaceClient interface {
@@ -94,4 +94,4 @@ type SpaceClient interface {
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
 }
 
-type SpaceClientBuilder func(string, string, string, string, config.Config) (SpaceClient, error)
+type SpaceClientBuilder func(string, string, string, string, *config.Config) (SpaceClient, error)

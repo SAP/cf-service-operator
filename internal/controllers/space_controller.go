@@ -149,7 +149,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			password = string(secret.Data["password"])
 		}
 
-		client, err = r.ClientBuilder(spec.OrganizationName, url, username, password, *r.Config)
+		client, err = r.ClientBuilder(spec.OrganizationName, url, username, password, r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the client from secret %s", secretName)
 		}

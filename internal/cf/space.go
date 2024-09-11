@@ -34,6 +34,9 @@ func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facad
 		}
 	}
 
+	// TODO :remove After internal review
+	fmt.Println("get space from CF only in case of cache is of or space not found in cache or creation case")
+
 	//Attempt to retrieve space from Cloud Foundry
 	listOpts := cfclient.NewSpaceListOptions()
 	listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)

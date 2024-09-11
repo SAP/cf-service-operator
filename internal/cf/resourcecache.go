@@ -89,17 +89,19 @@ func (c *resourceCache) isCacheExpired(resourceType cacheResourceType) bool {
 // 	log.Printf("Last cache time: %v\n", c.lastCacheTime)
 // }
 
-func (c *resourceCache) setLastCacheTime(resourceType string) {
+func (c *resourceCache) setLastCacheTime(resourceType cacheResourceType) {
 	now := time.Now()
 	switch resourceType {
-	case "serviceInstances":
+	case serviceInstances:
 		c.lastServiceInstanceCacheTime = now
-	case "spaces":
+	case spaces:
 		c.lastSpaceCacheTime = now
-	case "serviceBindings":
+	case serviceBindings:
 		c.lastServiceBindingCacheTime = now
 	}
 	log.Printf("Last cache time for %s: %v\n", resourceType, now)
+	//TODO:remove later
+	fmt.Printf("Last cache time for %s: %v\n", resourceType, now)
 }
 
 // setResourceCacheEnabled enables or disables the resource cahce
@@ -120,6 +122,8 @@ func (c *resourceCache) checkResourceCacheEnabled() bool {
 func (c *resourceCache) addInstanceInCache(key string, instance *facade.Instance) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
+	// TODO :remove After internal review
+	fmt.Printf("Added the instance to Cache: %v", instance)
 	c.instances[key] = instance
 }
 
@@ -138,6 +142,8 @@ func (c *resourceCache) deleteInstanceFromCache(key string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	delete(c.instances, key)
+	// TODO :remove After internal review
+	fmt.Printf("deleted the instance from Cache: %v", key)
 
 }
 
@@ -180,6 +186,8 @@ func (c *resourceCache) addBindingInCache(key string, binding *facade.Binding) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.bindings[key] = binding
+	// TODO :remove After internal review
+	fmt.Printf("Added the binding to Cache: %v", binding)
 }
 
 // getBindingFromCache retrieves binding from the cache
@@ -197,6 +205,8 @@ func (c *resourceCache) deleteBindingFromCache(key string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	delete(c.bindings, key)
+	// TODO :remove After internal review
+	fmt.Printf("Added the binding to Cache: %v", key)
 
 }
 
@@ -227,6 +237,8 @@ func (c *resourceCache) addSpaceInCache(key string, space *facade.Space) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	c.spaces[key] = space
+	// TODO :remove After internal review
+	fmt.Printf("Added the space to Cache: %v", space)
 }
 
 // GetSpaceFromCache retrieves a space from the cache
@@ -234,6 +246,8 @@ func (c *resourceCache) getSpaceFromCache(key string) (*facade.Space, bool) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 	space, found := c.spaces[key]
+	// TODO :remove After internal review
+	fmt.Printf("Got the space from Cache: %v", space)
 	return space, found
 }
 
@@ -242,6 +256,8 @@ func (c *resourceCache) deleteSpaceFromCache(key string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
 	delete(c.spaces, key)
+	// TODO :remove After internal review
+	fmt.Printf("Deleted the space from Cache: %v", key)
 
 }
 
@@ -271,6 +287,8 @@ func (c *resourceCache) getCachedSpaces() map[string]*facade.Space {
 
 // reset cache of a specific resource type and last cache time
 func (c *resourceCache) resetCache(resourceType cacheResourceType) {
+
+	fmt.Printf("reset requested for %v", resourceType)
 	switch resourceType {
 	case serviceInstances:
 		c.instances = make(map[string]*facade.Instance)

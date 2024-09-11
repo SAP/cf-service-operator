@@ -70,9 +70,11 @@ var (
 	cacheInstanceOnce sync.Once
 )
 
-func initAndConfigureResourceCache(config config.Config) *resourceCache {
+func initAndConfigureResourceCache(config *config.Config) *resourceCache {
 	cacheInstanceOnce.Do(func() {
 		cacheInstance = initResourceCache()
+		//TODO:Remove later:print cache initialized
+		fmt.Printf("Resource cache initialized")
 		cacheInstance.setResourceCacheEnabled(config.IsResourceCacheEnabled)
 		cacheInstance.setCacheTimeOut(config.CacheTimeOut)
 	})
@@ -107,7 +109,6 @@ func newOrganizationClient(organizationName string, url string, username string,
 	if err != nil {
 		return nil, err
 	}
-	// TODO:Populate resource cache for ORg client
 
 	return &organizationClient{organizationName: organizationName, client: *c}, nil
 }
@@ -144,7 +145,7 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	return &spaceClient{spaceGuid: spaceGuid, client: *c}, nil
 }
 
-func NewOrganizationClient(organizationName string, url string, username string, password string, config config.Config) (facade.OrganizationClient, error) {
+func NewOrganizationClient(organizationName string, url string, username string, password string, config *config.Config) (facade.OrganizationClient, error) {
 	clientCacheMutex.Lock()
 	defer clientCacheMutex.Unlock()
 
@@ -182,7 +183,7 @@ func NewOrganizationClient(organizationName string, url string, username string,
 	return client, err
 }
 
-func NewSpaceClient(spaceGuid string, url string, username string, password string, config config.Config) (facade.SpaceClient, error) {
+func NewSpaceClient(spaceGuid string, url string, username string, password string, config *config.Config) (facade.SpaceClient, error) {
 	clientCacheMutex.Lock()
 	defer clientCacheMutex.Unlock()
 
@@ -269,38 +270,6 @@ type manageResourceCache interface {
 	resetCache(resourceType cacheResourceType)
 }
 
-// populateResourceCache populates the resource cache by fetching all resources matching
-// the owner label key from the Cloud Foundry API and storing them in an in-memory cache.
-// This function ensures that the cache is refreshed if it is expired.
-// It uses concurrency to initialize and cache resources efficiently.
-// func populateResourceCache[T any](c ResourceClient[T], resourceType string) {
-// 	cfResourceCacheMutex.Lock()
-// 	defer cfResourceCacheMutex.Unlock()
-// 	ctx := context.Background()
-// 	var err error
-
-// 	switch resourceType {
-// 	case "serviceInstances":
-// 		err = c.populateServiceInstances(ctx)
-// 	case "spaces":
-// 		err = c.populateSpaces(ctx)
-// 	case "serviceBindings":
-// 		err = c.populateServiceBindings(ctx)
-// 	default:
-// 		//TODO: populate for all resource types??
-// 		log.Printf("Unknown resource type: %s", resourceType)
-// 		return
-// 	}
-
-// 	if err != nil {
-// 		// reset the cache to nil in case of error
-// 		log.Printf("Error populating %s: %s", resourceType, err)
-// 		c.resetCache(resourceType)
-// 		return
-// 	}
-// 	c.setResourceCache(c.getResourceCache())
-// }
-
 func populateResourceCache[T manageResourceCache](c T, resourceType cacheResourceType) {
 	ctx := context.Background()
 	var err error
@@ -309,14 +278,20 @@ func populateResourceCache[T manageResourceCache](c T, resourceType cacheResourc
 	case serviceInstances:
 		if client, ok := any(c).(ResourceServicesClient[T]); ok {
 			err = client.populateServiceInstances(ctx)
+			//TODO:remove later
+			fmt.Println("populate service instance finished")
 		}
 	case spaces:
 		if client, ok := any(c).(ResourceSpaceClient[T]); ok {
 			err = client.populateSpaces(ctx)
+			//TODO:remove later
+			fmt.Println("populate space finished")
 		}
 	case serviceBindings:
 		if client, ok := any(c).(ResourceServicesClient[T]); ok {
 			err = client.populateServiceBindings(ctx)
+			//TODO:remove later
+			fmt.Println("populate service binding finished")
 		}
 	}
 
@@ -332,7 +307,7 @@ func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
 	refreshServiceInstanceResourceCacheMutex.Lock()
 	defer refreshServiceInstanceResourceCacheMutex.Unlock()
 
-	if c.resourceCache.isCacheExpired("serviceInstances") {
+	if c.resourceCache.isCacheExpired(serviceInstances) {
 		instanceOptions := cfclient.NewServiceInstanceListOptions()
 		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 
@@ -354,7 +329,7 @@ func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
 			}(cfInstance)
 		}
 		waitGroup.Wait()
-		c.resourceCache.setLastCacheTime("serviceInstances")
+		c.resourceCache.setLastCacheTime(serviceInstances)
 	}
 
 	return nil
@@ -365,7 +340,7 @@ func (c *spaceClient) populateServiceBindings(ctx context.Context) error {
 	refreshServiceBindingResourceCacheMutex.Lock()
 	defer refreshServiceBindingResourceCacheMutex.Unlock()
 
-	if c.resourceCache.isCacheExpired("serviceBindings") {
+	if c.resourceCache.isCacheExpired(serviceBindings) {
 		bindingOptions := cfclient.NewServiceCredentialBindingListOptions()
 		bindingOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 
@@ -387,7 +362,7 @@ func (c *spaceClient) populateServiceBindings(ctx context.Context) error {
 			}(cfBinding)
 		}
 		waitGroup.Wait()
-		c.resourceCache.setLastCacheTime("serviceBindings")
+		c.resourceCache.setLastCacheTime(serviceBindings)
 	}
 
 	return nil
@@ -397,7 +372,7 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 	refreshSpaceResourceCacheMutex.Lock()
 	defer refreshSpaceResourceCacheMutex.Unlock()
 
-	if c.resourceCache.isCacheExpired("spaces") {
+	if c.resourceCache.isCacheExpired(spaces) {
 		spaceOptions := cfclient.NewSpaceListOptions()
 		spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 
@@ -419,7 +394,7 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 			}(cfSpace)
 		}
 		waitGroup.Wait()
-		c.resourceCache.setLastCacheTime("spaces")
+		c.resourceCache.setLastCacheTime(spaces)
 	}
 
 	return nil

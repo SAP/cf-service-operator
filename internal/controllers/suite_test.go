@@ -208,7 +208,7 @@ func addControllers(k8sManager ctrl.Manager) {
 		Client:                   k8sManager.GetClient(),
 		Scheme:                   k8sManager.GetScheme(),
 		ClusterResourceNamespace: testK8sNamespace,
-		ClientBuilder: func(organizationName string, url string, username string, password string, config config.Config) (facade.OrganizationClient, error) {
+		ClientBuilder: func(organizationName string, url string, username string, password string, config *config.Config) (facade.OrganizationClient, error) {
 			return fakeOrgClient, nil
 		},
 		HealthCheckerBuilder: func(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
@@ -222,7 +222,7 @@ func addControllers(k8sManager ctrl.Manager) {
 		Client:                   k8sManager.GetClient(),
 		Scheme:                   k8sManager.GetScheme(),
 		ClusterResourceNamespace: testK8sNamespace,
-		ClientBuilder: func(organizationName string, url string, username string, password string, config config.Config) (facade.SpaceClient, error) {
+		ClientBuilder: func(organizationName string, url string, username string, password string, config *config.Config) (facade.SpaceClient, error) {
 			return fakeSpaceClient, nil
 		},
 		Config: cfg,

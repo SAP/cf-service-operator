@@ -64,6 +64,9 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		}
 	}
 
+	// TODO :remove After internal review
+	fmt.Println("get instance from CF only in case of cache is of or instance not found in cache or creation case")
+
 	// Attempt to retrieve instance from Cloud Foundry
 	var filterOpts instanceFilter
 	if instanceOpts["name"] != "" {
