@@ -199,6 +199,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 						ctx,
 						cfspace.Guid,
 						updateName,
+						cfspace.Owner,
 						space.GetGeneration(),
 					); err != nil {
 						return ctrl.Result{}, err
@@ -276,7 +277,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			return ctrl.Result{}, nil
 		} else {
 			log.V(1).Info("Deleting space")
-			if err := client.DeleteSpace(ctx, cfspace.Guid); err != nil {
+			if err := client.DeleteSpace(ctx, cfspace.Owner, cfspace.Guid); err != nil {
 				return ctrl.Result{}, err
 			}
 			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]

@@ -312,6 +312,8 @@ func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
 		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 
 		cfInstances, err := c.client.ServiceInstances.ListAll(ctx, instanceOptions)
+		//TODO:remove later after review
+		fmt.Println("populate instance cache called")
 		if err != nil {
 			return err
 		}
@@ -345,6 +347,8 @@ func (c *spaceClient) populateServiceBindings(ctx context.Context) error {
 		bindingOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 
 		cfBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, bindingOptions)
+		//TODO:remove later after review
+		fmt.Println("populate service binding cache called")
 		if err != nil {
 			return err
 		}
@@ -376,6 +380,8 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 		spaceOptions := cfclient.NewSpaceListOptions()
 		spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 
+		//TODO:remove later after review
+		fmt.Println("populate Space cache called")
 		cfSpaces, err := c.client.Spaces.ListAll(ctx, spaceOptions)
 		if err != nil {
 			return err

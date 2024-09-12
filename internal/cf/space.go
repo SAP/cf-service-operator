@@ -19,10 +19,10 @@ import (
 func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facade.Space, error) {
 	if c.resourceCache.checkResourceCacheEnabled() {
 		// Attempt to retrieve space from cache
-		if c.resourceCache.isCacheExpired("spaces") {
+		if c.resourceCache.isCacheExpired(spaces) {
 			//TODO: remove after internal review
-			fmt.Println("Cache is expired")
-			populateResourceCache[*organizationClient](c, "spaces")
+			fmt.Println("Cache is expired for space")
+			populateResourceCache[*organizationClient](c, spaces)
 		}
 		if len(c.resourceCache.getCachedSpaces()) != 0 {
 			space, spaceInCache := c.resourceCache.getSpaceFromCache(owner)
@@ -80,7 +80,7 @@ func (c *organizationClient) CreateSpace(ctx context.Context, name string, owner
 
 // Required parameters (may not be initial): guid, generation
 // Optional parameters (may be initial): name
-func (c *organizationClient) UpdateSpace(ctx context.Context, guid string, name string, generation int64) error {
+func (c *organizationClient) UpdateSpace(ctx context.Context, guid string, name string, owner string, generation int64) error {
 	// TODO: why is there no cfresource.NewSpaceUpdate() method ?
 	req := &cfresource.SpaceUpdate{}
 	if name != "" {
@@ -90,15 +90,30 @@ func (c *organizationClient) UpdateSpace(ctx context.Context, guid string, name 
 		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
 
 	_, err := c.client.Spaces.Update(ctx, guid, req)
+	//update space in cache
+	if c.resourceCache.checkResourceCacheEnabled() {
+		isUpdated := c.resourceCache.updateSpaceInCache(owner, name, generation)
+		if !isUpdated {
+			//add space to cache
+			space := &facade.Space{
+				Guid:       guid,
+				Name:       name,
+				Owner:      owner,
+				Generation: generation,
+			}
+			c.resourceCache.addSpaceInCache(owner, space)
+		}
+	}
+
 	return err
 }
 
-func (c *organizationClient) DeleteSpace(ctx context.Context, guid string) error {
+func (c *organizationClient) DeleteSpace(ctx context.Context, owner string, guid string) error {
 	_, err := c.client.Spaces.Delete(ctx, guid)
 
 	// Delete space from cache
 	if c.resourceCache.checkResourceCacheEnabled() {
-		c.resourceCache.deleteSpaceFromCache(guid)
+		c.resourceCache.deleteSpaceFromCache(owner)
 	}
 	return err
 }

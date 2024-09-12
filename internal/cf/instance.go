@@ -51,7 +51,7 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		// Attempt to retrieve instance from cache
 		if c.resourceCache.isCacheExpired("serviceInstances") {
 			//TODO: remove after internal review
-			fmt.Println("Cache is expired")
+			fmt.Println("Cache is expired for instance so populating cache")
 			populateResourceCache[*spaceClient](c, "serviceInstances")
 		}
 		if len(c.resourceCache.getCachedInstances()) != 0 {
@@ -155,7 +155,7 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 
 	// Update instance in cache
 	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
-		isUpdated := c.resourceCache.updateInstanceInCache(owner, servicePlanGuid, parameters, generation)
+		isUpdated := c.resourceCache.updateInstanceInCache(name, owner, servicePlanGuid, parameters, generation)
 
 		if !isUpdated {
 			// add instance to cache in case of orphan instance

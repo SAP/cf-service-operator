@@ -66,11 +66,12 @@ type FakeOrganizationClient struct {
 	createSpaceReturnsOnCall map[int]struct {
 		result1 error
 	}
-	DeleteSpaceStub        func(context.Context, string) error
+	DeleteSpaceStub        func(context.Context, string, string) error
 	deleteSpaceMutex       sync.RWMutex
 	deleteSpaceArgsForCall []struct {
 		arg1 context.Context
 		arg2 string
+		arg3 string
 	}
 	deleteSpaceReturns struct {
 		result1 error
@@ -92,13 +93,14 @@ type FakeOrganizationClient struct {
 		result1 *facade.Space
 		result2 error
 	}
-	UpdateSpaceStub        func(context.Context, string, string, int64) error
+	UpdateSpaceStub        func(context.Context, string, string, string, int64) error
 	updateSpaceMutex       sync.RWMutex
 	updateSpaceArgsForCall []struct {
 		arg1 context.Context
 		arg2 string
 		arg3 string
-		arg4 int64
+		arg4 string
+		arg5 int64
 	}
 	updateSpaceReturns struct {
 		result1 error
@@ -363,19 +365,20 @@ func (fake *FakeOrganizationClient) CreateSpaceReturnsOnCall(i int, result1 erro
 	}{result1}
 }
 
-func (fake *FakeOrganizationClient) DeleteSpace(arg1 context.Context, arg2 string) error {
+func (fake *FakeOrganizationClient) DeleteSpace(arg1 context.Context, arg2 string, arg3 string) error {
 	fake.deleteSpaceMutex.Lock()
 	ret, specificReturn := fake.deleteSpaceReturnsOnCall[len(fake.deleteSpaceArgsForCall)]
 	fake.deleteSpaceArgsForCall = append(fake.deleteSpaceArgsForCall, struct {
 		arg1 context.Context
 		arg2 string
-	}{arg1, arg2})
+		arg3 string
+	}{arg1, arg2, arg3})
 	stub := fake.DeleteSpaceStub
 	fakeReturns := fake.deleteSpaceReturns
-	fake.recordInvocation("DeleteSpace", []interface{}{arg1, arg2})
+	fake.recordInvocation("DeleteSpace", []interface{}{arg1, arg2, arg3})
 	fake.deleteSpaceMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1
@@ -389,17 +392,17 @@ func (fake *FakeOrganizationClient) DeleteSpaceCallCount() int {
 	return len(fake.deleteSpaceArgsForCall)
 }
 
-func (fake *FakeOrganizationClient) DeleteSpaceCalls(stub func(context.Context, string) error) {
+func (fake *FakeOrganizationClient) DeleteSpaceCalls(stub func(context.Context, string, string) error) {
 	fake.deleteSpaceMutex.Lock()
 	defer fake.deleteSpaceMutex.Unlock()
 	fake.DeleteSpaceStub = stub
 }
 
-func (fake *FakeOrganizationClient) DeleteSpaceArgsForCall(i int) (context.Context, string) {
+func (fake *FakeOrganizationClient) DeleteSpaceArgsForCall(i int) (context.Context, string, string) {
 	fake.deleteSpaceMutex.RLock()
 	defer fake.deleteSpaceMutex.RUnlock()
 	argsForCall := fake.deleteSpaceArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeOrganizationClient) DeleteSpaceReturns(result1 error) {
@@ -490,21 +493,22 @@ func (fake *FakeOrganizationClient) GetSpaceReturnsOnCall(i int, result1 *facade
 	}{result1, result2}
 }
 
-func (fake *FakeOrganizationClient) UpdateSpace(arg1 context.Context, arg2 string, arg3 string, arg4 int64) error {
+func (fake *FakeOrganizationClient) UpdateSpace(arg1 context.Context, arg2 string, arg3 string, arg4 string, arg5 int64) error {
 	fake.updateSpaceMutex.Lock()
 	ret, specificReturn := fake.updateSpaceReturnsOnCall[len(fake.updateSpaceArgsForCall)]
 	fake.updateSpaceArgsForCall = append(fake.updateSpaceArgsForCall, struct {
 		arg1 context.Context
 		arg2 string
 		arg3 string
-		arg4 int64
-	}{arg1, arg2, arg3, arg4})
+		arg4 string
+		arg5 int64
+	}{arg1, arg2, arg3, arg4, arg5})
 	stub := fake.UpdateSpaceStub
 	fakeReturns := fake.updateSpaceReturns
-	fake.recordInvocation("UpdateSpace", []interface{}{arg1, arg2, arg3, arg4})
+	fake.recordInvocation("UpdateSpace", []interface{}{arg1, arg2, arg3, arg4, arg5})
 	fake.updateSpaceMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4)
+		return stub(arg1, arg2, arg3, arg4, arg5)
 	}
 	if specificReturn {
 		return ret.result1
@@ -518,17 +522,17 @@ func (fake *FakeOrganizationClient) UpdateSpaceCallCount() int {
 	return len(fake.updateSpaceArgsForCall)
 }
 
-func (fake *FakeOrganizationClient) UpdateSpaceCalls(stub func(context.Context, string, string, int64) error) {
+func (fake *FakeOrganizationClient) UpdateSpaceCalls(stub func(context.Context, string, string, string, int64) error) {
 	fake.updateSpaceMutex.Lock()
 	defer fake.updateSpaceMutex.Unlock()
 	fake.UpdateSpaceStub = stub
 }
 
-func (fake *FakeOrganizationClient) UpdateSpaceArgsForCall(i int) (context.Context, string, string, int64) {
+func (fake *FakeOrganizationClient) UpdateSpaceArgsForCall(i int) (context.Context, string, string, string, int64) {
 	fake.updateSpaceMutex.RLock()
 	defer fake.updateSpaceMutex.RUnlock()
 	argsForCall := fake.updateSpaceArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5
 }
 
 func (fake *FakeOrganizationClient) UpdateSpaceReturns(result1 error) {

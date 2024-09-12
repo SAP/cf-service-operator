@@ -50,10 +50,10 @@ func (bo *bindingFilterOwner) getListOptions() *cfclient.ServiceCredentialBindin
 func (c *spaceClient) GetBinding(ctx context.Context, bindingOpts map[string]string) (*facade.Binding, error) {
 	if c.resourceCache.checkResourceCacheEnabled() {
 		// Attempt to retrieve binding from cache
-		if c.resourceCache.isCacheExpired("serviceBindings") {
+		if c.resourceCache.isCacheExpired(serviceBindings) {
 			//TODO: remove after internal review
-			fmt.Println("Cache is expired")
-			populateResourceCache[*spaceClient](c, "serviceBindings")
+			fmt.Println("Cache is expired for binding")
+			populateResourceCache[*spaceClient](c, serviceBindings)
 		}
 		if len(c.resourceCache.getCachedBindings()) != 0 {
 			binding, bindingInCache := c.resourceCache.getBindingFromCache(bindingOpts["owner"])

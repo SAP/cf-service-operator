@@ -70,8 +70,8 @@ const (
 type OrganizationClient interface {
 	GetSpace(ctx context.Context, owner string) (*Space, error)
 	CreateSpace(ctx context.Context, name string, owner string, generation int64) error
-	UpdateSpace(ctx context.Context, guid string, name string, generation int64) error
-	DeleteSpace(ctx context.Context, guid string) error
+	UpdateSpace(ctx context.Context, guid string, name string, owner string, generation int64) error
+	DeleteSpace(ctx context.Context, owner string, guid string) error
 	AddAuditor(ctx context.Context, guid string, username string) error
 	AddDeveloper(ctx context.Context, guid string, username string) error
 	AddManager(ctx context.Context, guid string, username string) error
