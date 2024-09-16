@@ -74,6 +74,7 @@ var (
 
 func initAndConfigureResourceCache(config *config.Config) *resourceCache {
 	cacheInstanceOnce.Do(func() {
+		//TODO: make this initialize cache for different testing purposes
 		cacheInstance = initResourceCache()
 		//TODO:Remove later:print cache initialized
 		fmt.Printf("Resource cache initialized")
@@ -391,6 +392,7 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 
 	if c.resourceCache.isCacheExpired(spaces) {
 		spaceOptions := cfclient.NewSpaceListOptions()
+		//TODO: check for existing spaces as label owner annotation wont be present
 		spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 		spaceOptions.Page = 1
 		spaceOptions.PerPage = 5000
@@ -424,9 +426,10 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, username string) error {
 	refreshSpaceUserRoleCacheMutex.Lock()
 	defer refreshSpaceUserRoleCacheMutex.Unlock()
-
+	fmt.Println("populate Space cache called")
 	if c.resourceCache.isCacheExpired(spaceUserRoles) {
 		spaceOptions := cfclient.NewSpaceListOptions()
+
 		spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 		spaceOptions.Page = 1
 		spaceOptions.PerPage = 5000

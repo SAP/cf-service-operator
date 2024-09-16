@@ -139,6 +139,7 @@ func (c *organizationClient) AddDeveloper(ctx context.Context, guid string, user
 		}
 	}
 
+	fmt.Printf("get space user role from CF only in case of cache is off or space user role not found in cache or creation case")
 	// Attempt to retrieve binding from Cloud Foundry
 	userListOpts := cfclient.NewUserListOptions()
 	userListOpts.UserNames.EqualTo(username)
