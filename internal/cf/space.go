@@ -22,7 +22,7 @@ func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facad
 		if c.resourceCache.isCacheExpired(spaces) {
 			//TODO: remove after internal review
 			fmt.Println("Cache is expired for space")
-			populateResourceCache[*organizationClient](c, spaces)
+			populateResourceCache[*organizationClient](c, spaces, "")
 		}
 		if len(c.resourceCache.getCachedSpaces()) != 0 {
 			space, spaceInCache := c.resourceCache.getSpaceFromCache(owner)
@@ -114,6 +114,7 @@ func (c *organizationClient) DeleteSpace(ctx context.Context, owner string, guid
 	// Delete space from cache
 	if c.resourceCache.checkResourceCacheEnabled() {
 		c.resourceCache.deleteSpaceFromCache(owner)
+		c.resourceCache.deleteSpaceUserRoleFromCache(guid)
 	}
 	return err
 }
@@ -123,6 +124,22 @@ func (c *organizationClient) AddAuditor(ctx context.Context, guid string, userna
 }
 
 func (c *organizationClient) AddDeveloper(ctx context.Context, guid string, username string) error {
+
+	if c.resourceCache.checkResourceCacheEnabled() {
+		// Attempt to retrieve space user role from cache
+		if c.resourceCache.isCacheExpired(spaceUserRoles) {
+			// populateResourceCache[*organizationClient](c, spaceUserRoles)
+			populateResourceCache[*organizationClient](c, spaceUserRoles, username)
+		}
+		if len(c.resourceCache.getCachedSpaceUserRoles()) != 0 {
+			_, roleInCache := c.resourceCache.getSpaceUserRoleFromCache(guid)
+			if roleInCache {
+				return nil
+			}
+		}
+	}
+
+	// Attempt to retrieve binding from Cloud Foundry
 	userListOpts := cfclient.NewUserListOptions()
 	userListOpts.UserNames.EqualTo(username)
 	users, err := c.client.Users.ListAll(ctx, userListOpts)

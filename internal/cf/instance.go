@@ -52,7 +52,7 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		if c.resourceCache.isCacheExpired("serviceInstances") {
 			//TODO: remove after internal review
 			fmt.Println("Cache is expired for instance so populating cache")
-			populateResourceCache[*spaceClient](c, "serviceInstances")
+			populateResourceCache[*spaceClient](c, "serviceInstances", "")
 		}
 		if len(c.resourceCache.getCachedInstances()) != 0 {
 			instance, instanceInCache := c.resourceCache.getInstanceFromCache(instanceOpts["owner"])

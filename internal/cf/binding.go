@@ -53,7 +53,7 @@ func (c *spaceClient) GetBinding(ctx context.Context, bindingOpts map[string]str
 		if c.resourceCache.isCacheExpired(serviceBindings) {
 			//TODO: remove after internal review
 			fmt.Println("Cache is expired for binding")
-			populateResourceCache[*spaceClient](c, serviceBindings)
+			populateResourceCache[*spaceClient](c, serviceBindings, "")
 		}
 		if len(c.resourceCache.getCachedBindings()) != 0 {
 			binding, bindingInCache := c.resourceCache.getBindingFromCache(bindingOpts["owner"])

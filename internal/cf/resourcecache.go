@@ -25,10 +25,19 @@ type resourceCache struct {
 	bindings                     map[string]*facade.Binding
 	mutex                        sync.RWMutex
 	cacheTimeOut                 time.Duration
-	lastServiceInstanceCacheTime time.Time
-	lastSpaceCacheTime           time.Time
-	lastServiceBindingCacheTime  time.Time
+	serviceInstanceLastCacheTime time.Time
+	spaceLastaCheTime            time.Time
+	serviceBindingLastCacheTime  time.Time
+	spaceUserRoleLastCacheTime   time.Time
 	isResourceCacheEnabled       bool
+	spaceUserRole                map[string]*spaceUserRole
+}
+
+type spaceUserRole struct {
+	user      string
+	spaceGuid string
+	userGUID  string
+	roleType  string
 }
 
 type cacheResourceType string
@@ -37,73 +46,20 @@ const (
 	serviceInstances cacheResourceType = "serviceInstances"
 	spaces           cacheResourceType = "spaces"
 	serviceBindings  cacheResourceType = "serviceBindings"
+	spaceUserRoles   cacheResourceType = "spaceUserRole"
 )
 
 // InitResourcesCache initializes a new cache
 func initResourceCache() *resourceCache {
 
 	cache := &resourceCache{
-		spaces:    make(map[string]*facade.Space),
-		instances: make(map[string]*facade.Instance),
-		bindings:  make(map[string]*facade.Binding),
+		spaces:        make(map[string]*facade.Space),
+		instances:     make(map[string]*facade.Instance),
+		bindings:      make(map[string]*facade.Binding),
+		spaceUserRole: make(map[string]*spaceUserRole),
 	}
 
 	return cache
-}
-
-// setCacheTimeOut sets the timeout used for expiration of the cache
-func (c *resourceCache) setCacheTimeOut(timeOut string) {
-	cacheTimeOut, err := time.ParseDuration(timeOut)
-	if err != nil {
-		log.Printf("Error parsing duration: %v\n", err)
-		c.cacheTimeOut = 1 * time.Minute
-		return
-	}
-	c.cacheTimeOut = cacheTimeOut
-}
-
-// // isCacheExpired checks if the cache is already expired
-//
-//	func (c *resourceCache) isCacheExpired() bool {
-//		expirationTime := c.lastCacheTime.Add(c.cacheTimeOut)
-//		return time.Now().After(expirationTime)
-//	}
-func (c *resourceCache) isCacheExpired(resourceType cacheResourceType) bool {
-	var lastCacheTime time.Time
-	switch resourceType {
-	case serviceInstances:
-		lastCacheTime = c.lastServiceInstanceCacheTime
-	case spaces:
-		lastCacheTime = c.lastSpaceCacheTime
-	case serviceBindings:
-		lastCacheTime = c.lastServiceBindingCacheTime
-	}
-
-	// Ensure lastCacheTime is properly initialized
-	if lastCacheTime.IsZero() {
-		return true
-	}
-
-	expirationTime := lastCacheTime.Add(c.cacheTimeOut)
-	//TODO:remove later
-	fmt.Printf("Expiration time for %s: %v\n", resourceType, expirationTime)
-
-	return time.Now().After(expirationTime)
-}
-
-func (c *resourceCache) setLastCacheTime(resourceType cacheResourceType) {
-	now := time.Now()
-	switch resourceType {
-	case serviceInstances:
-		c.lastServiceInstanceCacheTime = now
-	case spaces:
-		c.lastSpaceCacheTime = now
-	case serviceBindings:
-		c.lastServiceBindingCacheTime = now
-	}
-	log.Printf("Last cache time for %s: %v\n", resourceType, now)
-	//TODO:remove later
-	fmt.Printf("Last cache time for %s: %v\n", resourceType, now)
 }
 
 // setResourceCacheEnabled enables or disables the resource cahce
@@ -118,6 +74,86 @@ func (c *resourceCache) checkResourceCacheEnabled() bool {
 		return false
 	}
 	return c.isResourceCacheEnabled
+}
+
+// setCacheTimeOut sets the timeout used for expiration of the cache
+func (c *resourceCache) setCacheTimeOut(timeOut string) {
+	cacheTimeOut, err := time.ParseDuration(timeOut)
+	if err != nil {
+		log.Printf("Error parsing duration: %v\n", err)
+		c.cacheTimeOut = 1 * time.Minute
+		return
+	}
+	c.cacheTimeOut = cacheTimeOut
+}
+
+// setLastCacheTime sets the last cache time for a specific resource type
+func (c *resourceCache) setLastCacheTime(resourceType cacheResourceType) {
+	now := time.Now()
+	switch resourceType {
+	case serviceBindings:
+		c.serviceBindingLastCacheTime = now
+	case serviceInstances:
+		c.serviceInstanceLastCacheTime = now
+	case spaces:
+		c.spaceLastaCheTime = now
+	case spaceUserRoles:
+		c.spaceUserRoleLastCacheTime = now
+	}
+	//TODO:remove later
+	fmt.Printf("Last cache time for %s: %v\n", resourceType, now)
+}
+
+// isCacheExpired checks if the cache is expired for a specific resource type
+func (c *resourceCache) isCacheExpired(resourceType cacheResourceType) bool {
+	var lastCacheTime time.Time
+	switch resourceType {
+	case serviceInstances:
+		lastCacheTime = c.serviceInstanceLastCacheTime
+	case spaces:
+		lastCacheTime = c.spaceLastaCheTime
+	case serviceBindings:
+		lastCacheTime = c.serviceBindingLastCacheTime
+	case spaceUserRoles:
+		lastCacheTime = c.spaceUserRoleLastCacheTime
+	}
+
+	// Ensure lastCacheTime is properly initialized
+	if lastCacheTime.IsZero() {
+		return true
+	}
+
+	expirationTime := lastCacheTime.Add(c.cacheTimeOut)
+	//TODO:remove later
+	fmt.Printf("Expiration time for %s: %v and last cached time: %v and timenow :%v\n", resourceType, expirationTime, lastCacheTime, time.Now())
+	bool := time.Now().After(expirationTime)
+	return bool
+}
+
+// reset cache of a specific resource type and last cache time
+func (c *resourceCache) resetCache(resourceType cacheResourceType) {
+
+	fmt.Printf("reset requested for %v \n", resourceType)
+	switch resourceType {
+	case serviceInstances:
+		c.instances = make(map[string]*facade.Instance)
+		c.serviceInstanceLastCacheTime = time.Now()
+	case spaces:
+		c.spaces = make(map[string]*facade.Space)
+		c.spaceLastaCheTime = time.Now()
+	case serviceBindings:
+		c.bindings = make(map[string]*facade.Binding)
+		c.serviceBindingLastCacheTime = time.Now()
+	case spaceUserRoles:
+		c.spaceUserRole = make(map[string]*spaceUserRole)
+		c.spaceUserRoleLastCacheTime = time.Now()
+
+	}
+}
+
+// getCachedInstances retrieves instances from the cache
+func (c *resourceCache) getCachedInstances() map[string]*facade.Instance {
+	return c.instances
 }
 
 // addInstanceInCache stores an instance in the cache
@@ -177,10 +213,6 @@ func (c *resourceCache) updateInstanceInCache(owner string, name string, service
 
 }
 
-func (c *resourceCache) getCachedInstances() map[string]*facade.Instance {
-	return c.instances
-}
-
 // getBindingFromCache retrieves binding from the cache
 func (c *resourceCache) getCachedBindings() map[string]*facade.Binding {
 	return c.bindings
@@ -237,6 +269,11 @@ func (c *resourceCache) updateBindingInCache(owner string, parameters map[string
 
 }
 
+// getCachedSpaces retrieves spaces from the cache
+func (c *resourceCache) getCachedSpaces() map[string]*facade.Space {
+	return c.spaces
+}
+
 // AddSpaceInCache stores a space in the cache
 func (c *resourceCache) addSpaceInCache(key string, space *facade.Space) {
 	c.mutex.Lock()
@@ -266,11 +303,6 @@ func (c *resourceCache) deleteSpaceFromCache(key string) {
 
 }
 
-// getCachedSpaces retrieves spaces from the cache
-func (c *resourceCache) getCachedSpaces() map[string]*facade.Space {
-	return c.spaces
-}
-
 // updateSpaceInCache updates an space in the cache
 func (c *resourceCache) updateSpaceInCache(owner string, name string, generation int64) (status bool) {
 	c.mutex.Lock()
@@ -292,20 +324,41 @@ func (c *resourceCache) updateSpaceInCache(owner string, name string, generation
 
 }
 
-// reset cache of a specific resource type and last cache time
-func (c *resourceCache) resetCache(resourceType cacheResourceType) {
+// list all cached spaceuserroles in cache
+func (c *resourceCache) getCachedSpaceUserRoles() map[string]*spaceUserRole {
+	return c.spaceUserRole
+}
 
-	fmt.Printf("reset requested for %v \n", resourceType)
-	switch resourceType {
-	case serviceInstances:
-		c.instances = make(map[string]*facade.Instance)
-		c.lastServiceInstanceCacheTime = time.Now()
-	case spaces:
-		c.spaces = make(map[string]*facade.Space)
-		c.lastSpaceCacheTime = time.Now()
-	case serviceBindings:
-		c.bindings = make(map[string]*facade.Binding)
-		c.lastServiceBindingCacheTime = time.Now()
-
+// add spaceuserrole to cache
+func (c *resourceCache) addSpaceUserRoleInCache(spaceGuid string, userGuid string, username string, roleType string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	role := &spaceUserRole{
+		user:      username,
+		spaceGuid: spaceGuid,
+		userGUID:  userGuid,
+		roleType:  roleType,
 	}
+	c.spaceUserRole[spaceGuid] = role
+	// TODO :remove After internal review
+	fmt.Printf("Added the space user role to Cache: %v \n", role)
+}
+
+// get spaceuserrole in cache
+func (c *resourceCache) getSpaceUserRoleFromCache(key string) (*spaceUserRole, bool) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	spaceUserRole, found := c.spaceUserRole[key]
+	// TODO :remove After internal review
+	fmt.Printf("Got the space user role from Cache: %v \n", spaceUserRole)
+	return spaceUserRole, found
+}
+
+// delete spaceuserrole not present in the cache
+func (c *resourceCache) deleteSpaceUserRoleFromCache(spaceGuid string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	delete(c.spaceUserRole, spaceGuid)
+	// TODO :remove After internal review
+	fmt.Printf("Deleted the space user role from Cache: %v \n", spaceGuid)
 }

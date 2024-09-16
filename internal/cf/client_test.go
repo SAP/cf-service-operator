@@ -38,6 +38,8 @@ const (
 	serviceInstancesURI = "/v3/service_instances"
 	spaceURI            = "/v3/spaces"
 	serviceBindingURI   = "/v3/service_credential_bindings"
+	userURI             = "v3/users"
+	roleURI             = "v3/roles"
 	uaaURI              = "/uaa/oauth/token"
 	labelSelector       = "service-operator.cf.cs.sap.com"
 )
@@ -143,6 +145,36 @@ var fakeSpaces = cfResource.SpaceList{
 	},
 }
 
+var fakeUsers = cfResource.UserList{
+	Resources: []*cfResource.User{
+		{
+			GUID:     "test-user-guid-1",
+			Username: "testUser",
+		},
+	},
+}
+
+var fakeRoles = cfResource.RoleList{
+	Resources: []*cfResource.Role{
+		{
+			GUID: "test-role-guid-1",
+			Type: "test-role-type-1",
+			Relationships: cfResource.RoleSpaceUserOrganizationRelationships{
+				User: cfResource.ToOneRelationship{
+					Data: &cfResource.Relationship{
+						GUID: "test-user-guid-1",
+					},
+				},
+				Space: cfResource.ToOneRelationship{
+					Data: &cfResource.Relationship{
+						GUID: "test-space-guid-1",
+					},
+				},
+			},
+		},
+	},
+}
+
 // -----------------------------------------------------------------------------------------------
 // Tests
 // -----------------------------------------------------------------------------------------------
@@ -214,6 +246,15 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			server.RouteToHandler("GET", spaceURI, ghttp.CombineHandlers(
 				ghttp.RespondWithJSONEncodedPtr(&statusCode, &fakeSpaces),
 			))
+			// - Fake response for get users
+			server.RouteToHandler("GET", "/v3/users", ghttp.CombineHandlers(
+				ghttp.RespondWithJSONEncodedPtr(&statusCode, &fakeUsers),
+			))
+			// - Fake response for get roles
+			server.RouteToHandler("GET", "/v3/roles", ghttp.CombineHandlers(
+				ghttp.RespondWithJSONEncodedPtr(&statusCode, &fakeRoles),
+			))
+
 		})
 
 		It("should create OrgClient", func() {
@@ -351,7 +392,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(orgClient).ToNot(BeNil())
 
 			// Verify resource cache is populated during client creation
-			Expect(server.ReceivedRequests()).To(HaveLen(3))
+			Expect(server.ReceivedRequests()).To(HaveLen(6))
 			// - Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
@@ -361,33 +402,40 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// - Populate cache with spaces
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[2].RequestURI).To(ContainSubstring(spaceURI))
+			//- Populate cache with spaces,user and role
+			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[3].RequestURI).To(ContainSubstring(spaceURI))
+			Expect(server.ReceivedRequests()[4].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[4].RequestURI).To(ContainSubstring(userURI))
+			Expect(server.ReceivedRequests()[5].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[5].RequestURI).To(ContainSubstring(roleURI))
 
 			// Make a request and verify that cache is used and no additional requests expected
 			orgClient.GetSpace(ctx, Owner)
-			Expect(server.ReceivedRequests()).To(HaveLen(3)) // still same as above
+			Expect(server.ReceivedRequests()).To(HaveLen(6)) // still same as above
 
 			// Make another request after cache expired and verify that cache is repopulated
 			time.Sleep(10 * time.Second)
 			orgClient.GetSpace(ctx, Owner)
-			Expect(server.ReceivedRequests()).To(HaveLen(4)) // one more request to repopulate cache
-			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[3].RequestURI).To(ContainSubstring(spaceURI))
-			Expect(server.ReceivedRequests()[3].RequestURI).NotTo(ContainSubstring(Owner))
+			Expect(server.ReceivedRequests()).To(HaveLen(7)) // one more request to repopulate cache
+			Expect(server.ReceivedRequests()[6].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[6].RequestURI).To(ContainSubstring(spaceURI))
+			Expect(server.ReceivedRequests()[6].RequestURI).NotTo(ContainSubstring(Owner))
 
 			// Delete space from cache
 			err = orgClient.DeleteSpace(ctx, Owner, "test-space-guid-1")
 			Expect(err).To(BeNil())
-			Expect(server.ReceivedRequests()).To(HaveLen(5))
+			Expect(server.ReceivedRequests()).To(HaveLen(8))
 			// - Delete space from cache
-			Expect(server.ReceivedRequests()[4].Method).To(Equal("DELETE"))
-			Expect(server.ReceivedRequests()[4].RequestURI).To(ContainSubstring("test-space-guid-1"))
+			Expect(server.ReceivedRequests()[7].Method).To(Equal("DELETE"))
+			Expect(server.ReceivedRequests()[7].RequestURI).To(ContainSubstring("test-space-guid-1"))
 
 			// Get space from cache should return empty
 			orgClient.GetSpace(ctx, Owner)
-			Expect(server.ReceivedRequests()).To(HaveLen(6))
+			Expect(server.ReceivedRequests()).To(HaveLen(9))
 			// - Get call to cf to get the space
-			Expect(server.ReceivedRequests()[5].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[5].RequestURI).To(ContainSubstring(Owner))
+			Expect(server.ReceivedRequests()[8].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[8].RequestURI).To(ContainSubstring(Owner))
 		})
 
 	})
@@ -593,7 +641,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 		It("should initialize resource cache after start and on cache expiry", func() {
 			// Enable resource cache in config
 			clientConfig.IsResourceCacheEnabled = true
-			clientConfig.CacheTimeOut = "8s" // short duration for fast test
+			clientConfig.CacheTimeOut = "5s" // short duration for fast test
 
 			//resource cache will be initialized only only once, so we need to wait till the cache expiry from previous test
 			time.Sleep(10 * time.Second)
