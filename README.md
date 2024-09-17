@@ -8,6 +8,7 @@ Disclaimer: Cloud Foundry is a registered trademark of THE LINUX FOUNDATION. Any
 
 This repository adds native support for Cloud Foundry spaces, service instances and service bindings to Kubernetes clusters.
 It contains custom resource definitions
+
 - `spaces.cf.cs.sap.com` (kind `Space`)
 - `clusterspaces.cf.cs.sap.com` (kind `ClusterSpace`)
 - `serviceinstances.cf.cs.sap.com` (kind `ServiceInstance`)
@@ -76,6 +77,10 @@ The API reference is here: [https://pkg.go.dev/github.com/sap/cf-service-operato
 ## Support, Feedback, Contributing
 
 This project is open to feature requests/suggestions, bug reports etc. via [GitHub issues](https://github.com/SAP/cf-service-operator/issues). Contribution and feedback are encouraged and always welcome. For more information about how to contribute, the project structure, as well as additional contribution information, see our [Contribution Guidelines](CONTRIBUTING.md).
+
+As artificial intelligence evolves, AI-generated code is becoming valuable for many software projects, including open-source initiatives. While we recognize the potential benefits of incorporating AI-generated content into our open-source projects there a certain requirements that need to be reflected and adhered to when making contributions.
+
+Please see our [guideline for AI-generated code contributions to SAP Open Source Software Projects](CONTRIBUTING_USING_GENAI.md) for these requirements.
 
 ## Code of Conduct
 
