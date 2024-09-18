@@ -20,17 +20,23 @@ import (
 // The map uses the owner of the instance (which is Kubernetes UID) as key and the service instance
 // as value.
 type resourceCache struct {
-	spaces                       map[string]*facade.Space
-	instances                    map[string]*facade.Instance
-	bindings                     map[string]*facade.Binding
-	mutex                        sync.RWMutex
-	cacheTimeOut                 time.Duration
-	serviceInstanceLastCacheTime time.Time
-	spaceLastaCheTime            time.Time
-	serviceBindingLastCacheTime  time.Time
-	spaceUserRoleLastCacheTime   time.Time
-	isResourceCacheEnabled       bool
-	spaceUserRole                map[string]*spaceUserRole
+	mutex sync.RWMutex
+
+	// cache for each resource type
+	bindings       map[string]*facade.Binding
+	instances      map[string]*facade.Instance
+	spaces         map[string]*facade.Space
+	spaceUserRoles map[string]*spaceUserRole
+
+	// last cache time for each resource type
+	bindingLastCacheTime       time.Time
+	instanceLastCacheTime      time.Time
+	spaceLastCacheTime         time.Time
+	spaceUserRoleLastCacheTime time.Time
+
+	// configuration
+	cacheTimeOut           time.Duration
+	isResourceCacheEnabled bool
 }
 
 type spaceUserRole struct {
@@ -43,20 +49,19 @@ type spaceUserRole struct {
 type cacheResourceType string
 
 const (
-	serviceInstances cacheResourceType = "serviceInstances"
-	spaces           cacheResourceType = "spaces"
-	serviceBindings  cacheResourceType = "serviceBindings"
-	spaceUserRoles   cacheResourceType = "spaceUserRole"
+	bindingType       cacheResourceType = "bindingType"
+	instanceType      cacheResourceType = "instanceType"
+	spaceType         cacheResourceType = "spaceType"
+	spaceUserRoleType cacheResourceType = "spaceUserRoleType"
 )
 
 // InitResourcesCache initializes a new cache
 func initResourceCache() *resourceCache {
-
 	cache := &resourceCache{
-		spaces:        make(map[string]*facade.Space),
-		instances:     make(map[string]*facade.Instance),
-		bindings:      make(map[string]*facade.Binding),
-		spaceUserRole: make(map[string]*spaceUserRole),
+		bindings:       make(map[string]*facade.Binding),
+		instances:      make(map[string]*facade.Instance),
+		spaces:         make(map[string]*facade.Space),
+		spaceUserRoles: make(map[string]*spaceUserRole),
 	}
 
 	return cache
@@ -91,13 +96,13 @@ func (c *resourceCache) setCacheTimeOut(timeOut string) {
 func (c *resourceCache) setLastCacheTime(resourceType cacheResourceType) {
 	now := time.Now()
 	switch resourceType {
-	case serviceBindings:
-		c.serviceBindingLastCacheTime = now
-	case serviceInstances:
-		c.serviceInstanceLastCacheTime = now
-	case spaces:
-		c.spaceLastaCheTime = now
-	case spaceUserRoles:
+	case bindingType:
+		c.bindingLastCacheTime = now
+	case instanceType:
+		c.instanceLastCacheTime = now
+	case spaceType:
+		c.spaceLastCacheTime = now
+	case spaceUserRoleType:
 		c.spaceUserRoleLastCacheTime = now
 	}
 	//TODO:remove later
@@ -108,13 +113,13 @@ func (c *resourceCache) setLastCacheTime(resourceType cacheResourceType) {
 func (c *resourceCache) isCacheExpired(resourceType cacheResourceType) bool {
 	var lastCacheTime time.Time
 	switch resourceType {
-	case serviceInstances:
-		lastCacheTime = c.serviceInstanceLastCacheTime
-	case spaces:
-		lastCacheTime = c.spaceLastaCheTime
-	case serviceBindings:
-		lastCacheTime = c.serviceBindingLastCacheTime
-	case spaceUserRoles:
+	case bindingType:
+		lastCacheTime = c.bindingLastCacheTime
+	case instanceType:
+		lastCacheTime = c.instanceLastCacheTime
+	case spaceType:
+		lastCacheTime = c.spaceLastCacheTime
+	case spaceUserRoleType:
 		lastCacheTime = c.spaceUserRoleLastCacheTime
 	}
 
@@ -126,37 +131,93 @@ func (c *resourceCache) isCacheExpired(resourceType cacheResourceType) bool {
 	expirationTime := lastCacheTime.Add(c.cacheTimeOut)
 	//TODO:remove later
 	fmt.Printf("Expiration time for %s: %v and last cached time: %v and timenow :%v\n", resourceType, expirationTime, lastCacheTime, time.Now())
-	bool := time.Now().After(expirationTime)
-	return bool
+	isExpired := time.Now().After(expirationTime)
+	return isExpired
 }
 
 // reset cache of a specific resource type and last cache time
 func (c *resourceCache) resetCache(resourceType cacheResourceType) {
-
 	fmt.Printf("reset requested for %v \n", resourceType)
 	switch resourceType {
-	case serviceInstances:
-		c.instances = make(map[string]*facade.Instance)
-		c.serviceInstanceLastCacheTime = time.Now()
-	case spaces:
-		c.spaces = make(map[string]*facade.Space)
-		c.spaceLastaCheTime = time.Now()
-	case serviceBindings:
+	case bindingType:
 		c.bindings = make(map[string]*facade.Binding)
-		c.serviceBindingLastCacheTime = time.Now()
-	case spaceUserRoles:
-		c.spaceUserRole = make(map[string]*spaceUserRole)
+		c.bindingLastCacheTime = time.Now()
+	case instanceType:
+		c.instances = make(map[string]*facade.Instance)
+		c.instanceLastCacheTime = time.Now()
+	case spaceType:
+		c.spaces = make(map[string]*facade.Space)
+		c.spaceLastCacheTime = time.Now()
+	case spaceUserRoleType:
+		c.spaceUserRoles = make(map[string]*spaceUserRole)
 		c.spaceUserRoleLastCacheTime = time.Now()
-
 	}
 }
 
-// getCachedInstances retrieves instances from the cache
-func (c *resourceCache) getCachedInstances() map[string]*facade.Instance {
-	return c.instances
+// -----------------------------------------------------------------------------------------------
+// Bindings
+// -----------------------------------------------------------------------------------------------
+
+// addBindingInCache stores a binding to the cache
+func (c *resourceCache) addBindingInCache(key string, binding *facade.Binding) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.bindings[key] = binding
+	// TODO :remove After internal review
+	fmt.Printf("Added the binding to Cache: %v \n", binding)
 }
 
-// addInstanceInCache stores an instance in the cache
+// deleteBindingFromCache deletes a specific binding from the cache
+func (c *resourceCache) deleteBindingFromCache(key string) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	delete(c.bindings, key)
+	// TODO :remove After internal review
+	fmt.Printf("Added the binding to Cache: %v \n", key)
+
+}
+
+// getCachedBindings retrieves all bindings from the cache
+func (c *resourceCache) getCachedBindings() map[string]*facade.Binding {
+	return c.bindings
+}
+
+// getBindingFromCache retrieves a specific binding from the cache
+func (c *resourceCache) getBindingFromCache(key string) (*facade.Binding, bool) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	binding, found := c.bindings[key]
+	// TODO :remove After internal review
+	fmt.Printf("Got the binding from Cache: %v \n", binding)
+	return binding, found
+}
+
+// updateBindingInCache updates a specific binding in the cache
+func (c *resourceCache) updateBindingInCache(owner string, parameters map[string]interface{}, generation int64) (status bool) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	//update if the instance is found in the cache
+	//update all the struct variables if they are not nil or empty
+	binding, found := c.bindings[owner]
+	if found {
+		if parameters != nil {
+			binding.ParameterHash = facade.ObjectHash(parameters)
+		}
+		if generation != 0 {
+			binding.Generation = generation
+		}
+		c.bindings[owner] = binding
+		return true
+
+	}
+	return false
+}
+
+// -----------------------------------------------------------------------------------------------
+// Instances
+// -----------------------------------------------------------------------------------------------
+
+// addInstanceInCache stores an instance to the cache
 func (c *resourceCache) addInstanceInCache(key string, instance *facade.Instance) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -165,17 +226,7 @@ func (c *resourceCache) addInstanceInCache(key string, instance *facade.Instance
 	c.instances[key] = instance
 }
 
-// getInstanceFromCache retrieves an instance from the cache
-func (c *resourceCache) getInstanceFromCache(key string) (*facade.Instance, bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	instance, found := c.instances[key]
-	// TODO :remove After internal review
-	fmt.Printf("Got the instance from Cache: %v \n", instance)
-	return instance, found
-}
-
-// deleteInstanceFromCache deletes an instance from the cache
+// deleteInstanceFromCache deletes a specific instance from the cache
 func (c *resourceCache) deleteInstanceFromCache(key string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -185,7 +236,22 @@ func (c *resourceCache) deleteInstanceFromCache(key string) {
 
 }
 
-// updateInstanceInCache updates an instance in the cache
+// getCachedInstances retrieves all instances from the cache
+func (c *resourceCache) getCachedInstances() map[string]*facade.Instance {
+	return c.instances
+}
+
+// getInstanceFromCache retrieves a specific instance from the cache
+func (c *resourceCache) getInstanceFromCache(key string) (*facade.Instance, bool) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	instance, found := c.instances[key]
+	// TODO :remove After internal review
+	fmt.Printf("Got the instance from Cache: %v \n", instance)
+	return instance, found
+}
+
+// updateInstanceInCache updates a specific instance in the cache
 func (c *resourceCache) updateInstanceInCache(owner string, name string, servicePlanGuid string, parameters map[string]interface{}, generation int64) (status bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -213,68 +279,11 @@ func (c *resourceCache) updateInstanceInCache(owner string, name string, service
 
 }
 
-// getBindingFromCache retrieves binding from the cache
-func (c *resourceCache) getCachedBindings() map[string]*facade.Binding {
-	return c.bindings
-}
+// -----------------------------------------------------------------------------------------------
+// Spaces
+// -----------------------------------------------------------------------------------------------
 
-// addBindingInCache stores binding in the cache
-func (c *resourceCache) addBindingInCache(key string, binding *facade.Binding) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	c.bindings[key] = binding
-	// TODO :remove After internal review
-	fmt.Printf("Added the binding to Cache: %v \n", binding)
-}
-
-// getBindingFromCache retrieves binding from the cache
-func (c *resourceCache) getBindingFromCache(key string) (*facade.Binding, bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	binding, found := c.bindings[key]
-	// TODO :remove After internal review
-	fmt.Printf("Got the binding from Cache: %v \n", binding)
-	return binding, found
-}
-
-// deleteBindingFromCache deletes binding from the cache
-func (c *resourceCache) deleteBindingFromCache(key string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	delete(c.bindings, key)
-	// TODO :remove After internal review
-	fmt.Printf("Added the binding to Cache: %v \n", key)
-
-}
-
-// updateBindingInCache updates an binding in the cache
-func (c *resourceCache) updateBindingInCache(owner string, parameters map[string]interface{}, generation int64) (status bool) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-	//update if the instance is found in the cache
-	//update all the struct variables if they are not nil or empty
-	binding, found := c.bindings[owner]
-	if found {
-		if parameters != nil {
-			binding.ParameterHash = facade.ObjectHash(parameters)
-		}
-		if generation != 0 {
-			binding.Generation = generation
-		}
-		c.bindings[owner] = binding
-		return true
-
-	}
-	return false
-
-}
-
-// getCachedSpaces retrieves spaces from the cache
-func (c *resourceCache) getCachedSpaces() map[string]*facade.Space {
-	return c.spaces
-}
-
-// AddSpaceInCache stores a space in the cache
+// addSpaceInCache stores a space to the cache
 func (c *resourceCache) addSpaceInCache(key string, space *facade.Space) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -283,17 +292,7 @@ func (c *resourceCache) addSpaceInCache(key string, space *facade.Space) {
 	fmt.Printf("Added the space to Cache: %v \n", space)
 }
 
-// GetSpaceFromCache retrieves a space from the cache
-func (c *resourceCache) getSpaceFromCache(key string) (*facade.Space, bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	space, found := c.spaces[key]
-	// TODO :remove After internal review
-	fmt.Printf("Got the space from Cache: %v \n", space)
-	return space, found
-}
-
-// deleteSpaceFromCache deletes space from the cache
+// deleteSpaceFromCache deletes a specific space from the cache
 func (c *resourceCache) deleteSpaceFromCache(key string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -303,7 +302,22 @@ func (c *resourceCache) deleteSpaceFromCache(key string) {
 
 }
 
-// updateSpaceInCache updates an space in the cache
+// getCachedSpaces retrieves all spaces from the cache
+func (c *resourceCache) getCachedSpaces() map[string]*facade.Space {
+	return c.spaces
+}
+
+// getSpaceFromCache retrieves a specific space from the cache
+func (c *resourceCache) getSpaceFromCache(key string) (*facade.Space, bool) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	space, found := c.spaces[key]
+	// TODO :remove After internal review
+	fmt.Printf("Got the space from Cache: %v \n", space)
+	return space, found
+}
+
+// updateSpaceInCache updates a specific space in the cache
 func (c *resourceCache) updateSpaceInCache(owner string, name string, generation int64) (status bool) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -321,15 +335,13 @@ func (c *resourceCache) updateSpaceInCache(owner string, name string, generation
 		return true
 	}
 	return false
-
 }
 
-// list all cached spaceuserroles in cache
-func (c *resourceCache) getCachedSpaceUserRoles() map[string]*spaceUserRole {
-	return c.spaceUserRole
-}
+// -----------------------------------------------------------------------------------------------
+// Space User Roles
+// -----------------------------------------------------------------------------------------------
 
-// add spaceuserrole to cache
+// addSpaceUserRoleInCache adds a specific spaceuserrole to the cache
 func (c *resourceCache) addSpaceUserRoleInCache(spaceGuid string, userGuid string, username string, roleType string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
@@ -339,26 +351,31 @@ func (c *resourceCache) addSpaceUserRoleInCache(spaceGuid string, userGuid strin
 		userGUID:  userGuid,
 		roleType:  roleType,
 	}
-	c.spaceUserRole[spaceGuid] = role
+	c.spaceUserRoles[spaceGuid] = role
 	// TODO :remove After internal review
 	fmt.Printf("Added the space user role to Cache: %v \n", role)
 }
 
-// get spaceuserrole in cache
-func (c *resourceCache) getSpaceUserRoleFromCache(key string) (*spaceUserRole, bool) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
-	spaceUserRole, found := c.spaceUserRole[key]
-	// TODO :remove After internal review
-	fmt.Printf("Got the space user role from Cache: %v \n", spaceUserRole)
-	return spaceUserRole, found
-}
-
-// delete spaceuserrole not present in the cache
+// deleteSpaceUserRoleFromCache deletes a specifc spaceuserrole from the cache
 func (c *resourceCache) deleteSpaceUserRoleFromCache(spaceGuid string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	delete(c.spaceUserRole, spaceGuid)
+	delete(c.spaceUserRoles, spaceGuid)
 	// TODO :remove After internal review
 	fmt.Printf("Deleted the space user role from Cache: %v \n", spaceGuid)
+}
+
+// getCachedSpaceUserRoles lists all spaceuserroles from the cache
+func (c *resourceCache) getCachedSpaceUserRoles() map[string]*spaceUserRole {
+	return c.spaceUserRoles
+}
+
+// getSpaceUserRoleFromCache gets a specific spaceuserrole from the cache
+func (c *resourceCache) getSpaceUserRoleFromCache(key string) (*spaceUserRole, bool) {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	spaceUserRole, found := c.spaceUserRoles[key]
+	// TODO :remove After internal review
+	fmt.Printf("Got the space user role from Cache: %v \n", spaceUserRole)
+	return spaceUserRole, found
 }

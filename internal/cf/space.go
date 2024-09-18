@@ -19,10 +19,10 @@ import (
 func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facade.Space, error) {
 	if c.resourceCache.checkResourceCacheEnabled() {
 		// Attempt to retrieve space from cache
-		if c.resourceCache.isCacheExpired(spaces) {
+		if c.resourceCache.isCacheExpired(spaceType) {
 			//TODO: remove after internal review
 			fmt.Println("Cache is expired for space")
-			populateResourceCache[*organizationClient](c, spaces, "")
+			populateResourceCache[*organizationClient](c, spaceType, "")
 		}
 		if len(c.resourceCache.getCachedSpaces()) != 0 {
 			space, spaceInCache := c.resourceCache.getSpaceFromCache(owner)
@@ -127,9 +127,9 @@ func (c *organizationClient) AddDeveloper(ctx context.Context, guid string, user
 
 	if c.resourceCache.checkResourceCacheEnabled() {
 		// Attempt to retrieve space user role from cache
-		if c.resourceCache.isCacheExpired(spaceUserRoles) {
+		if c.resourceCache.isCacheExpired(spaceUserRoleType) {
 			// populateResourceCache[*organizationClient](c, spaceUserRoles)
-			populateResourceCache[*organizationClient](c, spaceUserRoles, username)
+			populateResourceCache[*organizationClient](c, spaceUserRoleType, username)
 		}
 		if len(c.resourceCache.getCachedSpaceUserRoles()) != 0 {
 			_, roleInCache := c.resourceCache.getSpaceUserRoleFromCache(guid)

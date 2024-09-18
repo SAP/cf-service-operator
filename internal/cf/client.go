@@ -179,8 +179,8 @@ func NewOrganizationClient(organizationName string, url string, username string,
 
 	if config.IsResourceCacheEnabled && client.resourceCache == nil {
 		client.resourceCache = initAndConfigureResourceCache(config)
-		populateResourceCache(client, spaces, "")
-		populateResourceCache(client, spaceUserRoles, username)
+		populateResourceCache(client, spaceType, "")
+		populateResourceCache(client, spaceUserRoleType, username)
 		cfResourceCache = client.resourceCache
 	}
 
@@ -218,8 +218,8 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 
 	if config.IsResourceCacheEnabled && client.resourceCache == nil {
 		client.resourceCache = initAndConfigureResourceCache(config)
-		populateResourceCache(client, serviceInstances, "")
-		populateResourceCache(client, serviceBindings, "")
+		populateResourceCache(client, instanceType, "")
+		populateResourceCache(client, bindingType, "")
 		cfResourceCache = client.resourceCache
 	}
 
@@ -280,25 +280,25 @@ func populateResourceCache[T manageResourceCache](c T, resourceType cacheResourc
 	var err error
 
 	switch resourceType {
-	case serviceInstances:
-		if client, ok := any(c).(ResourceServicesClient[T]); ok {
-			err = client.populateServiceInstances(ctx)
-			//TODO:remove later
-			fmt.Println("populate service instance finished")
-		}
-	case spaces:
-		if client, ok := any(c).(ResourceSpaceClient[T]); ok {
-			err = client.populateSpaces(ctx)
-			//TODO:remove later
-			fmt.Println("populate space finished")
-		}
-	case serviceBindings:
+	case bindingType:
 		if client, ok := any(c).(ResourceServicesClient[T]); ok {
 			err = client.populateServiceBindings(ctx)
 			//TODO:remove later
 			fmt.Println("populate service binding finished")
 		}
-	case spaceUserRoles:
+	case instanceType:
+		if client, ok := any(c).(ResourceServicesClient[T]); ok {
+			err = client.populateServiceInstances(ctx)
+			//TODO:remove later
+			fmt.Println("populate service instance finished")
+		}
+	case spaceType:
+		if client, ok := any(c).(ResourceSpaceClient[T]); ok {
+			err = client.populateSpaces(ctx)
+			//TODO:remove later
+			fmt.Println("populate space finished")
+		}
+	case spaceUserRoleType:
 		if client, ok := any(c).(ResourceSpaceClient[T]); ok {
 			err = client.populateSpaceUserRoleCache(ctx, username)
 			fmt.Println("populate service spaceUserRoles finished")
@@ -317,7 +317,7 @@ func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
 	refreshServiceInstanceResourceCacheMutex.Lock()
 	defer refreshServiceInstanceResourceCacheMutex.Unlock()
 
-	if c.resourceCache.isCacheExpired(serviceInstances) {
+	if c.resourceCache.isCacheExpired(instanceType) {
 		instanceOptions := cfclient.NewServiceInstanceListOptions()
 		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 		instanceOptions.Page = 1
@@ -343,7 +343,7 @@ func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
 			}(cfInstance)
 		}
 		waitGroup.Wait()
-		c.resourceCache.setLastCacheTime(serviceInstances)
+		c.resourceCache.setLastCacheTime(instanceType)
 	}
 
 	return nil
@@ -354,7 +354,7 @@ func (c *spaceClient) populateServiceBindings(ctx context.Context) error {
 	refreshServiceBindingResourceCacheMutex.Lock()
 	defer refreshServiceBindingResourceCacheMutex.Unlock()
 
-	if c.resourceCache.isCacheExpired(serviceBindings) {
+	if c.resourceCache.isCacheExpired(bindingType) {
 		bindingOptions := cfclient.NewServiceCredentialBindingListOptions()
 		bindingOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 		bindingOptions.Page = 1
@@ -380,7 +380,7 @@ func (c *spaceClient) populateServiceBindings(ctx context.Context) error {
 			}(cfBinding)
 		}
 		waitGroup.Wait()
-		c.resourceCache.setLastCacheTime(serviceBindings)
+		c.resourceCache.setLastCacheTime(bindingType)
 	}
 
 	return nil
@@ -390,7 +390,7 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 	refreshSpaceResourceCacheMutex.Lock()
 	defer refreshSpaceResourceCacheMutex.Unlock()
 
-	if c.resourceCache.isCacheExpired(spaces) {
+	if c.resourceCache.isCacheExpired(spaceType) {
 		spaceOptions := cfclient.NewSpaceListOptions()
 		//TODO: check for existing spaces as label owner annotation wont be present
 		spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
@@ -417,7 +417,7 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 			}(cfSpace)
 		}
 		waitGroup.Wait()
-		c.resourceCache.setLastCacheTime(spaces)
+		c.resourceCache.setLastCacheTime(spaceType)
 	}
 
 	return nil
@@ -427,7 +427,7 @@ func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, use
 	refreshSpaceUserRoleCacheMutex.Lock()
 	defer refreshSpaceUserRoleCacheMutex.Unlock()
 	fmt.Println("populate Space cache called")
-	if c.resourceCache.isCacheExpired(spaceUserRoles) {
+	if c.resourceCache.isCacheExpired(spaceUserRoleType) {
 		spaceOptions := cfclient.NewSpaceListOptions()
 
 		spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
@@ -484,7 +484,7 @@ func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, use
 			}(cfRole)
 		}
 		waitGroup.Wait()
-		c.resourceCache.setLastCacheTime(spaceUserRoles)
+		c.resourceCache.setLastCacheTime(spaceUserRoleType)
 	}
 
 	return nil
@@ -492,12 +492,10 @@ func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, use
 
 // Implementation for resetting the cache
 func (c *spaceClient) resetCache(resourceType cacheResourceType) {
-
 	c.resourceCache.resetCache(resourceType)
 }
 
 // Implementation for resetting the cache
 func (c *organizationClient) resetCache(resourceType cacheResourceType) {
-
 	c.resourceCache.resetCache(resourceType)
 }
