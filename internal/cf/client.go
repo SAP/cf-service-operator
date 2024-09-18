@@ -335,7 +335,7 @@ func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
 			waitGroup.Add(1)
 			go func(cfInstance *cfresource.ServiceInstance) {
 				defer waitGroup.Done()
-				if instance, err := InitInstance(cfInstance, nil); err == nil {
+				if instance, err := c.InitInstance(cfInstance, nil); err == nil {
 					c.resourceCache.addInstanceInCache(*cfInstance.Metadata.Labels[labelOwner], instance)
 				} else {
 					log.Printf("Error initializing instance: %s", err)

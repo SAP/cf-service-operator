@@ -49,26 +49,19 @@ func (bo *bindingFilterOwner) getListOptions() *cfclient.ServiceCredentialBindin
 // The function add the parameter values to the orphan cf binding, so that can be adopted.
 func (c *spaceClient) GetBinding(ctx context.Context, bindingOpts map[string]string) (*facade.Binding, error) {
 	if c.resourceCache.checkResourceCacheEnabled() {
-		// Attempt to retrieve binding from cache
+		// attempt to retrieve binding from cache
 		if c.resourceCache.isCacheExpired(bindingType) {
-			//TODO: remove after internal review
-			fmt.Println("Cache is expired for binding")
 			populateResourceCache[*spaceClient](c, bindingType, "")
 		}
 		if len(c.resourceCache.getCachedBindings()) != 0 {
-			binding, bindingInCache := c.resourceCache.getBindingFromCache(bindingOpts["owner"])
-			//TODO: remove after internal review
-			fmt.Printf("Length of cache: %d\n", len(c.resourceCache.getCachedBindings()))
-			if bindingInCache {
+			binding, inCache := c.resourceCache.getBindingFromCache(bindingOpts["owner"])
+			if inCache {
 				return binding, nil
 			}
 		}
 	}
 
-	// TODO :remove After internal review
-	fmt.Println("get binding from CF only in case of cache is of or binding not found in cache or creation case")
-
-	// Attempt to retrieve binding from Cloud Foundry
+	// attempt to retrieve binding from Cloud Foundry
 	var filterOpts bindingFilter
 	if bindingOpts["name"] != "" {
 		filterOpts = &bindingFilterName{name: bindingOpts["name"]}
@@ -86,16 +79,16 @@ func (c *spaceClient) GetBinding(ctx context.Context, bindingOpts map[string]str
 	} else if len(serviceBindings) > 1 {
 		return nil, errors.New(fmt.Sprintf("found multiple service bindings with owner: %s", bindingOpts["owner"]))
 	}
-
 	serviceBinding := serviceBindings[0]
 
-	// add parameter values to the cf orphan binding
+	// add parameter values to the orphaned binding in Cloud Foundry
 	if bindingOpts["name"] != "" {
 		generationvalue := "0"
-		serviceBinding.Metadata.Annotations[annotationGeneration] = &generationvalue
 		parameterHashValue := "0"
+		serviceBinding.Metadata.Annotations[annotationGeneration] = &generationvalue
 		serviceBinding.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
 	}
+
 	return c.InitBinding(ctx, serviceBinding, bindingOpts)
 }
 
@@ -133,12 +126,13 @@ func (c *spaceClient) UpdateBinding(ctx context.Context, guid string, owner stri
 		}
 	}
 	_, err := c.client.ServiceCredentialBindings.Update(ctx, guid, req)
-	// Update binding in cache
+
+	// update binding in cache
 	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
 		isUpdated := c.resourceCache.updateBindingInCache(owner, parameters, generation)
-
 		if !isUpdated {
-			//add the binding to cache if it is not found
+			// add binding to cache if it is not found
+			// TODO: why getting binding here but not instance in CreateInstance() ?
 			binding, err := c.GetBinding(ctx, map[string]string{"owner": owner})
 			if err != nil {
 				return err
@@ -151,26 +145,28 @@ func (c *spaceClient) UpdateBinding(ctx context.Context, guid string, owner stri
 }
 
 func (c *spaceClient) DeleteBinding(ctx context.Context, guid string, owner string) error {
-
 	err := c.client.ServiceCredentialBindings.Delete(ctx, guid)
 
-	// Delete binding from cache
-	if c.resourceCache.checkResourceCacheEnabled() {
+	// delete binding from cache
+	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
 		c.resourceCache.deleteBindingFromCache(owner)
 	}
 
 	return err
 }
 
+// InitBinding wraps cfclient.ServiceCredentialBinding as a facade.Binding.
 func (c *spaceClient) InitBinding(ctx context.Context, serviceBinding *cfresource.ServiceCredentialBinding, bindingOpts map[string]string) (*facade.Binding, error) {
-
-	guid := serviceBinding.GUID
-	name := serviceBinding.Name
 	generation, err := strconv.ParseInt(*serviceBinding.Metadata.Annotations[annotationGeneration], 10, 64)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing service binding generation")
 	}
-	parameterHash := *serviceBinding.Metadata.Annotations[annotationParameterHash]
+
+	owner := bindingOpts["owner"]
+	if owner == "" {
+		owner = *serviceBinding.Metadata.Labels[labelOwner]
+	}
+
 	var state facade.BindingState
 	switch serviceBinding.LastOperation.Type + ":" + serviceBinding.LastOperation.State {
 	case "create:in progress":
@@ -188,7 +184,8 @@ func (c *spaceClient) InitBinding(ctx context.Context, serviceBinding *cfresourc
 	default:
 		state = facade.BindingStateUnknown
 	}
-	stateDescription := serviceBinding.LastOperation.Description
+
+	guid := serviceBinding.GUID
 
 	var credentials map[string]interface{}
 	if state == facade.BindingStateReady {
@@ -198,19 +195,15 @@ func (c *spaceClient) InitBinding(ctx context.Context, serviceBinding *cfresourc
 		}
 		credentials = details.Credentials
 	}
-	owner := bindingOpts["owner"]
-	if owner == "" {
-		owner = *serviceBinding.Metadata.Labels[labelOwner]
-	}
 
 	return &facade.Binding{
 		Guid:             guid,
-		Name:             name,
+		Name:             serviceBinding.Name,
 		Owner:            owner,
 		Generation:       generation,
-		ParameterHash:    parameterHash,
+		ParameterHash:    *serviceBinding.Metadata.Annotations[annotationParameterHash],
 		State:            state,
-		StateDescription: stateDescription,
+		StateDescription: serviceBinding.LastOperation.Description,
 		Credentials:      credentials,
 	}, nil
 }

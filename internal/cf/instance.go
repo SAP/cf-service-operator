@@ -48,26 +48,19 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // If the instance is not found in the cache, it is searched in Cloud Foundry.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
 	if c.resourceCache.checkResourceCacheEnabled() {
-		// Attempt to retrieve instance from cache
-		if c.resourceCache.isCacheExpired("serviceInstances") {
-			//TODO: remove after internal review
-			fmt.Println("Cache is expired for instance so populating cache")
-			populateResourceCache[*spaceClient](c, "serviceInstances", "")
+		// attempt to retrieve instance from cache
+		if c.resourceCache.isCacheExpired(instanceType) {
+			populateResourceCache[*spaceClient](c, instanceType, "")
 		}
 		if len(c.resourceCache.getCachedInstances()) != 0 {
-			instance, instanceInCache := c.resourceCache.getInstanceFromCache(instanceOpts["owner"])
-			//TODO: remove after internal review
-			fmt.Printf("Length of cache: %d\n", len(c.resourceCache.getCachedInstances()))
-			if instanceInCache {
+			instance, inCache := c.resourceCache.getInstanceFromCache(instanceOpts["owner"])
+			if inCache {
 				return instance, nil
 			}
 		}
 	}
 
-	// TODO :remove After internal review
-	fmt.Println("get instance from CF only in case of cache is of or instance not found in cache or creation case")
-
-	// Attempt to retrieve instance from Cloud Foundry
+	// attempt to retrieve instance from Cloud Foundry
 	var filterOpts instanceFilter
 	if instanceOpts["name"] != "" {
 		filterOpts = &instanceFilterName{name: instanceOpts["name"]}
@@ -85,7 +78,7 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 	}
 	serviceInstance := serviceInstances[0]
 
-	// add parameter values to the orphan cf instance
+	// add parameter values to the orphaned instance in Cloud Foundry
 	if instanceOpts["name"] != "" {
 		generationvalue := "0"
 		parameterHashValue := "0"
@@ -93,7 +86,7 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 		serviceInstance.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
 	}
 
-	return InitInstance(serviceInstance, instanceOpts)
+	return c.InitInstance(serviceInstance, instanceOpts)
 }
 
 // Required parameters (may not be initial): name, servicePlanGuid, owner, generation
@@ -153,10 +146,9 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 
 	_, _, err := c.client.ServiceInstances.UpdateManaged(ctx, guid, req)
 
-	// Update instance in cache
+	// update instance in cache
 	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
 		isUpdated := c.resourceCache.updateInstanceInCache(name, owner, servicePlanGuid, parameters, generation)
-
 		if !isUpdated {
 			// add instance to cache in case of orphan instance
 			instance := &facade.Instance{
@@ -180,8 +172,8 @@ func (c *spaceClient) DeleteInstance(ctx context.Context, guid string, owner str
 	// TODO: return jobGUID to enable querying the job deletion status
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
 
-	// Delete instance from cache
-	if c.resourceCache.checkResourceCacheEnabled() {
+	// delete instance from cache
+	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
 		c.resourceCache.deleteInstanceFromCache(owner)
 	}
 
@@ -189,7 +181,7 @@ func (c *spaceClient) DeleteInstance(ctx context.Context, guid string, owner str
 }
 
 // InitInstance wraps cfclient.ServiceInstance as a facade.Instance.
-func InitInstance(serviceInstance *cfresource.ServiceInstance, instanceOpts map[string]string) (*facade.Instance, error) {
+func (c *spaceClient) InitInstance(serviceInstance *cfresource.ServiceInstance, instanceOpts map[string]string) (*facade.Instance, error) {
 	generation, err := strconv.ParseInt(*serviceInstance.Metadata.Annotations[annotationGeneration], 10, 64)
 	if err != nil {
 		return nil, errors.Wrap(err, "error parsing service instance generation")

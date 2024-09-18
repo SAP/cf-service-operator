@@ -8,7 +8,7 @@ package cf
 import "context"
 
 func (c *spaceClient) Check(ctx context.Context) error {
-	//TODO:Need to check if caching needed here or code can be removed
+	// TODO: Need to check if caching needed here or code can be removed
 	_, err := c.client.Spaces.Get(ctx, c.spaceGuid)
 	if err != nil {
 		return err
