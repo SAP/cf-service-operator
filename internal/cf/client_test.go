@@ -423,7 +423,7 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[6].RequestURI).NotTo(ContainSubstring(Owner))
 
 			// Delete space from cache
-			err = orgClient.DeleteSpace(ctx, Owner, "test-space-guid-1")
+			err = orgClient.DeleteSpace(ctx, "test-space-guid-1", Owner)
 			Expect(err).To(BeNil())
 			Expect(server.ReceivedRequests()).To(HaveLen(8))
 			// - Delete space from cache

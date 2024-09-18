@@ -108,7 +108,7 @@ func (c *organizationClient) UpdateSpace(ctx context.Context, guid string, name 
 	return err
 }
 
-func (c *organizationClient) DeleteSpace(ctx context.Context, owner string, guid string) error {
+func (c *organizationClient) DeleteSpace(ctx context.Context, guid string, owner string) error {
 	_, err := c.client.Spaces.Delete(ctx, guid)
 
 	// Delete space from cache
