@@ -214,6 +214,7 @@ func addControllers(k8sManager ctrl.Manager) {
 		HealthCheckerBuilder: func(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
 			return fakeSpaceHealthChecker, nil
 		},
+		Config: cfg,
 	}
 	Expect(spaceReconciler.SetupWithManager(k8sManager)).To(Succeed())
 
