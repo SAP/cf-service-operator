@@ -76,7 +76,7 @@ The cache feature is optional and can be enabled via the environment variable RE
 - **`RESOURCE_CACHE_ENABLED`**  
   - Description: Determines whether the caching mechanism is enabled or disabled.  
   - Type: Boolean  
-  - Default: `true`  
+  - Default: `false`  
   - Values:  
     - `true`: Enables caching of CF resources.  
     - `false`: Disables the cache, and the operator will fetch CF resources directly from the CF API on each request.
@@ -107,7 +107,7 @@ Additionally, the corresponding values can be set in the `values.yaml` file, all
 # -- Enable Resources Cache
 cache:
   # -- Whether to enable the cache
-  enabled: true    # default: true
+  enabled: false    # default: false
   # -- Cache expiration time
   timeout: 1m     # default: 1m   
 ```
