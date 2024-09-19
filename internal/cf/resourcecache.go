@@ -22,6 +22,14 @@ import (
 type resourceCache struct {
 	mutex sync.RWMutex
 
+	// TODO: document which keys are used for the maps
+	// TODO: check if the keys for resources like spaces are unique across all CF organziations
+	// Scenario:
+	// - we have two CF organizations and one org_client for each of them
+	// - both org_clients will use the same shared resource cache
+	// => verify that it is not possible that two spaces from different CF organizations
+	//    are using the same key for below map
+
 	// cache for each resource type
 	bindings       map[string]*facade.Binding
 	instances      map[string]*facade.Instance
