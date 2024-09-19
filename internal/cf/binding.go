@@ -53,11 +53,9 @@ func (c *spaceClient) GetBinding(ctx context.Context, bindingOpts map[string]str
 		if c.resourceCache.isCacheExpired(bindingType) {
 			populateResourceCache[*spaceClient](c, bindingType, "")
 		}
-		if len(c.resourceCache.getCachedBindings()) != 0 {
-			binding, inCache := c.resourceCache.getBindingFromCache(bindingOpts["owner"])
-			if inCache {
-				return binding, nil
-			}
+		binding, inCache := c.resourceCache.getBindingFromCache(bindingOpts["owner"])
+		if inCache {
+			return binding, nil
 		}
 	}
 

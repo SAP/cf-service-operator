@@ -275,37 +275,31 @@ type manageResourceCache interface {
 
 func populateResourceCache[T manageResourceCache](c T, resourceType cacheResourceType, username string) {
 	ctx := context.Background()
+
 	var err error
 
 	switch resourceType {
 	case bindingType:
 		if client, ok := any(c).(ResourceServicesClient[T]); ok {
 			err = client.populateServiceBindings(ctx)
-			//TODO:remove later
-			fmt.Println("populate service binding finished")
 		}
 	case instanceType:
 		if client, ok := any(c).(ResourceServicesClient[T]); ok {
 			err = client.populateServiceInstances(ctx)
-			//TODO:remove later
-			fmt.Println("populate service instance finished")
 		}
 	case spaceType:
 		if client, ok := any(c).(ResourceSpaceClient[T]); ok {
 			err = client.populateSpaces(ctx)
-			//TODO:remove later
-			fmt.Println("populate space finished")
 		}
 	case spaceUserRoleType:
 		if client, ok := any(c).(ResourceSpaceClient[T]); ok {
 			err = client.populateSpaceUserRoleCache(ctx, username)
-			fmt.Println("populate service spaceUserRoles finished")
 		}
 	}
 
 	if err != nil {
 		// reset the cache to nil in case of error
-		log.Printf("Error populating %s: %s", resourceType, err)
+		log.Printf("Error populating cache for type %s: %s", resourceType, err)
 		c.resetCache(resourceType)
 		return
 	}

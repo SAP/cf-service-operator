@@ -105,8 +105,6 @@ func (c *resourceCache) setLastCacheTime(resourceType cacheResourceType) {
 	case spaceUserRoleType:
 		c.spaceUserRoleLastCacheTime = now
 	}
-	//TODO:remove later
-	fmt.Printf("Last cache time for %s: %v\n", resourceType, now)
 }
 
 // isCacheExpired checks if the cache is expired for a specific resource type
@@ -129,9 +127,8 @@ func (c *resourceCache) isCacheExpired(resourceType cacheResourceType) bool {
 	}
 
 	expirationTime := lastCacheTime.Add(c.cacheTimeOut)
-	//TODO:remove later
-	fmt.Printf("Expiration time for %s: %v and last cached time: %v and timenow :%v\n", resourceType, expirationTime, lastCacheTime, time.Now())
 	isExpired := time.Now().After(expirationTime)
+
 	return isExpired
 }
 

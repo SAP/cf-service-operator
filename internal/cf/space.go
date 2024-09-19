@@ -22,11 +22,9 @@ func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facad
 		if c.resourceCache.isCacheExpired(spaceType) {
 			populateResourceCache[*organizationClient](c, spaceType, "")
 		}
-		if len(c.resourceCache.getCachedSpaces()) != 0 {
-			space, inCache := c.resourceCache.getSpaceFromCache(owner)
-			if inCache {
-				return space, nil
-			}
+		space, inCache := c.resourceCache.getSpaceFromCache(owner)
+		if inCache {
+			return space, nil
 		}
 	}
 
@@ -45,6 +43,7 @@ func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facad
 	}
 	space := spaces[0]
 
+	// TODO: add directly to cache
 	return InitSpace(space, owner)
 }
 
@@ -69,6 +68,8 @@ func (c *organizationClient) CreateSpace(ctx context.Context, name string, owner
 		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
 
 	_, err = c.client.Spaces.Create(ctx, req)
+	// do not add space to the cache here because we wait until the space GUID is known
+
 	return err
 }
 
