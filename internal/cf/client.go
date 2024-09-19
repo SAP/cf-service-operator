@@ -74,10 +74,8 @@ var (
 
 func initAndConfigureResourceCache(config *config.Config) *resourceCache {
 	cacheInstanceOnce.Do(func() {
-		//TODO: make this initialize cache for different testing purposes
+		// TODO: make this initialize cache for different testing purposes
 		cacheInstance = initResourceCache()
-		//TODO:Remove later:print cache initialized
-		fmt.Printf("Resource cache initialized")
 		cacheInstance.setResourceCacheEnabled(config.IsResourceCacheEnabled)
 		cacheInstance.setCacheTimeOut(config.CacheTimeOut)
 	})
@@ -313,75 +311,76 @@ func populateResourceCache[T manageResourceCache](c T, resourceType cacheResourc
 	}
 }
 
-func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
-	refreshServiceInstanceResourceCacheMutex.Lock()
-	defer refreshServiceInstanceResourceCacheMutex.Unlock()
-
-	if c.resourceCache.isCacheExpired(instanceType) {
-		instanceOptions := cfclient.NewServiceInstanceListOptions()
-		instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
-		instanceOptions.Page = 1
-		instanceOptions.PerPage = 5000
-
-		cfInstances, err := c.client.ServiceInstances.ListAll(ctx, instanceOptions)
-		//TODO:remove later after review
-		fmt.Println("populate instance cache called")
-		if err != nil {
-			return err
-		}
-
-		var waitGroup sync.WaitGroup
-		for _, cfInstance := range cfInstances {
-			waitGroup.Add(1)
-			go func(cfInstance *cfresource.ServiceInstance) {
-				defer waitGroup.Done()
-				if instance, err := c.InitInstance(cfInstance, nil); err == nil {
-					c.resourceCache.addInstanceInCache(*cfInstance.Metadata.Labels[labelOwner], instance)
-				} else {
-					log.Printf("Error initializing instance: %s", err)
-				}
-			}(cfInstance)
-		}
-		waitGroup.Wait()
-		c.resourceCache.setLastCacheTime(instanceType)
-	}
-
-	return nil
-
-}
-
 func (c *spaceClient) populateServiceBindings(ctx context.Context) error {
 	refreshServiceBindingResourceCacheMutex.Lock()
 	defer refreshServiceBindingResourceCacheMutex.Unlock()
 
-	if c.resourceCache.isCacheExpired(bindingType) {
-		bindingOptions := cfclient.NewServiceCredentialBindingListOptions()
-		bindingOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
-		bindingOptions.Page = 1
-		bindingOptions.PerPage = 5000
-
-		cfBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, bindingOptions)
-		//TODO:remove later after review
-		fmt.Println("populate service binding cache called")
-		if err != nil {
-			return err
-		}
-
-		var waitGroup sync.WaitGroup
-		for _, cfBinding := range cfBindings {
-			waitGroup.Add(1)
-			go func(cfBinding *cfresource.ServiceCredentialBinding) {
-				defer waitGroup.Done()
-				if binding, err := c.InitBinding(ctx, cfBinding, nil); err == nil {
-					c.resourceCache.addBindingInCache(*cfBinding.Metadata.Labels[labelOwner], binding)
-				} else {
-					log.Printf("Error initializing binding: %s", err)
-				}
-			}(cfBinding)
-		}
-		waitGroup.Wait()
-		c.resourceCache.setLastCacheTime(bindingType)
+	if !c.resourceCache.isCacheExpired(bindingType) {
+		return nil
 	}
+
+	// retrieve all service bindings with the specified owner
+	bindingOptions := cfclient.NewServiceCredentialBindingListOptions()
+	bindingOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+	bindingOptions.Page = 1
+	bindingOptions.PerPage = 5000
+	cfBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, bindingOptions)
+	if err != nil {
+		return err
+	}
+
+	// wrap each service binding as a facade.Binding and add it to the cache (in parallel)
+	var waitGroup sync.WaitGroup
+	for _, cfBinding := range cfBindings {
+		waitGroup.Add(1)
+		go func(cfBinding *cfresource.ServiceCredentialBinding) {
+			defer waitGroup.Done()
+			if binding, err := c.InitBinding(ctx, cfBinding, nil); err == nil {
+				c.resourceCache.addBindingInCache(*cfBinding.Metadata.Labels[labelOwner], binding)
+			} else {
+				log.Printf("Error initializing binding: %s", err)
+			}
+		}(cfBinding)
+	}
+	waitGroup.Wait()
+	c.resourceCache.setLastCacheTime(bindingType)
+
+	return nil
+}
+
+func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
+	refreshServiceInstanceResourceCacheMutex.Lock()
+	defer refreshServiceInstanceResourceCacheMutex.Unlock()
+
+	if !c.resourceCache.isCacheExpired(instanceType) {
+		return nil
+	}
+
+	// retrieve all service instances with the specified owner
+	instanceOptions := cfclient.NewServiceInstanceListOptions()
+	instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+	instanceOptions.Page = 1
+	instanceOptions.PerPage = 5000
+	cfInstances, err := c.client.ServiceInstances.ListAll(ctx, instanceOptions)
+	if err != nil {
+		return err
+	}
+
+	// wrap each service instance as a facade.Instance and add it to the cache (in parallel)
+	var waitGroup sync.WaitGroup
+	for _, cfInstance := range cfInstances {
+		waitGroup.Add(1)
+		go func(cfInstance *cfresource.ServiceInstance) {
+			defer waitGroup.Done()
+			if instance, err := c.InitInstance(cfInstance, nil); err == nil {
+				c.resourceCache.addInstanceInCache(*cfInstance.Metadata.Labels[labelOwner], instance)
+			} else {
+				log.Printf("Error initializing instance: %s", err)
+			}
+		}(cfInstance)
+	}
+	waitGroup.Wait()
+	c.resourceCache.setLastCacheTime(instanceType)
 
 	return nil
 }
@@ -390,35 +389,36 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 	refreshSpaceResourceCacheMutex.Lock()
 	defer refreshSpaceResourceCacheMutex.Unlock()
 
-	if c.resourceCache.isCacheExpired(spaceType) {
-		spaceOptions := cfclient.NewSpaceListOptions()
-		//TODO: check for existing spaces as label owner annotation wont be present
-		spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
-		spaceOptions.Page = 1
-		spaceOptions.PerPage = 5000
-
-		//TODO:remove later after review
-		fmt.Println("populate Space cache called")
-		cfSpaces, err := c.client.Spaces.ListAll(ctx, spaceOptions)
-		if err != nil {
-			return err
-		}
-
-		var waitGroup sync.WaitGroup
-		for _, cfSpace := range cfSpaces {
-			waitGroup.Add(1)
-			go func(cfSpace *cfresource.Space) {
-				defer waitGroup.Done()
-				if binding, err := InitSpace(cfSpace, ""); err == nil {
-					c.resourceCache.addSpaceInCache(*cfSpace.Metadata.Labels[labelOwner], binding)
-				} else {
-					log.Printf("Error initializing space: %s", err)
-				}
-			}(cfSpace)
-		}
-		waitGroup.Wait()
-		c.resourceCache.setLastCacheTime(spaceType)
+	if !c.resourceCache.isCacheExpired(spaceType) {
+		return nil
 	}
+
+	// retrieve all spaces with the specified owner
+	// TODO: check for existing spaces as label owner annotation wont be present
+	spaceOptions := cfclient.NewSpaceListOptions()
+	spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+	spaceOptions.Page = 1
+	spaceOptions.PerPage = 5000
+	cfSpaces, err := c.client.Spaces.ListAll(ctx, spaceOptions)
+	if err != nil {
+		return err
+	}
+
+	// wrap each space as a facade.Space and add it to the cache (in parallel)
+	var waitGroup sync.WaitGroup
+	for _, cfSpace := range cfSpaces {
+		waitGroup.Add(1)
+		go func(cfSpace *cfresource.Space) {
+			defer waitGroup.Done()
+			if binding, err := InitSpace(cfSpace, ""); err == nil {
+				c.resourceCache.addSpaceInCache(*cfSpace.Metadata.Labels[labelOwner], binding)
+			} else {
+				log.Printf("Error initializing space: %s", err)
+			}
+		}(cfSpace)
+	}
+	waitGroup.Wait()
+	c.resourceCache.setLastCacheTime(spaceType)
 
 	return nil
 }
@@ -426,66 +426,74 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, username string) error {
 	refreshSpaceUserRoleCacheMutex.Lock()
 	defer refreshSpaceUserRoleCacheMutex.Unlock()
-	fmt.Println("populate Space cache called")
-	if c.resourceCache.isCacheExpired(spaceUserRoleType) {
-		spaceOptions := cfclient.NewSpaceListOptions()
 
-		spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
-		spaceOptions.Page = 1
-		spaceOptions.PerPage = 5000
-		cfSpaces, err := c.client.Spaces.ListAll(ctx, spaceOptions)
-		if err != nil {
-			return err
-		}
-		if len(cfSpaces) == 0 {
-			return fmt.Errorf("no user spaces found")
-		}
-		var spaceGUIDs []string
-		for _, cfSpace := range cfSpaces {
-			spaceGUIDs = append(spaceGUIDs, cfSpace.GUID)
-		}
-
-		userOptions := cfclient.NewUserListOptions()
-		userOptions.UserNames.EqualTo(username)
-		userOptions.Page = 1
-		userOptions.PerPage = 5000
-
-		users, err := c.client.Users.ListAll(ctx, userOptions)
-		if err != nil {
-			return err
-		}
-		if len(users) == 0 {
-			return fmt.Errorf("found no user with name: %s", username)
-		} else if len(users) > 1 {
-			return fmt.Errorf("found multiple users with name: %s (this should not be possible, actually)", username)
-		}
-		user := users[0]
-
-		roleListOpts := cfclient.NewRoleListOptions()
-		roleListOpts.SpaceGUIDs.EqualTo(strings.Join(spaceGUIDs, ","))
-		roleListOpts.UserGUIDs.EqualTo(user.GUID)
-		roleListOpts.Types.EqualTo(cfresource.SpaceRoleDeveloper.String())
-		roleListOpts.Page = 1
-		roleListOpts.PerPage = 5000
-		cfRoles, err := c.client.Roles.ListAll(ctx, roleListOpts)
-		if err != nil {
-			return err
-		}
-
-		if len(cfRoles) == 0 {
-			return fmt.Errorf("no RoleSpaceUser relationship found")
-		}
-		var waitGroup sync.WaitGroup
-		for _, cfRole := range cfRoles {
-			waitGroup.Add(1)
-			go func(cfrole *cfresource.Role) {
-				defer waitGroup.Done()
-				c.resourceCache.addSpaceUserRoleInCache(cfrole.Relationships.Space.Data.GUID, cfrole.Relationships.User.Data.GUID, username, cfrole.Type)
-			}(cfRole)
-		}
-		waitGroup.Wait()
-		c.resourceCache.setLastCacheTime(spaceUserRoleType)
+	if !c.resourceCache.isCacheExpired(spaceUserRoleType) {
+		return nil
 	}
+
+	// retrieve all spaces with the specified owner
+	spaceOptions := cfclient.NewSpaceListOptions()
+	spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+	spaceOptions.Page = 1
+	spaceOptions.PerPage = 5000
+	cfSpaces, err := c.client.Spaces.ListAll(ctx, spaceOptions)
+	if err != nil {
+		return err
+	}
+	if len(cfSpaces) == 0 {
+		return fmt.Errorf("no user spaces found")
+	}
+	var spaceGUIDs []string
+	for _, cfSpace := range cfSpaces {
+		spaceGUIDs = append(spaceGUIDs, cfSpace.GUID)
+	}
+
+	// retrieve user with the specified name
+	userOptions := cfclient.NewUserListOptions()
+	userOptions.UserNames.EqualTo(username)
+	userOptions.Page = 1
+	userOptions.PerPage = 5000
+	users, err := c.client.Users.ListAll(ctx, userOptions)
+	if err != nil {
+		return err
+	}
+	if len(users) == 0 {
+		return fmt.Errorf("found no user with name: %s", username)
+	} else if len(users) > 1 {
+		return fmt.Errorf("found multiple users with name: %s (this should not be possible, actually)", username)
+	}
+	user := users[0]
+
+	// retrieve corresponding role
+	roleListOpts := cfclient.NewRoleListOptions()
+	roleListOpts.SpaceGUIDs.EqualTo(strings.Join(spaceGUIDs, ","))
+	roleListOpts.UserGUIDs.EqualTo(user.GUID)
+	roleListOpts.Types.EqualTo(cfresource.SpaceRoleDeveloper.String())
+	roleListOpts.Page = 1
+	roleListOpts.PerPage = 5000
+	cfRoles, err := c.client.Roles.ListAll(ctx, roleListOpts)
+	if err != nil {
+		return err
+	}
+	if len(cfRoles) == 0 {
+		return fmt.Errorf("no RoleSpaceUser relationship found")
+	}
+
+	// add each role to the cache (in parallel)
+	var waitGroup sync.WaitGroup
+	for _, cfRole := range cfRoles {
+		waitGroup.Add(1)
+		go func(cfrole *cfresource.Role) {
+			defer waitGroup.Done()
+			c.resourceCache.addSpaceUserRoleInCache(
+				cfrole.Relationships.Space.Data.GUID,
+				cfrole.Relationships.User.Data.GUID,
+				username,
+				cfrole.Type)
+		}(cfRole)
+	}
+	waitGroup.Wait()
+	c.resourceCache.setLastCacheTime(spaceUserRoleType)
 
 	return nil
 }
