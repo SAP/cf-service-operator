@@ -101,7 +101,7 @@ These environment variables can be configured in your `deployment.yaml` file as 
       value: "{{ .Values.cache.enabled }}"    
 ```
 
-Additionally, the corresponding values can be set in the `values.yaml` file of the [helm chart](https://github.com/SAP/cf-service-operator-helm/blob/main/chart/values.yaml)![image](https://github.com/user-attachments/assets/0426656d-fd55-4276-a7c3-e4483ba74218), allowing the operator to be easily configured:
+Additionally, the corresponding values can be set in the `values.yaml` file of the [helm chart](https://github.com/SAP/cf-service-operator-helm/blob/main/chart/values.yaml), allowing the operator to be easily configured:
 
 ```yaml
 # -- Enable Resources Cache
