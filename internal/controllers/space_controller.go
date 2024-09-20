@@ -235,13 +235,13 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 		url := string(secret.Data["url"])
 		username := string(secret.Data["username"])
 		password := string(secret.Data["password"])
-		checker, err := r.HealthCheckerBuilder(status.SpaceGuid, url, username, password)
+		checker, err := r.HealthCheckerBuilder(status.SpaceGuid, url, username, password, r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the healthchecker from secret %s", secretName)
 		}
 
 		log.V(1).Info("Checking space")
-		if err := checker.Check(ctx); err != nil {
+		if err := checker.Check(ctx, cfspace.Owner); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "healthcheck failed")
 		}
 

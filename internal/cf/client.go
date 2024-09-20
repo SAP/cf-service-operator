@@ -225,7 +225,7 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 
 }
 
-func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
+func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string, config *config.Config) (facade.SpaceHealthChecker, error) {
 	clientCacheMutex.Lock()
 	defer clientCacheMutex.Unlock()
 
@@ -251,6 +251,13 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 		if err == nil {
 			// add CF client to cache
 			clientCache[identifier] = &clientCacheEntry{url: url, username: username, password: password, client: client.client}
+		}
+	}
+
+	if config.IsResourceCacheEnabled && client.resourceCache == nil {
+		if cfResourceCache != nil {
+			// It is expected cfResourceCache be already populated
+			client.resourceCache = cfResourceCache
 		}
 	}
 
