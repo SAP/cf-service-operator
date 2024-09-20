@@ -61,10 +61,10 @@ var (
 	clientCacheMutex                         = &sync.Mutex{}
 	clientCache                              = make(map[clientIdentifier]*clientCacheEntry)
 	cfResourceCache                          *resourceCache
-	refreshServiceInstanceResourceCacheMutex = &sync.Mutex{}
-	refreshSpaceResourceCacheMutex           = &sync.Mutex{}
-	refreshServiceBindingResourceCacheMutex  = &sync.Mutex{}
-	refreshSpaceUserRoleCacheMutex           = &sync.Mutex{}
+	refreshServiceInstanceResourceCacheMutex = sync.Mutex{}
+	refreshSpaceResourceCacheMutex           = sync.Mutex{}
+	refreshServiceBindingResourceCacheMutex  = sync.Mutex{}
+	refreshSpaceUserRoleCacheMutex           = sync.Mutex{}
 )
 
 var (

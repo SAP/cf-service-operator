@@ -211,7 +211,7 @@ func addControllers(k8sManager ctrl.Manager) {
 		ClientBuilder: func(organizationName string, url string, username string, password string, config *config.Config) (facade.OrganizationClient, error) {
 			return fakeOrgClient, nil
 		},
-		HealthCheckerBuilder: func(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
+		HealthCheckerBuilder: func(spaceGuid string, url string, username string, password string, config *config.Config) (facade.SpaceHealthChecker, error) {
 			return fakeSpaceHealthChecker, nil
 		},
 		Config: cfg,
