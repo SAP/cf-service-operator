@@ -60,7 +60,6 @@ type clientCacheEntry struct {
 var (
 	clientCacheMutex                         = &sync.Mutex{}
 	clientCache                              = make(map[clientIdentifier]*clientCacheEntry)
-	cfResourceCache                          *resourceCache
 	refreshServiceInstanceResourceCacheMutex = sync.Mutex{}
 	refreshSpaceResourceCacheMutex           = sync.Mutex{}
 	refreshServiceBindingResourceCacheMutex  = sync.Mutex{}
@@ -68,18 +67,18 @@ var (
 )
 
 var (
-	cacheInstance     *resourceCache
+	cfResourceCache   *resourceCache
 	cacheInstanceOnce sync.Once
 )
 
 func initAndConfigureResourceCache(config *config.Config) *resourceCache {
 	cacheInstanceOnce.Do(func() {
 		// TODO: make this initialize cache for different testing purposes
-		cacheInstance = initResourceCache()
-		cacheInstance.setResourceCacheEnabled(config.IsResourceCacheEnabled)
-		cacheInstance.setCacheTimeOut(config.CacheTimeOut)
+		cfResourceCache = initResourceCache()
+		cfResourceCache.setResourceCacheEnabled(config.IsResourceCacheEnabled)
+		cfResourceCache.setCacheTimeOut(config.CacheTimeOut)
 	})
-	return cacheInstance
+	return cfResourceCache
 }
 
 func newOrganizationClient(organizationName string, url string, username string, password string) (*organizationClient, error) {
@@ -179,7 +178,6 @@ func NewOrganizationClient(organizationName string, url string, username string,
 		client.resourceCache = initAndConfigureResourceCache(config)
 		populateResourceCache(client, spaceType, "")
 		populateResourceCache(client, spaceUserRoleType, username)
-		cfResourceCache = client.resourceCache
 	}
 
 	return client, err
@@ -218,7 +216,6 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 		client.resourceCache = initAndConfigureResourceCache(config)
 		populateResourceCache(client, instanceType, "")
 		populateResourceCache(client, bindingType, "")
-		cfResourceCache = client.resourceCache
 	}
 
 	return client, err
@@ -237,7 +234,7 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 	var client *spaceClient = nil
 	if isInCache {
 		// re-use CF client from cache and wrap it as spaceClient
-		client = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client}
+		client = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client, resourceCache: cfResourceCache}
 		if cacheEntry.password != password {
 			// password was rotated => delete client from cache and create a new one below
 			delete(clientCache, identifier)
