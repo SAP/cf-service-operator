@@ -408,8 +408,8 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 		waitGroup.Add(1)
 		go func(cfSpace *cfresource.Space) {
 			defer waitGroup.Done()
-			if binding, err := InitSpace(cfSpace, ""); err == nil {
-				c.resourceCache.addSpaceInCache(*cfSpace.Metadata.Labels[labelOwner], binding)
+			if space, err := c.InitSpace(cfSpace, ""); err == nil {
+				c.resourceCache.addSpaceInCache(*cfSpace.Metadata.Labels[labelOwner], space)
 			} else {
 				log.Printf("Error initializing space: %s", err)
 			}

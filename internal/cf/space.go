@@ -44,7 +44,7 @@ func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facad
 	space := spaces[0]
 
 	// TODO: add directly to cache
-	return InitSpace(space, owner)
+	return c.InitSpace(space, owner)
 }
 
 // Required parameters (may not be initial): name, owner, generation
@@ -168,7 +168,7 @@ func (c *organizationClient) AddManager(ctx context.Context, guid string, userna
 }
 
 // InitSpace wraps cfclient.Space as a facade.Space
-func InitSpace(space *cfresource.Space, owner string) (*facade.Space, error) {
+func (c *organizationClient) InitSpace(space *cfresource.Space, owner string) (*facade.Space, error) {
 	guid := space.GUID
 	name := space.Name
 	generation, err := strconv.ParseInt(*space.Metadata.Annotations[annotationGeneration], 10, 64)
