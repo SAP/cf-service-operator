@@ -50,7 +50,7 @@ func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]s
 	if c.resourceCache.checkResourceCacheEnabled() {
 		// attempt to retrieve instance from cache
 		if c.resourceCache.isCacheExpired(instanceType) {
-			populateResourceCache[*spaceClient](c, instanceType, "")
+			populateResourceCache(c, instanceType, "")
 		}
 		instance, inCache := c.resourceCache.getInstanceFromCache(instanceOpts["owner"])
 		if inCache {
