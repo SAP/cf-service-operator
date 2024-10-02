@@ -318,6 +318,7 @@ func (c *spaceClient) populateServiceBindings(ctx context.Context) error {
 	}
 
 	logger := ctrl.LoggerFrom(ctx)
+	logger.V(1).Info("Populating cache for service bindings")
 
 	// retrieve all service bindings with the specified owner
 	bindingOptions := cfclient.NewServiceCredentialBindingListOptions()
@@ -357,6 +358,7 @@ func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
 	}
 
 	logger := ctrl.LoggerFrom(ctx)
+	logger.V(1).Info("Populating cache for service instances")
 
 	// retrieve all service instances with the specified owner
 	instanceOptions := cfclient.NewServiceInstanceListOptions()
@@ -396,6 +398,7 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 	}
 
 	logger := ctrl.LoggerFrom(ctx)
+	logger.V(1).Info("Populating cache for spaces")
 
 	// retrieve all spaces with the specified owner
 	// TODO: check for existing spaces as label owner annotation wont be present
@@ -435,6 +438,9 @@ func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, use
 		return nil
 	}
 
+	logger := ctrl.LoggerFrom(ctx)
+	logger.V(1).Info("Populating cache for roles")
+
 	// retrieve all spaces with specified label 'owner'
 	spaceOptions := cfclient.NewSpaceListOptions()
 	spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
@@ -447,6 +453,8 @@ func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, use
 	if len(cfSpaces) == 0 {
 		return fmt.Errorf("no spaces found")
 	}
+
+	// collect GUIDs of spaces
 	var spaceGUIDs []string
 	for _, cfSpace := range cfSpaces {
 		spaceGUIDs = append(spaceGUIDs, cfSpace.GUID)
@@ -484,11 +492,11 @@ func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, use
 	for len(spaceGUIDs) > 0 {
 		var spaceFilter = ""
 		for i := 0; i < chunkSize && len(spaceGUIDs) > 0; i++ {
-			// pop first space GUID from the list
-			spaceGUID, spaceGUIDs = spaceGUIDs[0], spaceGUIDs[1:]
 			if i > 0 {
 				spaceFilter += ","
 			}
+			// pop first item from list
+			spaceGUID, spaceGUIDs = spaceGUIDs[0], spaceGUIDs[1:]
 			spaceFilter += spaceGUID
 		}
 		roleListOpts.SpaceGUIDs.EqualTo(spaceFilter)
