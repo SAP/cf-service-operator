@@ -185,15 +185,6 @@ func (c *spaceClient) InitBinding(ctx context.Context, serviceBinding *cfresourc
 
 	guid := serviceBinding.GUID
 
-	var credentials map[string]interface{}
-	if state == facade.BindingStateReady {
-		details, err := c.client.ServiceCredentialBindings.GetDetails(ctx, guid)
-		if err != nil {
-			return nil, errors.Wrap(err, "error getting service binding details")
-		}
-		credentials = details.Credentials
-	}
-
 	return &facade.Binding{
 		Guid:             guid,
 		Name:             serviceBinding.Name,
@@ -202,6 +193,16 @@ func (c *spaceClient) InitBinding(ctx context.Context, serviceBinding *cfresourc
 		ParameterHash:    *serviceBinding.Metadata.Annotations[annotationParameterHash],
 		State:            state,
 		StateDescription: serviceBinding.LastOperation.Description,
-		Credentials:      credentials,
+		Credentials:      nil, // filled later
 	}, nil
+}
+
+func (c *spaceClient) FillBindingDetails(ctx context.Context, binding *facade.Binding) error {
+	details, err := c.client.ServiceCredentialBindings.GetDetails(ctx, binding.Guid)
+	if err != nil {
+		return errors.Wrap(err, "error getting service binding details")
+	}
+	binding.Credentials = details.Credentials
+
+	return nil
 }

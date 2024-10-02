@@ -90,6 +90,7 @@ type SpaceClient interface {
 	CreateBinding(ctx context.Context, name string, serviceInstanceGuid string, parameters map[string]interface{}, owner string, generation int64) error
 	UpdateBinding(ctx context.Context, guid string, owner string, generation int64, parameters map[string]interface{}) error
 	DeleteBinding(ctx context.Context, guid string, owner string) error
+	FillBindingDetails(ctx context.Context, binding *Binding) error
 
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
 }

@@ -8,13 +8,12 @@ package cf
 import (
 	"context"
 	"fmt"
-	"log"
-	"strings"
 	"sync"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfconfig "github.com/cloudfoundry-community/go-cfclient/v3/config"
 	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	"github.com/sap/cf-service-operator/internal/config"
@@ -303,7 +302,8 @@ func populateResourceCache[T manageResourceCache](c T, resourceType cacheResourc
 
 	if err != nil {
 		// reset the cache to nil in case of error
-		log.Printf("Error populating cache for type %s: %s", resourceType, err)
+		logger := ctrl.LoggerFrom(ctx)
+		logger.Error(err, "Failed to populate cache", "type", resourceType)
 		c.resetCache(resourceType)
 		return
 	}
@@ -316,6 +316,8 @@ func (c *spaceClient) populateServiceBindings(ctx context.Context) error {
 	if !c.resourceCache.isCacheExpired(bindingType) {
 		return nil
 	}
+
+	logger := ctrl.LoggerFrom(ctx)
 
 	// retrieve all service bindings with the specified owner
 	bindingOptions := cfclient.NewServiceCredentialBindingListOptions()
@@ -336,7 +338,7 @@ func (c *spaceClient) populateServiceBindings(ctx context.Context) error {
 			if binding, err := c.InitBinding(ctx, cfBinding, nil); err == nil {
 				c.resourceCache.addBindingInCache(*cfBinding.Metadata.Labels[labelOwner], binding)
 			} else {
-				log.Printf("Error initializing binding: %s", err)
+				logger.Error(err, "Failed to wrap binding", "binding", cfBinding.GUID)
 			}
 		}(cfBinding)
 	}
@@ -353,6 +355,8 @@ func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
 	if !c.resourceCache.isCacheExpired(instanceType) {
 		return nil
 	}
+
+	logger := ctrl.LoggerFrom(ctx)
 
 	// retrieve all service instances with the specified owner
 	instanceOptions := cfclient.NewServiceInstanceListOptions()
@@ -373,7 +377,7 @@ func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
 			if instance, err := c.InitInstance(cfInstance, nil); err == nil {
 				c.resourceCache.addInstanceInCache(*cfInstance.Metadata.Labels[labelOwner], instance)
 			} else {
-				log.Printf("Error initializing instance: %s", err)
+				logger.Error(err, "Failed to wrap instance", "instance", cfInstance.GUID)
 			}
 		}(cfInstance)
 	}
@@ -390,6 +394,8 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 	if !c.resourceCache.isCacheExpired(spaceType) {
 		return nil
 	}
+
+	logger := ctrl.LoggerFrom(ctx)
 
 	// retrieve all spaces with the specified owner
 	// TODO: check for existing spaces as label owner annotation wont be present
@@ -411,7 +417,7 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 			if space, err := c.InitSpace(cfSpace, ""); err == nil {
 				c.resourceCache.addSpaceInCache(*cfSpace.Metadata.Labels[labelOwner], space)
 			} else {
-				log.Printf("Error initializing space: %s", err)
+				logger.Error(err, "Failed to wrap space", "space", cfSpace.GUID)
 			}
 		}(cfSpace)
 	}
@@ -429,7 +435,7 @@ func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, use
 		return nil
 	}
 
-	// retrieve all spaces with the specified owner
+	// retrieve all spaces with specified label 'owner'
 	spaceOptions := cfclient.NewSpaceListOptions()
 	spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
 	spaceOptions.Page = 1
@@ -439,14 +445,14 @@ func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, use
 		return err
 	}
 	if len(cfSpaces) == 0 {
-		return fmt.Errorf("no user spaces found")
+		return fmt.Errorf("no spaces found")
 	}
 	var spaceGUIDs []string
 	for _, cfSpace := range cfSpaces {
 		spaceGUIDs = append(spaceGUIDs, cfSpace.GUID)
 	}
 
-	// retrieve user with the specified name
+	// retrieve user with specified name (to get user GUID)
 	userOptions := cfclient.NewUserListOptions()
 	userOptions.UserNames.EqualTo(username)
 	userOptions.Page = 1
@@ -456,30 +462,50 @@ func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, use
 		return err
 	}
 	if len(users) == 0 {
-		return fmt.Errorf("found no user with name: %s", username)
+		return fmt.Errorf("no user found with name '%s'", username)
 	} else if len(users) > 1 {
-		return fmt.Errorf("found multiple users with name: %s (this should not be possible, actually)", username)
+		return fmt.Errorf("multiple users found with name '%s'", username)
 	}
 	user := users[0]
 
-	// retrieve corresponding role
+	// prepare common filter options for retrieving SpaceDeveloper role for above user
 	roleListOpts := cfclient.NewRoleListOptions()
-	roleListOpts.SpaceGUIDs.EqualTo(strings.Join(spaceGUIDs, ","))
-	roleListOpts.UserGUIDs.EqualTo(user.GUID)
 	roleListOpts.Types.EqualTo(cfresource.SpaceRoleDeveloper.String())
+	roleListOpts.UserGUIDs.EqualTo(user.GUID)
 	roleListOpts.Page = 1
 	roleListOpts.PerPage = 5000
-	cfRoles, err := c.client.Roles.ListAll(ctx, roleListOpts)
-	if err != nil {
-		return err
+
+	// collect SpaceDeveloper role for above user in chunks (each N spaces)
+	// otherwise, the request will fail with 414 Request-URI Too Long
+	const chunkSize = 30 // 30 space GUIDs each 36 characters plus one comma each => 1110 characters
+
+	var spaceGUID string
+	var collectedCfRoles []*cfresource.Role
+	for len(spaceGUIDs) > 0 {
+		var spaceFilter = ""
+		for i := 0; i < chunkSize && len(spaceGUIDs) > 0; i++ {
+			// pop first space GUID from the list
+			spaceGUID, spaceGUIDs = spaceGUIDs[0], spaceGUIDs[1:]
+			if i > 0 {
+				spaceFilter += ","
+			}
+			spaceFilter += spaceGUID
+		}
+		roleListOpts.SpaceGUIDs.EqualTo(spaceFilter)
+		roles, err := c.client.Roles.ListAll(ctx, roleListOpts)
+		if err != nil {
+			return err
+		}
+		collectedCfRoles = append(collectedCfRoles, roles...)
 	}
-	if len(cfRoles) == 0 {
-		return fmt.Errorf("no RoleSpaceUser relationship found")
+
+	if len(collectedCfRoles) == 0 {
+		return fmt.Errorf("no SpaceDeveloper role found for user '%s'", username)
 	}
 
 	// add each role to the cache (in parallel)
 	var waitGroup sync.WaitGroup
-	for _, cfRole := range cfRoles {
+	for _, cfRole := range collectedCfRoles {
 		waitGroup.Add(1)
 		go func(cfrole *cfresource.Role) {
 			defer waitGroup.Done()

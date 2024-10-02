@@ -72,6 +72,18 @@ type FakeSpaceClient struct {
 	deleteInstanceReturnsOnCall map[int]struct {
 		result1 error
 	}
+	FillBindingDetailsStub        func(context.Context, *facade.Binding) error
+	fillBindingDetailsMutex       sync.RWMutex
+	fillBindingDetailsArgsForCall []struct {
+		arg1 context.Context
+		arg2 *facade.Binding
+	}
+	fillBindingDetailsReturns struct {
+		result1 error
+	}
+	fillBindingDetailsReturnsOnCall map[int]struct {
+		result1 error
+	}
 	FindServicePlanStub        func(context.Context, string, string, string) (string, error)
 	findServicePlanMutex       sync.RWMutex
 	findServicePlanArgsForCall []struct {
@@ -413,6 +425,68 @@ func (fake *FakeSpaceClient) DeleteInstanceReturnsOnCall(i int, result1 error) {
 		})
 	}
 	fake.deleteInstanceReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSpaceClient) FillBindingDetails(arg1 context.Context, arg2 *facade.Binding) error {
+	fake.fillBindingDetailsMutex.Lock()
+	ret, specificReturn := fake.fillBindingDetailsReturnsOnCall[len(fake.fillBindingDetailsArgsForCall)]
+	fake.fillBindingDetailsArgsForCall = append(fake.fillBindingDetailsArgsForCall, struct {
+		arg1 context.Context
+		arg2 *facade.Binding
+	}{arg1, arg2})
+	stub := fake.FillBindingDetailsStub
+	fakeReturns := fake.fillBindingDetailsReturns
+	fake.recordInvocation("FillBindingDetails", []interface{}{arg1, arg2})
+	fake.fillBindingDetailsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSpaceClient) FillBindingDetailsCallCount() int {
+	fake.fillBindingDetailsMutex.RLock()
+	defer fake.fillBindingDetailsMutex.RUnlock()
+	return len(fake.fillBindingDetailsArgsForCall)
+}
+
+func (fake *FakeSpaceClient) FillBindingDetailsCalls(stub func(context.Context, *facade.Binding) error) {
+	fake.fillBindingDetailsMutex.Lock()
+	defer fake.fillBindingDetailsMutex.Unlock()
+	fake.FillBindingDetailsStub = stub
+}
+
+func (fake *FakeSpaceClient) FillBindingDetailsArgsForCall(i int) (context.Context, *facade.Binding) {
+	fake.fillBindingDetailsMutex.RLock()
+	defer fake.fillBindingDetailsMutex.RUnlock()
+	argsForCall := fake.fillBindingDetailsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeSpaceClient) FillBindingDetailsReturns(result1 error) {
+	fake.fillBindingDetailsMutex.Lock()
+	defer fake.fillBindingDetailsMutex.Unlock()
+	fake.FillBindingDetailsStub = nil
+	fake.fillBindingDetailsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSpaceClient) FillBindingDetailsReturnsOnCall(i int, result1 error) {
+	fake.fillBindingDetailsMutex.Lock()
+	defer fake.fillBindingDetailsMutex.Unlock()
+	fake.FillBindingDetailsStub = nil
+	if fake.fillBindingDetailsReturnsOnCall == nil {
+		fake.fillBindingDetailsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.fillBindingDetailsReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -763,6 +837,8 @@ func (fake *FakeSpaceClient) Invocations() map[string][][]interface{} {
 	defer fake.deleteBindingMutex.RUnlock()
 	fake.deleteInstanceMutex.RLock()
 	defer fake.deleteInstanceMutex.RUnlock()
+	fake.fillBindingDetailsMutex.RLock()
+	defer fake.fillBindingDetailsMutex.RUnlock()
 	fake.findServicePlanMutex.RLock()
 	defer fake.findServicePlanMutex.RUnlock()
 	fake.getBindingMutex.RLock()

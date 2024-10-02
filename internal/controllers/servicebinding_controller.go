@@ -360,6 +360,13 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			} else if serviceBinding.Annotations["service-operator.cf.cs.sap.com/with-sap-binding-metadata"] == "false" {
 				withMetadata = false
 			}
+
+			err = client.FillBindingDetails(ctx, cfbinding)
+			if err != nil {
+				// TODO: implement error handling
+				return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+			}
+
 			err = r.storeBindingSecret(ctx, serviceInstance, serviceBinding, cfbinding.Credentials, spec.SecretName, spec.SecretKey, withMetadata)
 			if err != nil {
 				// TODO: implement error handling

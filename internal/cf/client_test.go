@@ -662,7 +662,8 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(spaceClient).ToNot(BeNil())
 
 			// Verify resource cache is populated during client creation
-			Expect(server.ReceivedRequests()).To(HaveLen(5))
+			const numRequests = 4
+			Expect(server.ReceivedRequests()).To(HaveLen(numRequests))
 			// - Discover UAA endpoint
 			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
@@ -675,60 +676,52 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			// - Populate cache with bindings
 			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[3].RequestURI).To(ContainSubstring(serviceBindingURI))
-			// -get the binding details
-			Expect(server.ReceivedRequests()[4].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[4].RequestURI).To(ContainSubstring(serviceBindingURI + "/" + fakeServiceBindings.Resources[0].GUID + "/details"))
 
 			// Make a request and verify that cache is used and no additional requests expected
 			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
-			Expect(server.ReceivedRequests()).To(HaveLen(5)) // still same as above
+			Expect(server.ReceivedRequests()).To(HaveLen(numRequests)) // still same as above
 
 			// Make another request after cache expired and verify that cache is repopulated
 			time.Sleep(10 * time.Second)
 			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
 			spaceClient.GetBinding(ctx, map[string]string{"owner": Owner})
-			Expect(server.ReceivedRequests()).To(HaveLen(8)) // one more request to repopulate cache
+			Expect(server.ReceivedRequests()).To(HaveLen(6)) // one more request to repopulate cache
+			Expect(server.ReceivedRequests()[4].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[4].RequestURI).To(ContainSubstring(serviceInstancesURI))
+			Expect(server.ReceivedRequests()[4].RequestURI).NotTo(ContainSubstring(Owner))
 			Expect(server.ReceivedRequests()[5].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[5].RequestURI).To(ContainSubstring(serviceInstancesURI))
+			Expect(server.ReceivedRequests()[5].RequestURI).To(ContainSubstring(serviceBindingURI))
 			Expect(server.ReceivedRequests()[5].RequestURI).NotTo(ContainSubstring(Owner))
-			Expect(server.ReceivedRequests()[6].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[6].RequestURI).To(ContainSubstring(serviceBindingURI))
-			Expect(server.ReceivedRequests()[6].RequestURI).NotTo(ContainSubstring(Owner))
-			Expect(server.ReceivedRequests()[7].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[7].RequestURI).To(ContainSubstring(serviceBindingURI + "/" + fakeServiceBindings.Resources[0].GUID + "/details"))
 
 			// Delete instance from cache
 			err = spaceClient.DeleteInstance(ctx, "test-instance-guid-1", Owner)
 			Expect(err).To(BeNil())
-			Expect(server.ReceivedRequests()).To(HaveLen(9))
+			Expect(server.ReceivedRequests()).To(HaveLen(7))
 			// - Delete instance from cache
-			Expect(server.ReceivedRequests()[8].Method).To(Equal("DELETE"))
-			Expect(server.ReceivedRequests()[8].RequestURI).To(ContainSubstring("test-instance-guid-1"))
+			Expect(server.ReceivedRequests()[6].Method).To(Equal("DELETE"))
+			Expect(server.ReceivedRequests()[6].RequestURI).To(ContainSubstring("test-instance-guid-1"))
 
 			// Get instance from cache should return empty
 			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
-			Expect(server.ReceivedRequests()).To(HaveLen(10))
+			Expect(server.ReceivedRequests()).To(HaveLen(8))
 			// - Get call to cf to get the instance
-			Expect(server.ReceivedRequests()[9].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[9].RequestURI).To(ContainSubstring(Owner))
+			Expect(server.ReceivedRequests()[7].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[7].RequestURI).To(ContainSubstring(Owner))
 
 			// Delete binding from cache
 			err = spaceClient.DeleteBinding(ctx, "test-binding-guid-1", Owner)
 			Expect(err).To(BeNil())
-			Expect(server.ReceivedRequests()).To(HaveLen(11))
+			Expect(server.ReceivedRequests()).To(HaveLen(9))
 			// - Delete binding from cache
-			Expect(server.ReceivedRequests()[10].Method).To(Equal("DELETE"))
-			Expect(server.ReceivedRequests()[10].RequestURI).To(ContainSubstring("test-binding-guid-1"))
+			Expect(server.ReceivedRequests()[8].Method).To(Equal("DELETE"))
+			Expect(server.ReceivedRequests()[8].RequestURI).To(ContainSubstring("test-binding-guid-1"))
 
 			// Get binding from cache should return empty
 			spaceClient.GetBinding(ctx, map[string]string{"owner": Owner})
-			Expect(server.ReceivedRequests()).To(HaveLen(13))
+			Expect(server.ReceivedRequests()).To(HaveLen(10))
 			// - Get call to cf to get the binding
-			Expect(server.ReceivedRequests()[11].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[11].RequestURI).To(ContainSubstring(Owner))
-			Expect(server.ReceivedRequests()[12].Method).To(Equal("GET"))
-			Expect(server.ReceivedRequests()[12].RequestURI).To(ContainSubstring(serviceBindingURI + "/" + fakeServiceBindings.Resources[0].GUID + "/details"))
-
+			Expect(server.ReceivedRequests()[9].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[9].RequestURI).To(ContainSubstring(Owner))
 		})
 
 	})
