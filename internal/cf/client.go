@@ -47,10 +47,11 @@ type clientIdentifier struct {
 }
 
 type clientCacheEntry struct {
-	url      string
-	username string
-	password string
-	client   cfclient.Client
+	url       string
+	username  string
+	password  string
+	client    cfclient.Client
+	expiresAt time.Time
 }
 
 var (
@@ -148,6 +149,10 @@ func NewOrganizationClient(organizationName string, url string, username string,
 			delete(clientCache, identifier)
 			isInCache = false
 		}
+		if cacheEntry.expiresAt.Before(time.Now()) {
+			delete(clientCache, identifier)
+			isInCache = false
+		}
 	}
 
 	if !isInCache {
@@ -155,7 +160,14 @@ func NewOrganizationClient(organizationName string, url string, username string,
 		client, err = newOrganizationClient(organizationName, url, username, password)
 		if err == nil {
 			// add CF client to cache
-			clientCache[identifier] = &clientCacheEntry{url: url, username: username, password: password, client: client.client}
+			clientCache[identifier] = &clientCacheEntry{
+				url:       url,
+				username:  username,
+				password:  password,
+				client:    client.client,
+				expiresAt: time.Now().Add(config.RefreshTokenAutoRenewalInterval),
+			}
+
 		}
 	}
 
@@ -187,7 +199,13 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 		client, err = newSpaceClient(spaceGuid, url, username, password)
 		if err == nil {
 			// add CF client to cache
-			clientCache[identifier] = &clientCacheEntry{url: url, username: username, password: password, client: client.client}
+			clientCache[identifier] = &clientCacheEntry{
+				url:       url,
+				username:  username,
+				password:  password,
+				client:    client.client,
+				expiresAt: time.Now().Add(config.RefreshTokenAutoRenewalInterval),
+			}
 		}
 	}
 
@@ -219,7 +237,13 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 		client, err = newSpaceClient(spaceGuid, url, username, password)
 		if err == nil {
 			// add CF client to cache
-			clientCache[identifier] = &clientCacheEntry{url: url, username: username, password: password, client: client.client}
+			clientCache[identifier] = &clientCacheEntry{
+				url:       url,
+				username:  username,
+				password:  password,
+				client:    client.client,
+				expiresAt: time.Now().Add(config.RefreshTokenAutoRenewalInterval),
+			}
 		}
 	}
 

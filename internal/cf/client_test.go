@@ -187,6 +187,38 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[3].URL.Path).To(Equal(spacesURI))
 		})
 
+		It("should re-create the refresh token after configured RefreshTokenAutoRenewalInterval", func() {
+			cfgZero := config.Config{
+				RefreshTokenAutoRenewalInterval: time.Duration(time.Second * 0),
+			}
+			orgClient, err := NewOrganizationClient(OrgName, url, Username, Password, &cfgZero)
+			Expect(err).To(BeNil())
+			orgClient.GetSpace(ctx, Owner)
+
+			orgClient, err = NewOrganizationClient(OrgName, url, Username, Password, &cfgZero)
+			Expect(err).To(BeNil())
+			orgClient.GetSpace(ctx, Owner)
+
+			Expect(server.ReceivedRequests()).To(HaveLen(6))
+
+			// Discover UAA endpoint
+			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
+			// Get new oAuth token
+			Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
+			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
+			// Get space
+			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(spacesURI))
+
+			// Get new oAuth token
+			Expect(server.ReceivedRequests()[4].Method).To(Equal("POST"))
+			Expect(server.ReceivedRequests()[4].URL.Path).To(Equal(uaaURI))
+			// Get space
+			Expect(server.ReceivedRequests()[5].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[5].URL.Path).To(Equal(spacesURI))
+		})
+
 		It("should be able to query two different orgs", func() {
 			// test org 1
 			orgClient1, err1 := NewOrganizationClient(OrgName, url, Username, Password, &cfg)
