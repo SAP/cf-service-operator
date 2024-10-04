@@ -23,10 +23,6 @@ func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facad
 	listOpts.LabelSel.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
 	spaces, err := c.client.Spaces.ListAll(ctx, listOpts)
 	if err != nil {
-		var cferr cfresource.CloudFoundryError
-		if errors.As(err, &cferr) {
-			return nil, fmt.Errorf("CF Error: %d %s %s", cferr.Code, cferr.Title, cferr.Detail)
-		}
 		return nil, err
 	}
 
