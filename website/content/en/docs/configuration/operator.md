@@ -15,6 +15,8 @@ cf-service-operator accepts the following command line flags:
 Usage of manager:
   -cluster-resource-namespace string
       The namespace for secrets in which cluster-scoped resources are found.
+  -enableWebhooks bool
+      Enable webhooks in controller. May be disabled for local development.
   -health-probe-bind-address string
       The address the probe endpoint binds to. (default ":8081")
   -kubeconfig string
@@ -24,6 +26,8 @@ Usage of manager:
       Enabling this will ensure there is only one active controller manager.
   -metrics-bind-address string
       The address the metric endpoint binds to. (default ":8080")
+  -refresh-token-auto-renewal-interval duration
+      The interval after which the CF client should automatically renew its refresh token. (default 12h)
   -sap-binding-metadata
       Enhance binding secrets by SAP binding metadata by default.
   -webhook-bind-address string

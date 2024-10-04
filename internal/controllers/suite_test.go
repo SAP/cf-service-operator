@@ -16,6 +16,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/sap/cf-service-operator/api/v1alpha1"
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/facade"
 	"github.com/sap/cf-service-operator/internal/facade/facadefakes"
 
@@ -204,10 +205,10 @@ func addControllers(k8sManager ctrl.Manager) {
 		Client:                   k8sManager.GetClient(),
 		Scheme:                   k8sManager.GetScheme(),
 		ClusterResourceNamespace: testK8sNamespace,
-		ClientBuilder: func(organizationName string, url string, username string, password string) (facade.OrganizationClient, error) {
+		ClientBuilder: func(organizationName string, url string, username string, password string, config *config.Config) (facade.OrganizationClient, error) {
 			return fakeOrgClient, nil
 		},
-		HealthCheckerBuilder: func(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
+		HealthCheckerBuilder: func(spaceGuid string, url string, username string, password string, config *config.Config) (facade.SpaceHealthChecker, error) {
 			return fakeSpaceHealthChecker, nil
 		},
 	}
@@ -218,7 +219,7 @@ func addControllers(k8sManager ctrl.Manager) {
 		Client:                   k8sManager.GetClient(),
 		Scheme:                   k8sManager.GetScheme(),
 		ClusterResourceNamespace: testK8sNamespace,
-		ClientBuilder: func(organizationName string, url string, username string, password string) (facade.SpaceClient, error) {
+		ClientBuilder: func(organizationName string, url string, username string, password string, config *config.Config) (facade.SpaceClient, error) {
 			return fakeSpaceClient, nil
 		},
 	}

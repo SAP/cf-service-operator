@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
 	cfconfig "github.com/cloudfoundry/go-cfclient/v3/config"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/facade"
 	cfmetrics "github.com/sap/cf-service-operator/pkg/metrics"
 )
@@ -128,7 +130,7 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	return &spaceClient{spaceGuid: spaceGuid, client: *c}, nil
 }
 
-func NewOrganizationClient(organizationName string, url string, username string, password string) (facade.OrganizationClient, error) {
+func NewOrganizationClient(organizationName string, url string, username string, password string, config *config.Config) (facade.OrganizationClient, error) {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -160,7 +162,7 @@ func NewOrganizationClient(organizationName string, url string, username string,
 	return client, err
 }
 
-func NewSpaceClient(spaceGuid string, url string, username string, password string) (facade.SpaceClient, error) {
+func NewSpaceClient(spaceGuid string, url string, username string, password string, config *config.Config) (facade.SpaceClient, error) {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -192,7 +194,7 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 	return client, err
 }
 
-func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
+func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string, config *config.Config) (facade.SpaceHealthChecker, error) {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
