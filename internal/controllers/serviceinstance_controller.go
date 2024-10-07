@@ -25,6 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	cfv1alpha1 "github.com/sap/cf-service-operator/api/v1alpha1"
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
@@ -54,6 +55,7 @@ type ServiceInstanceReconciler struct {
 	Scheme                   *runtime.Scheme
 	ClusterResourceNamespace string
 	ClientBuilder            facade.SpaceClientBuilder
+	Config                   *config.Config
 }
 
 // RetryError is a special error to indicate that the operation should be retried.
@@ -182,7 +184,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Build cloud foundry client
 	var client facade.SpaceClient
 	if spaceGuid != "" {
-		client, err = r.ClientBuilder(spaceGuid, string(spaceSecret.Data["url"]), string(spaceSecret.Data["username"]), string(spaceSecret.Data["password"]))
+		client, err = r.ClientBuilder(spaceGuid, string(spaceSecret.Data["url"]), string(spaceSecret.Data["username"]), string(spaceSecret.Data["password"]), r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the client from secret %s", spaceSecretName)
 		}
@@ -206,34 +208,48 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			if err != nil {
 				return ctrl.Result{}, err
 			}
+			if cfinstance != nil && cfinstance.State == facade.InstanceStateReady {
+				//Add parameters to adopt the orphaned instance
+				var parameterObjects []map[string]interface{}
+				paramMap := make(map[string]interface{})
+				paramMap["parameter-hash"] = cfinstance.ParameterHash
+				paramMap["owner"] = cfinstance.Owner
+				parameterObjects = append(parameterObjects, paramMap)
+				parameters, err := mergeObjects(parameterObjects...)
+				if err != nil {
+					return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
+				}
+				servicePlanGuid := cfinstance.ServicePlanGuid
+				if servicePlanGuid == "" {
+					log.V(1).Info("Searching service plan")
+					servicePlanGuid, err = client.FindServicePlan(ctx, spec.ServiceOfferingName, spec.ServicePlanName, spaceGuid)
+					if err != nil {
+						return ctrl.Result{}, err
+					}
+				}
+				// update the orphaned cloud foundry instance
+				log.V(1).Info("Updating instance")
+				if err := client.UpdateInstance(
+					ctx,
+					cfinstance.Guid,
+					spec.Name,
+					string(serviceInstance.UID),
+					servicePlanGuid,
+					parameters,
+					nil,
+					serviceInstance.Generation,
+				); err != nil {
+					return ctrl.Result{}, err
+				}
+				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
+				// return the reconcile function to requeue inmediatly after the update
+				serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfinstance.State), cfinstance.StateDescription)
+				return ctrl.Result{Requeue: true}, nil
+			} else if cfinstance != nil && cfinstance.State != facade.InstanceStateReady {
+				//return the reconcile function to not reconcile and error message
+				return ctrl.Result{}, fmt.Errorf("orphaned instance is not ready to be adopted")
+			}
 
-			//Add parameters to adopt the orphaned instance
-			var parameterObjects []map[string]interface{}
-			paramMap := make(map[string]interface{})
-			paramMap["parameter-hash"] = cfinstance.ParameterHash
-			paramMap["owner"] = cfinstance.Owner
-			parameterObjects = append(parameterObjects, paramMap)
-			parameters, err := mergeObjects(parameterObjects...)
-			if err != nil {
-				return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
-			}
-			// update the orphaned cloud foundry instance
-			log.V(1).Info("Updating instance")
-			if err := client.UpdateInstance(
-				ctx,
-				cfinstance.Guid,
-				spec.Name,
-				"",
-				parameters,
-				nil,
-				serviceInstance.Generation,
-			); err != nil {
-				return ctrl.Result{}, err
-			}
-			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
-			// return the reconcile function to requeue inmediatly after the update
-			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfinstance.State), cfinstance.StateDescription)
-			return ctrl.Result{Requeue: true}, nil
 		}
 	}
 
@@ -313,7 +329,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			} else if recreateOnCreationFailure && (cfinstance.State == facade.InstanceStateCreatedFailed || cfinstance.State == facade.InstanceStateDeleteFailed) {
 				// Re-create instance
 				log.V(1).Info("Deleting instance for later re-creation")
-				if err := client.DeleteInstance(ctx, cfinstance.Guid); err != nil {
+				if err := client.DeleteInstance(ctx, cfinstance.Guid, cfinstance.Owner); err != nil {
 					return ctrl.Result{}, RetryError
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
@@ -350,6 +366,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 					ctx,
 					cfinstance.Guid,
 					updateName,
+					string(serviceInstance.UID),
 					updateServicePlanGuid,
 					updateParameters,
 					updateTags,
@@ -423,7 +440,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		} else {
 			if cfinstance.State != facade.InstanceStateDeleting {
 				log.V(1).Info("Deleting instance")
-				if err := client.DeleteInstance(ctx, cfinstance.Guid); err != nil {
+				if err := client.DeleteInstance(ctx, cfinstance.Guid, cfinstance.Owner); err != nil {
 					return ctrl.Result{}, err
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]

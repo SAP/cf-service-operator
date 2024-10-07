@@ -5,7 +5,11 @@ SPDX-License-Identifier: Apache-2.0
 
 package facade
 
-import "context"
+import (
+	"context"
+
+	"github.com/sap/cf-service-operator/internal/config"
+)
 
 type Space struct {
 	Guid       string
@@ -66,28 +70,29 @@ const (
 type OrganizationClient interface {
 	GetSpace(ctx context.Context, owner string) (*Space, error)
 	CreateSpace(ctx context.Context, name string, owner string, generation int64) error
-	UpdateSpace(ctx context.Context, guid string, name string, generation int64) error
-	DeleteSpace(ctx context.Context, guid string) error
+	UpdateSpace(ctx context.Context, guid string, name string, owner string, generation int64) error
+	DeleteSpace(ctx context.Context, guid string, owner string) error
 	AddAuditor(ctx context.Context, guid string, username string) error
 	AddDeveloper(ctx context.Context, guid string, username string) error
 	AddManager(ctx context.Context, guid string, username string) error
 }
 
-type OrganizationClientBuilder func(string, string, string, string) (OrganizationClient, error)
+type OrganizationClientBuilder func(string, string, string, string, *config.Config) (OrganizationClient, error)
 
 //counterfeiter:generate . SpaceClient
 type SpaceClient interface {
 	GetInstance(ctx context.Context, instanceOpts map[string]string) (*Instance, error)
 	CreateInstance(ctx context.Context, name string, servicePlanGuid string, parameters map[string]interface{}, tags []string, owner string, generation int64) error
-	UpdateInstance(ctx context.Context, guid string, name string, servicePlanGuid string, parameters map[string]interface{}, tags []string, generation int64) error
-	DeleteInstance(ctx context.Context, guid string) error
+	UpdateInstance(ctx context.Context, guid string, name string, owner string, servicePlanGuid string, parameters map[string]interface{}, tags []string, generation int64) error
+	DeleteInstance(ctx context.Context, guid string, owner string) error
 
 	GetBinding(ctx context.Context, bindingOpts map[string]string) (*Binding, error)
 	CreateBinding(ctx context.Context, name string, serviceInstanceGuid string, parameters map[string]interface{}, owner string, generation int64) error
-	UpdateBinding(ctx context.Context, guid string, generation int64, parameters map[string]interface{}) error
-	DeleteBinding(ctx context.Context, guid string) error
+	UpdateBinding(ctx context.Context, guid string, owner string, generation int64, parameters map[string]interface{}) error
+	DeleteBinding(ctx context.Context, guid string, owner string) error
+	FillBindingDetails(ctx context.Context, binding *Binding) error
 
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
 }
 
-type SpaceClientBuilder func(string, string, string, string) (SpaceClient, error)
+type SpaceClientBuilder func(string, string, string, string, *config.Config) (SpaceClient, error)

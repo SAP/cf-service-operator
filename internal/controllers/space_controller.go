@@ -23,6 +23,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	cfv1alpha1 "github.com/sap/cf-service-operator/api/v1alpha1"
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
@@ -46,6 +47,7 @@ type SpaceReconciler struct {
 	ClusterResourceNamespace string
 	ClientBuilder            facade.OrganizationClientBuilder
 	HealthCheckerBuilder     facade.SpaceHealthCheckerBuilder
+	Config                   *config.Config
 }
 
 // +kubebuilder:rbac:groups=cf.cs.sap.com,resources=clusterspaces,verbs=get;list;watch;update
@@ -147,7 +149,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			password = string(secret.Data["password"])
 		}
 
-		client, err = r.ClientBuilder(spec.OrganizationName, url, username, password)
+		client, err = r.ClientBuilder(spec.OrganizationName, url, username, password, r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the client from secret %s", secretName)
 		}
@@ -197,6 +199,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 						ctx,
 						cfspace.Guid,
 						updateName,
+						cfspace.Owner,
 						space.GetGeneration(),
 					); err != nil {
 						return ctrl.Result{}, err
@@ -232,13 +235,13 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 		url := string(secret.Data["url"])
 		username := string(secret.Data["username"])
 		password := string(secret.Data["password"])
-		checker, err := r.HealthCheckerBuilder(status.SpaceGuid, url, username, password)
+		checker, err := r.HealthCheckerBuilder(status.SpaceGuid, url, username, password, r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the healthchecker from secret %s", secretName)
 		}
 
 		log.V(1).Info("Checking space")
-		if err := checker.Check(ctx); err != nil {
+		if err := checker.Check(ctx, cfspace.Owner); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "healthcheck failed")
 		}
 
@@ -274,7 +277,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			return ctrl.Result{}, nil
 		} else {
 			log.V(1).Info("Deleting space")
-			if err := client.DeleteSpace(ctx, cfspace.Guid); err != nil {
+			if err := client.DeleteSpace(ctx, cfspace.Guid, cfspace.Owner); err != nil {
 				return ctrl.Result{}, err
 			}
 			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]

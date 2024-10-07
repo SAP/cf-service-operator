@@ -10,6 +10,9 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}",
+            "env": {
+                "RESOURCE_CACHE_ENABLED": "true"
+            },
             "args": [
                 "--kubeconfig=${workspaceFolder}/.kubeconfig",
                 "--webhook-bind-address=:2443",
