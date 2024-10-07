@@ -6,13 +6,17 @@ SPDX-License-Identifier: Apache-2.0
 package cf
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfconfig "github.com/cloudfoundry-community/go-cfclient/v3/config"
+	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/facade"
 	cfmetrics "github.com/sap/cf-service-operator/pkg/metrics"
 )
@@ -31,11 +35,13 @@ const (
 type organizationClient struct {
 	organizationName string
 	client           cfclient.Client
+	resourceCache    *resourceCache
 }
 
 type spaceClient struct {
-	spaceGuid string
-	client    cfclient.Client
+	spaceGuid     string
+	client        cfclient.Client
+	resourceCache *resourceCache
 }
 
 type clientIdentifier struct {
@@ -51,9 +57,28 @@ type clientCacheEntry struct {
 }
 
 var (
-	cacheMutex  = &sync.Mutex{}
-	clientCache = make(map[clientIdentifier]*clientCacheEntry)
+	clientCacheMutex                         = &sync.Mutex{}
+	clientCache                              = make(map[clientIdentifier]*clientCacheEntry)
+	refreshServiceInstanceResourceCacheMutex = sync.Mutex{}
+	refreshSpaceResourceCacheMutex           = sync.Mutex{}
+	refreshServiceBindingResourceCacheMutex  = sync.Mutex{}
+	refreshSpaceUserRoleCacheMutex           = sync.Mutex{}
 )
+
+var (
+	cfResourceCache   *resourceCache
+	cacheInstanceOnce sync.Once
+)
+
+func initAndConfigureResourceCache(config *config.Config) *resourceCache {
+	cacheInstanceOnce.Do(func() {
+		// TODO: make this initialize cache for different testing purposes
+		cfResourceCache = initResourceCache()
+		cfResourceCache.setResourceCacheEnabled(config.IsResourceCacheEnabled)
+		cfResourceCache.setCacheTimeOut(config.CacheTimeOut)
+	})
+	return cfResourceCache
+}
 
 func newOrganizationClient(organizationName string, url string, username string, password string) (*organizationClient, error) {
 	if organizationName == "" {
@@ -83,6 +108,7 @@ func newOrganizationClient(organizationName string, url string, username string,
 	if err != nil {
 		return nil, err
 	}
+
 	return &organizationClient{organizationName: organizationName, client: *c}, nil
 }
 
@@ -114,12 +140,13 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	if err != nil {
 		return nil, err
 	}
+
 	return &spaceClient{spaceGuid: spaceGuid, client: *c}, nil
 }
 
-func NewOrganizationClient(organizationName string, url string, username string, password string) (facade.OrganizationClient, error) {
-	cacheMutex.Lock()
-	defer cacheMutex.Unlock()
+func NewOrganizationClient(organizationName string, url string, username string, password string, config *config.Config) (facade.OrganizationClient, error) {
+	clientCacheMutex.Lock()
+	defer clientCacheMutex.Unlock()
 
 	// look up CF client in cache
 	identifier := clientIdentifier{url: url, username: username}
@@ -129,7 +156,7 @@ func NewOrganizationClient(organizationName string, url string, username string,
 	var client *organizationClient = nil
 	if isInCache {
 		// re-use CF client and wrap it as organizationClient
-		client = &organizationClient{organizationName: organizationName, client: cacheEntry.client}
+		client = &organizationClient{organizationName: organizationName, client: cacheEntry.client, resourceCache: cfResourceCache}
 		if cacheEntry.password != password {
 			// password was rotated => delete client from cache and create a new one below
 			delete(clientCache, identifier)
@@ -146,12 +173,18 @@ func NewOrganizationClient(organizationName string, url string, username string,
 		}
 	}
 
+	if config.IsResourceCacheEnabled && client.resourceCache == nil {
+		client.resourceCache = initAndConfigureResourceCache(config)
+		populateResourceCache(client, spaceType, "")
+		populateResourceCache(client, spaceUserRoleType, username)
+	}
+
 	return client, err
 }
 
-func NewSpaceClient(spaceGuid string, url string, username string, password string) (facade.SpaceClient, error) {
-	cacheMutex.Lock()
-	defer cacheMutex.Unlock()
+func NewSpaceClient(spaceGuid string, url string, username string, password string, config *config.Config) (facade.SpaceClient, error) {
+	clientCacheMutex.Lock()
+	defer clientCacheMutex.Unlock()
 
 	// look up CF client in cache
 	identifier := clientIdentifier{url: url, username: username}
@@ -161,7 +194,7 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 	var client *spaceClient = nil
 	if isInCache {
 		// re-use CF client from cache and wrap it as spaceClient
-		client = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client}
+		client = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client, resourceCache: cfResourceCache}
 		if cacheEntry.password != password {
 			// password was rotated => delete client from cache and create a new one below
 			delete(clientCache, identifier)
@@ -178,12 +211,19 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 		}
 	}
 
+	if config.IsResourceCacheEnabled && client.resourceCache == nil {
+		client.resourceCache = initAndConfigureResourceCache(config)
+		populateResourceCache(client, instanceType, "")
+		populateResourceCache(client, bindingType, "")
+	}
+
 	return client, err
+
 }
 
-func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
-	cacheMutex.Lock()
-	defer cacheMutex.Unlock()
+func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string, config *config.Config) (facade.SpaceHealthChecker, error) {
+	clientCacheMutex.Lock()
+	defer clientCacheMutex.Unlock()
 
 	// look up CF client in cache
 	identifier := clientIdentifier{url: url, username: username}
@@ -193,7 +233,7 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 	var client *spaceClient = nil
 	if isInCache {
 		// re-use CF client from cache and wrap it as spaceClient
-		client = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client}
+		client = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client, resourceCache: cfResourceCache}
 		if cacheEntry.password != password {
 			// password was rotated => delete client from cache and create a new one below
 			delete(clientCache, identifier)
@@ -210,5 +250,292 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 		}
 	}
 
+	if config.IsResourceCacheEnabled && client.resourceCache == nil {
+		if cfResourceCache != nil {
+			// It is expected cfResourceCache be already populated
+			client.resourceCache = cfResourceCache
+		}
+	}
+
 	return client, err
+}
+
+type ResourceServicesClient[T any] interface {
+	populateServiceInstances(ctx context.Context) error
+	populateServiceBindings(ctx context.Context) error
+	manageResourceCache
+}
+
+type ResourceSpaceClient[T any] interface {
+	populateSpaces(ctx context.Context) error
+	populateSpaceUserRoleCache(ctx context.Context, username string) error
+	manageResourceCache
+}
+
+type manageResourceCache interface {
+	resetCache(resourceType cacheResourceType)
+}
+
+func populateResourceCache[T manageResourceCache](c T, resourceType cacheResourceType, username string) {
+	ctx := context.Background()
+
+	var err error
+
+	switch resourceType {
+	case bindingType:
+		if client, ok := any(c).(ResourceServicesClient[T]); ok {
+			err = client.populateServiceBindings(ctx)
+		}
+	case instanceType:
+		if client, ok := any(c).(ResourceServicesClient[T]); ok {
+			err = client.populateServiceInstances(ctx)
+		}
+	case spaceType:
+		if client, ok := any(c).(ResourceSpaceClient[T]); ok {
+			err = client.populateSpaces(ctx)
+		}
+	case spaceUserRoleType:
+		if client, ok := any(c).(ResourceSpaceClient[T]); ok {
+			err = client.populateSpaceUserRoleCache(ctx, username)
+		}
+	}
+
+	if err != nil {
+		// reset the cache to nil in case of error
+		logger := ctrl.LoggerFrom(ctx)
+		logger.Error(err, "Failed to populate cache", "type", resourceType)
+		c.resetCache(resourceType)
+		return
+	}
+}
+
+func (c *spaceClient) populateServiceBindings(ctx context.Context) error {
+	refreshServiceBindingResourceCacheMutex.Lock()
+	defer refreshServiceBindingResourceCacheMutex.Unlock()
+
+	if !c.resourceCache.isCacheExpired(bindingType) {
+		return nil
+	}
+
+	logger := ctrl.LoggerFrom(ctx)
+	logger.V(1).Info("Populating cache for service bindings")
+
+	// retrieve all service bindings with the specified owner
+	bindingOptions := cfclient.NewServiceCredentialBindingListOptions()
+	bindingOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+	bindingOptions.Page = 1
+	bindingOptions.PerPage = 5000
+	cfBindings, err := c.client.ServiceCredentialBindings.ListAll(ctx, bindingOptions)
+	if err != nil {
+		return err
+	}
+
+	// wrap each service binding as a facade.Binding and add it to the cache (in parallel)
+	var waitGroup sync.WaitGroup
+	for _, cfBinding := range cfBindings {
+		waitGroup.Add(1)
+		go func(cfBinding *cfresource.ServiceCredentialBinding) {
+			defer waitGroup.Done()
+			if binding, err := c.InitBinding(ctx, cfBinding, nil); err == nil {
+				c.resourceCache.addBindingInCache(*cfBinding.Metadata.Labels[labelOwner], binding)
+			} else {
+				logger.Error(err, "Failed to wrap binding", "binding", cfBinding.GUID)
+			}
+		}(cfBinding)
+	}
+	waitGroup.Wait()
+	c.resourceCache.setLastCacheTime(bindingType)
+
+	return nil
+}
+
+func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
+	refreshServiceInstanceResourceCacheMutex.Lock()
+	defer refreshServiceInstanceResourceCacheMutex.Unlock()
+
+	if !c.resourceCache.isCacheExpired(instanceType) {
+		return nil
+	}
+
+	logger := ctrl.LoggerFrom(ctx)
+	logger.V(1).Info("Populating cache for service instances")
+
+	// retrieve all service instances with the specified owner
+	instanceOptions := cfclient.NewServiceInstanceListOptions()
+	instanceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+	instanceOptions.Page = 1
+	instanceOptions.PerPage = 5000
+	cfInstances, err := c.client.ServiceInstances.ListAll(ctx, instanceOptions)
+	if err != nil {
+		return err
+	}
+
+	// wrap each service instance as a facade.Instance and add it to the cache (in parallel)
+	var waitGroup sync.WaitGroup
+	for _, cfInstance := range cfInstances {
+		waitGroup.Add(1)
+		go func(cfInstance *cfresource.ServiceInstance) {
+			defer waitGroup.Done()
+			if instance, err := c.InitInstance(cfInstance, nil); err == nil {
+				c.resourceCache.addInstanceInCache(*cfInstance.Metadata.Labels[labelOwner], instance)
+			} else {
+				logger.Error(err, "Failed to wrap instance", "instance", cfInstance.GUID)
+			}
+		}(cfInstance)
+	}
+	waitGroup.Wait()
+	c.resourceCache.setLastCacheTime(instanceType)
+
+	return nil
+}
+
+func (c *organizationClient) populateSpaces(ctx context.Context) error {
+	refreshSpaceResourceCacheMutex.Lock()
+	defer refreshSpaceResourceCacheMutex.Unlock()
+
+	if !c.resourceCache.isCacheExpired(spaceType) {
+		return nil
+	}
+
+	logger := ctrl.LoggerFrom(ctx)
+	logger.V(1).Info("Populating cache for spaces")
+
+	// retrieve all spaces with the specified owner
+	// TODO: check for existing spaces as label owner annotation wont be present
+	spaceOptions := cfclient.NewSpaceListOptions()
+	spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+	spaceOptions.Page = 1
+	spaceOptions.PerPage = 5000
+	cfSpaces, err := c.client.Spaces.ListAll(ctx, spaceOptions)
+	if err != nil {
+		return err
+	}
+
+	// wrap each space as a facade.Space and add it to the cache (in parallel)
+	var waitGroup sync.WaitGroup
+	for _, cfSpace := range cfSpaces {
+		waitGroup.Add(1)
+		go func(cfSpace *cfresource.Space) {
+			defer waitGroup.Done()
+			if space, err := c.InitSpace(cfSpace, ""); err == nil {
+				c.resourceCache.addSpaceInCache(*cfSpace.Metadata.Labels[labelOwner], space)
+			} else {
+				logger.Error(err, "Failed to wrap space", "space", cfSpace.GUID)
+			}
+		}(cfSpace)
+	}
+	waitGroup.Wait()
+	c.resourceCache.setLastCacheTime(spaceType)
+
+	return nil
+}
+
+func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, username string) error {
+	refreshSpaceUserRoleCacheMutex.Lock()
+	defer refreshSpaceUserRoleCacheMutex.Unlock()
+
+	if !c.resourceCache.isCacheExpired(spaceUserRoleType) {
+		return nil
+	}
+
+	logger := ctrl.LoggerFrom(ctx)
+	logger.V(1).Info("Populating cache for roles")
+
+	// retrieve all spaces with specified label 'owner'
+	spaceOptions := cfclient.NewSpaceListOptions()
+	spaceOptions.ListOptions.LabelSelector.EqualTo(labelOwner)
+	spaceOptions.Page = 1
+	spaceOptions.PerPage = 5000
+	cfSpaces, err := c.client.Spaces.ListAll(ctx, spaceOptions)
+	if err != nil {
+		return err
+	}
+	if len(cfSpaces) == 0 {
+		return fmt.Errorf("no spaces found")
+	}
+
+	// collect GUIDs of spaces
+	var spaceGUIDs []string
+	for _, cfSpace := range cfSpaces {
+		spaceGUIDs = append(spaceGUIDs, cfSpace.GUID)
+	}
+
+	// retrieve user with specified name (to get user GUID)
+	userOptions := cfclient.NewUserListOptions()
+	userOptions.UserNames.EqualTo(username)
+	userOptions.Page = 1
+	userOptions.PerPage = 5000
+	users, err := c.client.Users.ListAll(ctx, userOptions)
+	if err != nil {
+		return err
+	}
+	if len(users) == 0 {
+		return fmt.Errorf("no user found with name '%s'", username)
+	} else if len(users) > 1 {
+		return fmt.Errorf("multiple users found with name '%s'", username)
+	}
+	user := users[0]
+
+	// prepare common filter options for retrieving SpaceDeveloper role for above user
+	roleListOpts := cfclient.NewRoleListOptions()
+	roleListOpts.Types.EqualTo(cfresource.SpaceRoleDeveloper.String())
+	roleListOpts.UserGUIDs.EqualTo(user.GUID)
+	roleListOpts.Page = 1
+	roleListOpts.PerPage = 5000
+
+	// collect SpaceDeveloper role for above user in chunks (each N spaces)
+	// otherwise, the request will fail with 414 Request-URI Too Long
+	const chunkSize = 30 // 30 space GUIDs each 36 characters plus one comma each => 1110 characters
+
+	var spaceGUID string
+	var collectedCfRoles []*cfresource.Role
+	for len(spaceGUIDs) > 0 {
+		var spaceFilter = ""
+		for i := 0; i < chunkSize && len(spaceGUIDs) > 0; i++ {
+			if i > 0 {
+				spaceFilter += ","
+			}
+			// pop first item from list
+			spaceGUID, spaceGUIDs = spaceGUIDs[0], spaceGUIDs[1:]
+			spaceFilter += spaceGUID
+		}
+		roleListOpts.SpaceGUIDs.EqualTo(spaceFilter)
+		roles, err := c.client.Roles.ListAll(ctx, roleListOpts)
+		if err != nil {
+			return err
+		}
+		collectedCfRoles = append(collectedCfRoles, roles...)
+	}
+
+	if len(collectedCfRoles) == 0 {
+		return fmt.Errorf("no SpaceDeveloper role found for user '%s'", username)
+	}
+
+	// add each role to the cache (in parallel)
+	var waitGroup sync.WaitGroup
+	for _, cfRole := range collectedCfRoles {
+		waitGroup.Add(1)
+		go func(cfrole *cfresource.Role) {
+			defer waitGroup.Done()
+			c.resourceCache.addSpaceUserRoleInCache(
+				cfrole.Relationships.Space.Data.GUID,
+				cfrole.Relationships.User.Data.GUID,
+				username,
+				cfrole.Type)
+		}(cfRole)
+	}
+	waitGroup.Wait()
+	c.resourceCache.setLastCacheTime(spaceUserRoleType)
+
+	return nil
+}
+
+// Implementation for resetting the cache
+func (c *spaceClient) resetCache(resourceType cacheResourceType) {
+	c.resourceCache.resetCache(resourceType)
+}
+
+// Implementation for resetting the cache
+func (c *organizationClient) resetCache(resourceType cacheResourceType) {
+	c.resourceCache.resetCache(resourceType)
 }

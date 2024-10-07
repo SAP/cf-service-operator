@@ -7,7 +7,14 @@ package cf
 
 import "context"
 
-func (c *spaceClient) Check(ctx context.Context) error {
+// TODO: Ask why do we have the health check with a different client than the origanization unit?
+func (c *spaceClient) Check(ctx context.Context, owner string) error {
+	if c.resourceCache.checkResourceCacheEnabled() {
+		_, inCache := c.resourceCache.getSpaceFromCache(owner)
+		if inCache {
+			return nil
+		}
+	}
 	_, err := c.client.Spaces.Get(ctx, c.spaceGuid)
 	if err != nil {
 		return err

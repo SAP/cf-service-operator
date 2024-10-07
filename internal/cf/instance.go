@@ -44,82 +44,47 @@ func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOpt
 // GetInstance returns the instance with the given instanceOpts["owner"] or instanceOpts["name"].
 // If instanceOpts["name"] is empty, the instance with the given instanceOpts["owner"] is returned.
 // If instanceOpts["name"] is not empty, the instance with the given Name is returned for orphan instances.
-// If no instance is found, nil is returned.
-// If multiple instances are found, an error is returned.
-// The function add the parameter values to the orphan cf instance, so that can be adopted.
+// If resource cache is enabled, the instance is first searched in the cache.
+// If the instance is not found in the cache, it is searched in Cloud Foundry.
 func (c *spaceClient) GetInstance(ctx context.Context, instanceOpts map[string]string) (*facade.Instance, error) {
+	if c.resourceCache.checkResourceCacheEnabled() {
+		// attempt to retrieve instance from cache
+		if c.resourceCache.isCacheExpired(instanceType) {
+			populateResourceCache(c, instanceType, "")
+		}
+		instance, inCache := c.resourceCache.getInstanceFromCache(instanceOpts["owner"])
+		if inCache {
+			return instance, nil
+		}
+	}
 
+	// attempt to retrieve instance from Cloud Foundry
 	var filterOpts instanceFilter
 	if instanceOpts["name"] != "" {
 		filterOpts = &instanceFilterName{name: instanceOpts["name"]}
 	} else {
 		filterOpts = &instanceFilterOwner{owner: instanceOpts["owner"]}
 	}
-	listOpts := filterOpts.getListOptions()
-	serviceInstances, err := c.client.ServiceInstances.ListAll(ctx, listOpts)
+	serviceInstances, err := c.client.ServiceInstances.ListAll(ctx, filterOpts.getListOptions())
 	if err != nil {
 		return nil, fmt.Errorf("failed to list service instances: %w", err)
 	}
-
 	if len(serviceInstances) == 0 {
-		return nil, nil
+		return nil, nil // instance not found
 	} else if len(serviceInstances) > 1 {
 		return nil, errors.New(fmt.Sprintf("found multiple service instances with owner: %s", instanceOpts["owner"]))
 	}
-
 	serviceInstance := serviceInstances[0]
 
-	// add parameter values to the orphan cf instance
+	// add parameter values to the orphaned instance in Cloud Foundry
 	if instanceOpts["name"] != "" {
 		generationvalue := "0"
-		serviceInstance.Metadata.Annotations[annotationGeneration] = &generationvalue
 		parameterHashValue := "0"
+		serviceInstance.Metadata.Annotations[annotationGeneration] = &generationvalue
 		serviceInstance.Metadata.Annotations[annotationParameterHash] = &parameterHashValue
 	}
 
-	guid := serviceInstance.GUID
-	name := serviceInstance.Name
-	servicePlanGuid := serviceInstance.Relationships.ServicePlan.Data.GUID
-	generation, err := strconv.ParseInt(*serviceInstance.Metadata.Annotations[annotationGeneration], 10, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "error parsing service instance generation")
-	}
-	parameterHash := *serviceInstance.Metadata.Annotations[annotationParameterHash]
-	var state facade.InstanceState
-	switch serviceInstance.LastOperation.Type + ":" + serviceInstance.LastOperation.State {
-	case "create:in progress":
-		state = facade.InstanceStateCreating
-	case "create:succeeded":
-		state = facade.InstanceStateReady
-	case "create:failed":
-		state = facade.InstanceStateCreatedFailed
-	case "update:in progress":
-		state = facade.InstanceStateUpdating
-	case "update:succeeded":
-		state = facade.InstanceStateReady
-	case "update:failed":
-		state = facade.InstanceStateUpdateFailed
-	case "delete:in progress":
-		state = facade.InstanceStateDeleting
-	case "delete:succeeded":
-		state = facade.InstanceStateDeleted
-	case "delete:failed":
-		state = facade.InstanceStateDeleteFailed
-	default:
-		state = facade.InstanceStateUnknown
-	}
-	stateDescription := serviceInstance.LastOperation.Description
-
-	return &facade.Instance{
-		Guid:             guid,
-		Name:             name,
-		ServicePlanGuid:  servicePlanGuid,
-		Owner:            instanceOpts["owner"],
-		Generation:       generation,
-		ParameterHash:    parameterHash,
-		State:            state,
-		StateDescription: stateDescription,
-	}, nil
+	return c.InitInstance(serviceInstance, instanceOpts)
 }
 
 // Required parameters (may not be initial): name, servicePlanGuid, owner, generation
@@ -149,7 +114,7 @@ func (c *spaceClient) CreateInstance(ctx context.Context, name string, servicePl
 
 // Required parameters (may not be initial): guid, generation
 // Optional parameters (may be initial): name, servicePlanGuid, parameters, tags
-func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name string, servicePlanGuid string, parameters map[string]interface{}, tags []string, generation int64) error {
+func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name string, owner string, servicePlanGuid string, parameters map[string]interface{}, tags []string, generation int64) error {
 	req := cfresource.NewServiceInstanceManagedUpdate()
 	if name != "" {
 		req.WithName(name)
@@ -178,11 +143,85 @@ func (c *spaceClient) UpdateInstance(ctx context.Context, guid string, name stri
 	}
 
 	_, _, err := c.client.ServiceInstances.UpdateManaged(ctx, guid, req)
+
+	// update instance in cache
+	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
+		isUpdated := c.resourceCache.updateInstanceInCache(name, owner, servicePlanGuid, parameters, generation)
+		if !isUpdated {
+			// add instance to cache in case of orphan instance
+			instance := &facade.Instance{
+				Guid:             guid,
+				Name:             name,
+				ServicePlanGuid:  servicePlanGuid,
+				Owner:            owner,
+				Generation:       generation,
+				ParameterHash:    facade.ObjectHash(parameters),
+				State:            facade.InstanceStateReady,
+				StateDescription: "",
+			}
+			c.resourceCache.addInstanceInCache(owner, instance)
+		}
+	}
+
 	return err
 }
 
-func (c *spaceClient) DeleteInstance(ctx context.Context, guid string) error {
+func (c *spaceClient) DeleteInstance(ctx context.Context, guid string, owner string) error {
 	// TODO: return jobGUID to enable querying the job deletion status
 	_, err := c.client.ServiceInstances.Delete(ctx, guid)
+
+	// delete instance from cache
+	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
+		c.resourceCache.deleteInstanceFromCache(owner)
+	}
+
 	return err
+}
+
+// InitInstance wraps cfclient.ServiceInstance as a facade.Instance.
+func (c *spaceClient) InitInstance(serviceInstance *cfresource.ServiceInstance, instanceOpts map[string]string) (*facade.Instance, error) {
+	generation, err := strconv.ParseInt(*serviceInstance.Metadata.Annotations[annotationGeneration], 10, 64)
+	if err != nil {
+		return nil, errors.Wrap(err, "error parsing service instance generation")
+	}
+
+	owner := instanceOpts["owner"]
+	if owner == "" {
+		owner = *serviceInstance.Metadata.Labels[labelOwner]
+	}
+
+	var state facade.InstanceState
+	switch serviceInstance.LastOperation.Type + ":" + serviceInstance.LastOperation.State {
+	case "create:in progress":
+		state = facade.InstanceStateCreating
+	case "create:succeeded":
+		state = facade.InstanceStateReady
+	case "create:failed":
+		state = facade.InstanceStateCreatedFailed
+	case "update:in progress":
+		state = facade.InstanceStateUpdating
+	case "update:succeeded":
+		state = facade.InstanceStateReady
+	case "update:failed":
+		state = facade.InstanceStateUpdateFailed
+	case "delete:in progress":
+		state = facade.InstanceStateDeleting
+	case "delete:succeeded":
+		state = facade.InstanceStateDeleted
+	case "delete:failed":
+		state = facade.InstanceStateDeleteFailed
+	default:
+		state = facade.InstanceStateUnknown
+	}
+
+	return &facade.Instance{
+		Guid:             serviceInstance.GUID,
+		Name:             serviceInstance.Name,
+		ServicePlanGuid:  serviceInstance.Relationships.ServicePlan.Data.GUID,
+		Owner:            owner,
+		Generation:       generation,
+		ParameterHash:    *serviceInstance.Metadata.Annotations[annotationParameterHash],
+		State:            state,
+		StateDescription: serviceInstance.LastOperation.Description,
+	}, nil
 }
