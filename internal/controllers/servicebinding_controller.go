@@ -222,9 +222,8 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				serviceBinding.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfbinding.State), cfbinding.StateDescription)
 				return ctrl.Result{Requeue: true}, nil
 			} else if cfbinding != nil && cfbinding.State != facade.BindingStateReady {
-
-				//return the reconcile function to not reconcile and error message
-				return ctrl.Result{}, fmt.Errorf("orphaned instance is not ready to be adopted")
+				// return the reconcile function to not reconcile and error message
+				return ctrl.Result{}, fmt.Errorf("orphaned binding is not ready to be adopted")
 			}
 		}
 	}
