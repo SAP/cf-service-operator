@@ -1,6 +1,6 @@
 module github.com/sap/cf-service-operator
 
-go 1.22.5
+go 1.23.1
 
 require (
 	github.com/cloudfoundry-community/go-cfclient/v3 v3.0.0-alpha.5
