@@ -169,11 +169,6 @@ func (c *resourceCache) deleteBindingFromCache(key string) {
 	delete(c.bindings, key)
 }
 
-// getCachedBindings retrieves all bindings from the cache
-func (c *resourceCache) getCachedBindings() map[string]*facade.Binding {
-	return c.bindings
-}
-
 // getBindingFromCache retrieves a specific binding from the cache
 func (c *resourceCache) getBindingFromCache(key string) (*facade.Binding, bool) {
 	c.bindingMutex.RLock()
@@ -219,11 +214,6 @@ func (c *resourceCache) deleteInstanceFromCache(key string) {
 	c.instanceMutex.Lock()
 	defer c.instanceMutex.Unlock()
 	delete(c.instances, key)
-}
-
-// getCachedInstances retrieves all instances from the cache
-func (c *resourceCache) getCachedInstances() map[string]*facade.Instance {
-	return c.instances
 }
 
 // getInstanceFromCache retrieves a specific instance from the cache
@@ -277,11 +267,6 @@ func (c *resourceCache) deleteSpaceFromCache(key string) {
 	c.spaceMutex.Lock()
 	defer c.spaceMutex.Unlock()
 	delete(c.spaces, key)
-}
-
-// getCachedSpaces retrieves all spaces from the cache
-func (c *resourceCache) getCachedSpaces() map[string]*facade.Space {
-	return c.spaces
 }
 
 // getSpaceFromCache retrieves a specific space from the cache
