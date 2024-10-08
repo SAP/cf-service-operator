@@ -9,7 +9,7 @@ import (
 	"context"
 	"fmt"
 
-	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
+	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
 )
 
 func (c *spaceClient) FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error) {
