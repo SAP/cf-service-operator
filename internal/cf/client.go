@@ -192,6 +192,10 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 			delete(clientCache, identifier)
 			isInCache = false
 		}
+		if cacheEntry.expiresAt.Before(time.Now()) {
+			delete(clientCache, identifier)
+			isInCache = false
+		}
 	}
 
 	if !isInCache {
@@ -227,6 +231,10 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 		client = &spaceClient{spaceGuid: spaceGuid, client: cacheEntry.client}
 		if cacheEntry.password != password {
 			// password was rotated => delete client from cache and create a new one below
+			delete(clientCache, identifier)
+			isInCache = false
+		}
+		if cacheEntry.expiresAt.Before(time.Now()) {
 			delete(clientCache, identifier)
 			isInCache = false
 		}

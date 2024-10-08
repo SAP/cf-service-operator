@@ -337,6 +337,38 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[3].URL.Path).To(Equal(instancesURI))
 		})
 
+		It("should re-create the refresh token after configured RefreshTokenAutoRenewalInterval", func() {
+			cfgZero := config.Config{
+				RefreshTokenAutoRenewalInterval: time.Duration(time.Second * 0),
+			}
+			spaceClient, err := NewSpaceClient(OrgName, url, Username, Password, &cfgZero)
+			Expect(err).To(BeNil())
+
+			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
+			spaceClient, err = NewSpaceClient(OrgName, url, Username, Password, &cfgZero)
+			Expect(err).To(BeNil())
+			spaceClient.GetInstance(ctx, map[string]string{"owner": Owner})
+
+			Expect(server.ReceivedRequests()).To(HaveLen(6))
+
+			// Discover UAA endpoint
+			Expect(server.ReceivedRequests()[0].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[0].URL.Path).To(Equal("/"))
+			// Get new oAuth token
+			Expect(server.ReceivedRequests()[1].Method).To(Equal("POST"))
+			Expect(server.ReceivedRequests()[1].URL.Path).To(Equal(uaaURI))
+			// Get instance
+			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(instancesURI))
+
+			// Get new oAuth token
+			Expect(server.ReceivedRequests()[4].Method).To(Equal("POST"))
+			Expect(server.ReceivedRequests()[4].URL.Path).To(Equal(uaaURI))
+			// Get instance
+			Expect(server.ReceivedRequests()[5].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[5].URL.Path).To(Equal(instancesURI))
+		})
+
 		It("should be able to query two different spaces", func() {
 			// test space 1
 			spaceClient1, err1 := NewSpaceClient(SpaceName, url, Username, Password, &cfg)
