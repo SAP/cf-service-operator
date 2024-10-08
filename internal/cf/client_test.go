@@ -211,6 +211,9 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(spacesURI))
 
+			// Discover UAA endpoint
+			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[3].URL.Path).To(Equal("/"))
 			// Get new oAuth token
 			Expect(server.ReceivedRequests()[4].Method).To(Equal("POST"))
 			Expect(server.ReceivedRequests()[4].URL.Path).To(Equal(uaaURI))
@@ -361,6 +364,9 @@ var _ = Describe("CF Client tests", Ordered, func() {
 			Expect(server.ReceivedRequests()[2].Method).To(Equal("GET"))
 			Expect(server.ReceivedRequests()[2].URL.Path).To(Equal(instancesURI))
 
+			// Discover UAA endpoint
+			Expect(server.ReceivedRequests()[3].Method).To(Equal("GET"))
+			Expect(server.ReceivedRequests()[3].URL.Path).To(Equal("/"))
 			// Get new oAuth token
 			Expect(server.ReceivedRequests()[4].Method).To(Equal("POST"))
 			Expect(server.ReceivedRequests()[4].URL.Path).To(Equal(uaaURI))
