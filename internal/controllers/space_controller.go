@@ -117,27 +117,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 		return ctrl.Result{}, errors.Wrapf(err, "failed to get Secret containing space credentials, secret name: %s", secretName)
 	}
 
-	// Find depending service instances
-	serviceInstanceList := &cfv1alpha1.ServiceInstanceList{}
-	if space.IsNamespaced() {
-		if err := client.NewNamespacedClient(r.Client, space.GetNamespace()).List(
-			ctx,
-			serviceInstanceList,
-			client.MatchingLabels{cfv1alpha1.LabelKeySpace: space.GetName()},
-		); err != nil {
-			return ctrl.Result{}, errors.Wrap(err, "failed to list depending service instances")
-		}
-	} else {
-		if err := r.Client.List(
-			ctx,
-			serviceInstanceList,
-			client.MatchingLabels{cfv1alpha1.LabelKeyClusterSpace: space.GetName()},
-		); err != nil {
-			return ctrl.Result{}, errors.Wrap(err, "failed to list depending service instances")
-		}
-	}
-
-	var client facade.OrganizationClient
+	var orgClient facade.OrganizationClient
 	var cfspace *facade.Space
 	if spec.Guid == "" {
 		// Build cloud foundry client
@@ -149,20 +129,22 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			password = string(secret.Data["password"])
 		}
 
-		client, err = r.ClientBuilder(spec.OrganizationName, url, username, password, r.Config)
+		orgClient, err = r.ClientBuilder(spec.OrganizationName, url, username, password, r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the client from secret %s", secretName)
 		}
 
 		// Retrieve cloud foundry space
 		log.V(1).Info("Retrieving space")
-		cfspace, err = client.GetSpace(ctx, string(space.GetUID()))
+		cfspace, err = orgClient.GetSpace(ctx, string(space.GetUID()))
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 	}
 
 	if space.GetDeletionTimestamp().IsZero() {
+		// Creation/Update case
+
 		if !containsString(space.GetFinalizers(), spaceFinalizer) {
 			controllerutil.AddFinalizer(space, spaceFinalizer)
 			if err := r.Update(ctx, space); err != nil {
@@ -179,7 +161,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 		if spec.Guid == "" {
 			if cfspace == nil {
 				log.V(1).Info("Creating space")
-				if err := client.CreateSpace(
+				if err := orgClient.CreateSpace(
 					ctx,
 					spec.Name,
 					string(space.GetUID()),
@@ -195,7 +177,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 					if updateName == cfspace.Name {
 						updateName = ""
 					}
-					if err := client.UpdateSpace(
+					if err := orgClient.UpdateSpace(
 						ctx,
 						cfspace.Guid,
 						updateName,
@@ -212,7 +194,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			if cfspace == nil {
 				// Re-retrieve cloud foundry space; this happens exactly if the space was created or updated above
 				log.V(1).Info("Retrieving space")
-				cfspace, err = client.GetSpace(ctx, string(space.GetUID()))
+				cfspace, err = orgClient.GetSpace(ctx, string(space.GetUID()))
 				if err != nil {
 					return ctrl.Result{}, err
 				}
@@ -223,7 +205,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			// TODO: the following is not very clean; if the user referenced by the secret changes, we leave the previous one orphaned;
 			// maybe we should clean it up somehow (but how ... what if that previous user has already been taken over by another manager, such as CAM?)
 			log.V(1).Info("Adding developer")
-			if err := client.AddDeveloper(ctx, cfspace.Guid, string(secret.Data["username"])); err != nil {
+			if err := orgClient.AddDeveloper(ctx, cfspace.Guid, string(secret.Data["username"])); err != nil {
 				return ctrl.Result{}, err
 			}
 			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
@@ -248,16 +230,39 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 		log.V(1).Info("Healthcheck successful")
 		space.SetReadyCondition(cfv1alpha1.ConditionTrue, spaceReadyConditionReasonSuccess, "Success")
 		return getPollingInterval(space.GetAnnotations(), "60s", cfv1alpha1.AnnotationPollingIntervalReady), nil
-	} else if len(serviceInstanceList.Items) > 0 {
-		space.SetReadyCondition(cfv1alpha1.ConditionUnknown, spaceReadyConditionReasonDeletionBlocked, "Waiting for deletion of depending service instances")
-		// TODO: apply some increasing period, depending on the age of the last update
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-	} else if len(removeString(space.GetFinalizers(), spaceFinalizer)) > 0 {
-		space.SetReadyCondition(cfv1alpha1.ConditionUnknown, spaceReadyConditionReasonDeletionBlocked, "Deletion blocked due to foreign finalizers")
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-		// TODO: apply some increasing period, depending on the age of the last update
 	} else {
-		if cfspace == nil {
+		// Deletion case
+
+		// Find depending service instances
+		// Hint: This call is expensive and is performed only in deletion case
+		serviceInstanceList := &cfv1alpha1.ServiceInstanceList{}
+		if space.IsNamespaced() {
+			if err := client.NewNamespacedClient(r.Client, space.GetNamespace()).List(
+				ctx,
+				serviceInstanceList,
+				client.MatchingLabels{cfv1alpha1.LabelKeySpace: space.GetName()},
+			); err != nil {
+				return ctrl.Result{}, errors.Wrap(err, "failed to list depending service instances")
+			}
+		} else {
+			if err := r.Client.List(
+				ctx,
+				serviceInstanceList,
+				client.MatchingLabels{cfv1alpha1.LabelKeyClusterSpace: space.GetName()},
+			); err != nil {
+				return ctrl.Result{}, errors.Wrap(err, "failed to list depending service instances")
+			}
+		}
+
+		if len(serviceInstanceList.Items) > 0 {
+			space.SetReadyCondition(cfv1alpha1.ConditionUnknown, spaceReadyConditionReasonDeletionBlocked, "Waiting for deletion of depending service instances")
+			// TODO: apply some increasing period, depending on the age of the last update
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		} else if len(removeString(space.GetFinalizers(), spaceFinalizer)) > 0 {
+			space.SetReadyCondition(cfv1alpha1.ConditionUnknown, spaceReadyConditionReasonDeletionBlocked, "Deletion blocked due to foreign finalizers")
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			// TODO: apply some increasing period, depending on the age of the last update
+		} else if cfspace == nil {
 			if containsString(secret.GetFinalizers(), spaceFinalizer) {
 				controllerutil.RemoveFinalizer(secret, spaceFinalizer)
 				if err := r.Update(ctx, secret); err != nil {
@@ -277,7 +282,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			return ctrl.Result{}, nil
 		} else {
 			log.V(1).Info("Deleting space")
-			if err := client.DeleteSpace(ctx, cfspace.Guid, cfspace.Owner); err != nil {
+			if err := orgClient.DeleteSpace(ctx, cfspace.Guid, cfspace.Owner); err != nil {
 				return ctrl.Result{}, err
 			}
 			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]

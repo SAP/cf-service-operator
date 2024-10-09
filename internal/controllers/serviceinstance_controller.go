@@ -156,15 +156,6 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, errors.Wrapf(err, "failed to get Secret containing space credentials, secret name: %s", spaceSecretName)
 	}
 
-	// Find depending service bindings
-	serviceBindingList := &cfv1alpha1.ServiceBindingList{}
-	if err := client.NewNamespacedClient(r.Client, serviceInstance.Namespace).List(
-		ctx,
-		serviceBindingList,
-		client.MatchingLabels{cfv1alpha1.LabelKeyServiceInstance: serviceInstance.Name},
-	); err != nil {
-		return ctrl.Result{}, errors.Wrap(err, "failed to list depending service bindings")
-	}
 	// Retrieve reconcileTimeout
 	reconcileTimeout := getReconcileTimeout(serviceInstance)
 
@@ -182,9 +173,9 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Build cloud foundry client
-	var client facade.SpaceClient
+	var spaceClient facade.SpaceClient
 	if spaceGuid != "" {
-		client, err = r.ClientBuilder(spaceGuid, string(spaceSecret.Data["url"]), string(spaceSecret.Data["username"]), string(spaceSecret.Data["password"]), r.Config)
+		spaceClient, err = r.ClientBuilder(spaceGuid, string(spaceSecret.Data["url"]), string(spaceSecret.Data["username"]), string(spaceSecret.Data["password"]), r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the client from secret %s", spaceSecretName)
 		}
@@ -193,9 +184,9 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Retrieve cloud foundry instance
 	var cfinstance *facade.Instance
 	instanceOpts := map[string]string{"name": "", "owner": string(serviceInstance.UID)}
-	if client != nil {
+	if spaceClient != nil {
 		log.V(1).Info("Retrieving instance by owner")
-		cfinstance, err = client.GetInstance(ctx, instanceOpts)
+		cfinstance, err = spaceClient.GetInstance(ctx, instanceOpts)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
@@ -204,7 +195,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			// find orphaned instance by name
 			instanceOpts["name"] = serviceInstance.Name
 			log.V(1).Info("Retrieving instance by name")
-			cfinstance, err = client.GetInstance(ctx, instanceOpts)
+			cfinstance, err = spaceClient.GetInstance(ctx, instanceOpts)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -222,14 +213,14 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				servicePlanGuid := cfinstance.ServicePlanGuid
 				if servicePlanGuid == "" {
 					log.V(1).Info("Searching service plan")
-					servicePlanGuid, err = client.FindServicePlan(ctx, spec.ServiceOfferingName, spec.ServicePlanName, spaceGuid)
+					servicePlanGuid, err = spaceClient.FindServicePlan(ctx, spec.ServiceOfferingName, spec.ServicePlanName, spaceGuid)
 					if err != nil {
 						return ctrl.Result{}, err
 					}
 				}
 				// update the orphaned cloud foundry instance
 				log.V(1).Info("Updating instance")
-				if err := client.UpdateInstance(
+				if err := spaceClient.UpdateInstance(
 					ctx,
 					cfinstance.Guid,
 					spec.Name,
@@ -249,12 +240,12 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				//return the reconcile function to not reconcile and error message
 				return ctrl.Result{}, fmt.Errorf("orphaned instance is not ready to be adopted")
 			}
-
 		}
 	}
 
 	if serviceInstance.DeletionTimestamp.IsZero() {
 		// Create/update case
+
 		if !containsString(serviceInstance.Finalizers, serviceInstanceFinalizer) {
 			controllerutil.AddFinalizer(serviceInstance, serviceInstanceFinalizer)
 			if err := r.Update(ctx, serviceInstance); err != nil {
@@ -265,7 +256,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		servicePlanGuid := spec.ServicePlanGuid
 		if servicePlanGuid == "" {
 			log.V(1).Info("Searching service plan")
-			servicePlanGuid, err = client.FindServicePlan(ctx, spec.ServiceOfferingName, spec.ServicePlanName, spaceGuid)
+			servicePlanGuid, err = spaceClient.FindServicePlan(ctx, spec.ServiceOfferingName, spec.ServicePlanName, spaceGuid)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -311,7 +302,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 
 		if cfinstance == nil {
 			log.V(1).Info("Creating instance")
-			if err := client.CreateInstance(
+			if err := spaceClient.CreateInstance(
 				ctx,
 				spec.Name,
 				servicePlanGuid,
@@ -329,7 +320,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			} else if recreateOnCreationFailure && (cfinstance.State == facade.InstanceStateCreatedFailed || cfinstance.State == facade.InstanceStateDeleteFailed) {
 				// Re-create instance
 				log.V(1).Info("Deleting instance for later re-creation")
-				if err := client.DeleteInstance(ctx, cfinstance.Guid, cfinstance.Owner); err != nil {
+				if err := spaceClient.DeleteInstance(ctx, cfinstance.Guid, cfinstance.Owner); err != nil {
 					return ctrl.Result{}, RetryError
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
@@ -362,7 +353,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 				if updateTags == nil {
 					updateTags = make([]string, 0)
 				}
-				if err := client.UpdateInstance(
+				if err := spaceClient.UpdateInstance(
 					ctx,
 					cfinstance.Guid,
 					updateName,
@@ -383,7 +374,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if cfinstance == nil {
 			// Re-retrieve cloud foundry instance by UID; this happens exactly if the instance was created or updated above
 			log.V(1).Info("Retrieving instance")
-			cfinstance, err = client.GetInstance(ctx, instanceOpts)
+			cfinstance, err = spaceClient.GetInstance(ctx, instanceOpts)
 			if err != nil {
 				return ctrl.Result{}, err
 			}
@@ -415,17 +406,29 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			// TODO: apply some increasing period, depending on the age of the last update
 			return ctrl.Result{RequeueAfter: reconcileTimeout}, nil
 		}
-	} else if len(serviceBindingList.Items) > 0 {
-		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonDeletionBlocked, "Waiting for deletion of depending service bindings")
-		// TODO: apply some increasing period, depending on the age of the last update
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-	} else if len(removeString(serviceInstance.Finalizers, serviceInstanceFinalizer)) > 0 {
-		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonDeletionBlocked, "Deletion blocked due to foreign finalizers")
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-		// TODO: apply some increasing period, depending on the age of the last update
 	} else {
 		// Deletion case
-		if cfinstance == nil {
+
+		// Find depending service bindings
+		// Hint: This call is expensive and is performed only in deletion case
+		serviceBindingList := &cfv1alpha1.ServiceBindingList{}
+		if err := client.NewNamespacedClient(r.Client, serviceInstance.Namespace).List(
+			ctx,
+			serviceBindingList,
+			client.MatchingLabels{cfv1alpha1.LabelKeyServiceInstance: serviceInstance.Name},
+		); err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "failed to list depending service bindings")
+		}
+
+		if len(serviceBindingList.Items) > 0 {
+			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonDeletionBlocked, "Waiting for deletion of depending service bindings")
+			// TODO: apply some increasing period, depending on the age of the last update
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+		} else if len(removeString(serviceInstance.Finalizers, serviceInstanceFinalizer)) > 0 {
+			serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonDeletionBlocked, "Deletion blocked due to foreign finalizers")
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+			// TODO: apply some increasing period, depending on the age of the last update
+		} else if cfinstance == nil {
 			if containsString(serviceInstance.Finalizers, serviceInstanceFinalizer) {
 				controllerutil.RemoveFinalizer(serviceInstance, serviceInstanceFinalizer)
 				if err := r.Update(ctx, serviceInstance); err != nil {
@@ -440,7 +443,7 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		} else {
 			if cfinstance.State != facade.InstanceStateDeleting {
 				log.V(1).Info("Deleting instance")
-				if err := client.DeleteInstance(ctx, cfinstance.Guid, cfinstance.Owner); err != nil {
+				if err := spaceClient.DeleteInstance(ctx, cfinstance.Guid, cfinstance.Owner); err != nil {
 					return ctrl.Result{}, err
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
