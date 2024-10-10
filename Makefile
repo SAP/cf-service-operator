@@ -70,13 +70,33 @@ test: manifests generate fmt vet envtest ## Run tests.
 test-fast: manifests envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(LOCALBIN)/k8s/current" go test ./... -coverprofile cover.out -ginkgo.v
 
+##@ Performance Measurement
+
+PERFORMANCE_TRACE_FILE := perf-trace.out
+
+.PHONY: measure-performance
+measure-performance: export RESOURCE_CACHE_ENABLED = true
+measure-performance: export CACHE_TIMEOUT = 15m
+measure-performance:
+	rm -f $(PERFORMANCE_TRACE_FILE)
+	go run ./main.go \
+	  --cluster-resource-namespace=default \
+	  --kubeconfig=$(shell pwd)/.kubeconfig \
+	  --performance-trace \
+	  --sap-binding-metadata \
+	  --webhooks=false \
+	  --zap-encoder=console \
+	  --zap-log-level=INFO \
+	  --zap-time-encoding=iso8601
+
 .PHONY: analyze-performance
 analyze-performance:
-	@if [[ ! -f trace.out ]]; then \
-	  echo "Collect performance data (trace.out) first by running manager with --performance-trace=true" \
+	@if [[ ! -f $(PERFORMANCE_TRACE_FILE) ]]; then \
+	  echo -n "Collect performance data ($(PERFORMANCE_TRACE_FILE)) first by running command: " \
+	  && echo "make measure-performance" \
 	  && false; \
 	fi
-	go tool trace trace.out
+	go tool trace $(PERFORMANCE_TRACE)
 
 ##@ Build
 
