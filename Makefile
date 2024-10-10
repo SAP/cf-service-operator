@@ -66,9 +66,17 @@ lint: golangci-lint ## Run linter against the code
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(LOCALBIN)/k8s/current" go test ./... -coverprofile cover.out
 
-.PHONY: manifests test-fast ## Run tests without build.
-test-fast: envtest ## Run tests.
+.PHONY: test-fast ## Run tests without build.
+test-fast: manifests envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(LOCALBIN)/k8s/current" go test ./... -coverprofile cover.out -ginkgo.v
+
+.PHONY: analyze-performance
+analyze-performance:
+	@if [[ ! -f trace.out ]]; then \
+	  echo "Collect performance data (trace.out) first by running manager with --performance-trace=true" \
+	  && false; \
+	fi
+	go tool trace trace.out
 
 ##@ Build
 
