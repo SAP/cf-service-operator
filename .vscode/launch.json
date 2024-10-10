@@ -15,12 +15,15 @@
             },
             "args": [
                 "--cluster-resource-namespace=default",
-                "--enable-performance-trace=false",
-                "--enable-webhooks=false",
                 "--kubeconfig=${workspaceFolder}/.kubeconfig",
+                "--performance-trace",
                 "--sap-binding-metadata",
+                "--webhooks=false",
                 "--webhook-bind-address=:2443",
                 "--webhook-tls-directory=${workspaceFolder}/.local/ssl",
+                "--zap-encoder=console",
+                "--zap-log-level=DEBUG",
+                "--zap-time-encoding=iso8601",
             ]
         },
         {
