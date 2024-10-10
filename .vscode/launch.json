@@ -11,7 +11,8 @@
             "mode": "auto",
             "program": "${workspaceFolder}",
             "env": {
-                "RESOURCE_CACHE_ENABLED": "true"
+                "RESOURCE_CACHE_ENABLED": "true",
+                "CACHE_TIMEOUT": "15m",
             },
             "args": [
                 "--cluster-resource-namespace=default",
@@ -22,7 +23,7 @@
                 "--webhook-bind-address=:2443",
                 "--webhook-tls-directory=${workspaceFolder}/.local/ssl",
                 "--zap-encoder=console",
-                "--zap-log-level=DEBUG",
+                "--zap-log-level=INFO",
                 "--zap-time-encoding=iso8601",
             ]
         },

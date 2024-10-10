@@ -7,6 +7,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"runtime/trace"
@@ -35,7 +36,8 @@ import (
 )
 
 const (
-	LeaderElectionID = "service-operator.cf.cs.sap.com"
+	LeaderElectionID     = "service-operator.cf.cs.sap.com"
+	PerformanceTraceName = "perf-trace.out"
 )
 
 var (
@@ -62,7 +64,7 @@ func main() {
 	flag.StringVar(&clusterResourceNamespace, "cluster-resource-namespace", "", "The namespace for secrets in which cluster-scoped resources are found.")
 	flag.BoolVar(&enableBindingMetadata, "sap-binding-metadata", false, "Enhance binding secrets by SAP binding metadata by default.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
-	flag.BoolVar(&enablePerformanceTrace, "performance-trace", false, "Enable performance trace (trace.out).")
+	flag.BoolVar(&enablePerformanceTrace, "performance-trace", false, fmt.Sprintf("Enable performance trace (writes result to '%s'.", PerformanceTraceName))
 	flag.BoolVar(&enableWebhooks, "webhooks", true, "Enable webhooks in controller. May be disabled for local development.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -233,9 +235,9 @@ func main() {
 
 	// start performance trace
 	if enablePerformanceTrace {
-		setupLog.Info("Starting performance trace")
+		setupLog.Info("Starting performance trace", "file", PerformanceTraceName)
 		var perfTraceFile *os.File
-		if perfTraceFile, err = os.OpenFile("trace.out", os.O_CREATE|os.O_WRONLY, 0660); err != nil {
+		if perfTraceFile, err = os.OpenFile(PerformanceTraceName, os.O_CREATE|os.O_WRONLY, 0660); err != nil {
 			setupLog.Error(err, "unable to create performance trace")
 			os.Exit(1)
 		}

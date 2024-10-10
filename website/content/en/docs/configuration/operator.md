@@ -25,7 +25,7 @@ Usage of manager:
   -metrics-bind-address string
       The address the metric endpoint binds to. (default ":8080")
   -performance-trace
-      Enable performance trace. (default: false)
+      Enable performance trace (writes results to 'perf-trace.out'). (default: false)
   -sap-binding-metadata
       Enhance binding secrets by SAP binding metadata by default.
   -webhooks
