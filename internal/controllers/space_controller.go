@@ -352,7 +352,7 @@ func (r *SpaceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(spaceType).
 		WithEventFilter(predicate.Or(predicate.GenerationChangedPredicate{}, predicate.AnnotationChangedPredicate{})).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: 2,
+			MaxConcurrentReconciles: 1,
 		}).
 		Complete(r)
 }
