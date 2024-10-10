@@ -24,8 +24,12 @@ Usage of manager:
       Enabling this will ensure there is only one active controller manager.
   -metrics-bind-address string
       The address the metric endpoint binds to. (default ":8080")
+  -performance-trace
+      Enable performance trace. (default: false)
   -sap-binding-metadata
       Enhance binding secrets by SAP binding metadata by default.
+  -webhooks
+      Enable webhooks in controller. May be disabled for local development. (default: true)
   -webhook-bind-address string
       The address the webhook endpoint binds to. (default ":9443")
   -webhook-tls-directory string

@@ -14,12 +14,13 @@
                 "RESOURCE_CACHE_ENABLED": "true"
             },
             "args": [
+                "--cluster-resource-namespace=default",
+                "--enable-performance-trace=false",
+                "--enable-webhooks=false",
                 "--kubeconfig=${workspaceFolder}/.kubeconfig",
+                "--sap-binding-metadata",
                 "--webhook-bind-address=:2443",
                 "--webhook-tls-directory=${workspaceFolder}/.local/ssl",
-                "--enableWebhooks=false",
-                "--cluster-resource-namespace=default",
-                "--sap-binding-metadata"
             ]
         },
         {
