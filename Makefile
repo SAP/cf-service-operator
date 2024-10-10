@@ -96,7 +96,7 @@ analyze-performance:
 	  && echo "make measure-performance" \
 	  && false; \
 	fi
-	go tool trace $(PERFORMANCE_TRACE)
+	go tool trace $(PERFORMANCE_TRACE_FILE)
 
 ##@ Build
 
