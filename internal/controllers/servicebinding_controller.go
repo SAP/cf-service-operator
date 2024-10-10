@@ -19,11 +19,13 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	cfv1alpha1 "github.com/sap/cf-service-operator/api/v1alpha1"
 	"github.com/sap/cf-service-operator/internal/binding"
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
@@ -47,6 +49,7 @@ type ServiceBindingReconciler struct {
 	ClusterResourceNamespace string
 	EnableBindingMetadata    bool
 	ClientBuilder            facade.SpaceClientBuilder
+	Config                   *config.Config
 }
 
 // +kubebuilder:rbac:groups=cf.cs.sap.com,resources=servicebindings,verbs=get;list;watch;update
@@ -168,7 +171,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	// Build cloud foundry client
 	var client facade.SpaceClient
 	if spaceGuid != "" {
-		client, err = r.ClientBuilder(spaceGuid, string(spaceSecret.Data["url"]), string(spaceSecret.Data["username"]), string(spaceSecret.Data["password"]))
+		client, err = r.ClientBuilder(spaceGuid, string(spaceSecret.Data["url"]), string(spaceSecret.Data["username"]), string(spaceSecret.Data["password"]), r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the client from secret %s", spaceSecretName)
 		}
@@ -192,32 +195,37 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			if err != nil {
 				return ctrl.Result{}, err
 			}
+			if cfbinding != nil && cfbinding.State == facade.BindingStateReady {
+				//Add parameters to adopt the orphaned binding
+				var parameterObjects []map[string]interface{}
+				paramMap := make(map[string]interface{})
+				paramMap["parameter-hash"] = cfbinding.ParameterHash
+				paramMap["owner"] = cfbinding.Owner
+				parameterObjects = append(parameterObjects, paramMap)
+				parameters, err := mergeObjects(parameterObjects...)
+				if err != nil {
+					return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
+				}
+				// update the orphaned cloud foundry service binding
+				log.V(1).Info("Updating binding")
+				if err := client.UpdateBinding(
+					ctx,
+					cfbinding.Guid,
+					cfbinding.Owner,
+					serviceBinding.Generation,
+					parameters,
+				); err != nil {
+					return ctrl.Result{}, err
+				}
+				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
 
-			//Add parameters to adopt the orphaned binding
-			var parameterObjects []map[string]interface{}
-			paramMap := make(map[string]interface{})
-			paramMap["parameter-hash"] = cfbinding.ParameterHash
-			paramMap["owner"] = cfbinding.Owner
-			parameterObjects = append(parameterObjects, paramMap)
-			parameters, err := mergeObjects(parameterObjects...)
-			if err != nil {
-				return ctrl.Result{}, errors.Wrap(err, "failed to unmarshal/merge parameters")
+				// return the reconcile function to requeue inmediatly after the update
+				serviceBinding.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfbinding.State), cfbinding.StateDescription)
+				return ctrl.Result{Requeue: true}, nil
+			} else if cfbinding != nil && cfbinding.State != facade.BindingStateReady {
+				// return the reconcile function to not reconcile and error message
+				return ctrl.Result{}, fmt.Errorf("orphaned binding is not ready to be adopted")
 			}
-			// update the orphaned cloud foundry service binding
-			log.V(1).Info("Updating binding")
-			if err := client.UpdateBinding(
-				ctx,
-				cfbinding.Guid,
-				serviceBinding.Generation,
-				parameters,
-			); err != nil {
-				return ctrl.Result{}, err
-			}
-			status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
-
-			// return the reconcile function to requeue inmediatly after the update
-			serviceBinding.SetReadyCondition(cfv1alpha1.ConditionUnknown, string(cfbinding.State), cfbinding.StateDescription)
-			return ctrl.Result{Requeue: true}, nil
 		}
 	}
 
@@ -296,7 +304,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				cfbinding.State == facade.BindingStateCreatedFailed || cfbinding.State == facade.BindingStateDeleteFailed {
 				// Re-create binding (unfortunately, cloud foundry does not support binding updates, other than metadata)
 				log.V(1).Info("Deleting binding for later re-creation")
-				if err := client.DeleteBinding(ctx, cfbinding.Guid); err != nil {
+				if err := client.DeleteBinding(ctx, cfbinding.Guid, cfbinding.Owner); err != nil {
 					return ctrl.Result{}, err
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
@@ -309,6 +317,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 				if err := client.UpdateBinding(
 					ctx,
 					cfbinding.Guid,
+					cfbinding.Owner,
 					serviceBinding.Generation,
 					nil,
 				); err != nil {
@@ -351,6 +360,13 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 			} else if serviceBinding.Annotations["service-operator.cf.cs.sap.com/with-sap-binding-metadata"] == "false" {
 				withMetadata = false
 			}
+
+			err = client.FillBindingDetails(ctx, cfbinding)
+			if err != nil {
+				// TODO: implement error handling
+				return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+			}
+
 			err = r.storeBindingSecret(ctx, serviceInstance, serviceBinding, cfbinding.Credentials, spec.SecretName, spec.SecretKey, withMetadata)
 			if err != nil {
 				// TODO: implement error handling
@@ -402,7 +418,7 @@ func (r *ServiceBindingReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 		} else {
 			if cfbinding.State != facade.BindingStateDeleting {
 				log.V(1).Info("Deleting binding")
-				if err := client.DeleteBinding(ctx, cfbinding.Guid); err != nil {
+				if err := client.DeleteBinding(ctx, cfbinding.Guid, cfbinding.Owner); err != nil {
 					return ctrl.Result{}, err
 				}
 				status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
@@ -490,5 +506,8 @@ func (r *ServiceBindingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&cfv1alpha1.ServiceBinding{}).
 		WithEventFilter(predicate.Or(predicate.GenerationChangedPredicate{}, predicate.AnnotationChangedPredicate{})).
+		WithOptions(controller.Options{
+			MaxConcurrentReconciles: 1,
+		}).
 		Complete(r)
 }
