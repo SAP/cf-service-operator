@@ -330,20 +330,15 @@ func (c *spaceClient) populateServiceBindings(ctx context.Context) error {
 		return err
 	}
 
-	// wrap each service binding as a facade.Binding and add it to the cache (in parallel)
-	var waitGroup sync.WaitGroup
+	// wrap each service binding as a facade.Binding and add it to the cache
 	for _, cfBinding := range cfBindings {
-		waitGroup.Add(1)
-		go func(cfBinding *cfresource.ServiceCredentialBinding) {
-			defer waitGroup.Done()
-			if binding, err := c.InitBinding(ctx, cfBinding, nil); err == nil {
-				c.resourceCache.addBindingInCache(*cfBinding.Metadata.Labels[labelOwner], binding)
-			} else {
-				logger.Error(err, "Failed to wrap binding", "binding", cfBinding.GUID)
-			}
-		}(cfBinding)
+		if binding, err := c.InitBinding(ctx, cfBinding, nil); err == nil {
+			c.resourceCache.addBindingInCache(*cfBinding.Metadata.Labels[labelOwner], binding)
+		} else {
+			logger.Error(err, "Failed to wrap binding", "binding", cfBinding.GUID)
+			return err
+		}
 	}
-	waitGroup.Wait()
 	c.resourceCache.setLastCacheTime(bindingType)
 
 	return nil
@@ -370,20 +365,15 @@ func (c *spaceClient) populateServiceInstances(ctx context.Context) error {
 		return err
 	}
 
-	// wrap each service instance as a facade.Instance and add it to the cache (in parallel)
-	var waitGroup sync.WaitGroup
+	// wrap each service instance as a facade.Instance and add it to the cache
 	for _, cfInstance := range cfInstances {
-		waitGroup.Add(1)
-		go func(cfInstance *cfresource.ServiceInstance) {
-			defer waitGroup.Done()
-			if instance, err := c.InitInstance(cfInstance, nil); err == nil {
-				c.resourceCache.addInstanceInCache(*cfInstance.Metadata.Labels[labelOwner], instance)
-			} else {
-				logger.Error(err, "Failed to wrap instance", "instance", cfInstance.GUID)
-			}
-		}(cfInstance)
+		if instance, err := c.InitInstance(cfInstance, nil); err == nil {
+			c.resourceCache.addInstanceInCache(*cfInstance.Metadata.Labels[labelOwner], instance)
+		} else {
+			logger.Error(err, "Failed to wrap instance", "instance", cfInstance.GUID)
+			return err
+		}
 	}
-	waitGroup.Wait()
 	c.resourceCache.setLastCacheTime(instanceType)
 
 	return nil
@@ -411,20 +401,15 @@ func (c *organizationClient) populateSpaces(ctx context.Context) error {
 		return err
 	}
 
-	// wrap each space as a facade.Space and add it to the cache (in parallel)
-	var waitGroup sync.WaitGroup
+	// wrap each space as a facade.Space and add it to the cache
 	for _, cfSpace := range cfSpaces {
-		waitGroup.Add(1)
-		go func(cfSpace *cfresource.Space) {
-			defer waitGroup.Done()
-			if space, err := c.InitSpace(cfSpace, ""); err == nil {
-				c.resourceCache.addSpaceInCache(*cfSpace.Metadata.Labels[labelOwner], space)
-			} else {
-				logger.Error(err, "Failed to wrap space", "space", cfSpace.GUID)
-			}
-		}(cfSpace)
+		if space, err := c.InitSpace(cfSpace, ""); err == nil {
+			c.resourceCache.addSpaceInCache(*cfSpace.Metadata.Labels[labelOwner], space)
+		} else {
+			logger.Error(err, "Failed to wrap space", "space", cfSpace.GUID)
+			return err
+		}
 	}
-	waitGroup.Wait()
 	c.resourceCache.setLastCacheTime(spaceType)
 
 	return nil
@@ -511,20 +496,14 @@ func (c *organizationClient) populateSpaceUserRoleCache(ctx context.Context, use
 		return fmt.Errorf("no SpaceDeveloper role found for user '%s'", username)
 	}
 
-	// add each role to the cache (in parallel)
-	var waitGroup sync.WaitGroup
+	// add each role to the cache
 	for _, cfRole := range collectedCfRoles {
-		waitGroup.Add(1)
-		go func(cfrole *cfresource.Role) {
-			defer waitGroup.Done()
-			c.resourceCache.addSpaceUserRoleInCache(
-				cfrole.Relationships.Space.Data.GUID,
-				cfrole.Relationships.User.Data.GUID,
-				username,
-				cfrole.Type)
-		}(cfRole)
+		c.resourceCache.addSpaceUserRoleInCache(
+			cfRole.Relationships.Space.Data.GUID,
+			cfRole.Relationships.User.Data.GUID,
+			username,
+			cfRole.Type)
 	}
-	waitGroup.Wait()
 	c.resourceCache.setLastCacheTime(spaceUserRoleType)
 
 	return nil
