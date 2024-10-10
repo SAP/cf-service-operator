@@ -91,10 +91,14 @@ func main() {
 	}
 
 	setupLog.Info(
-		"Starting",
-		"enable-leader-election", enableLeaderElection,
-		"metrics-addr", metricsAddr,
+		"Starting with configuration",
 		"cluster-resource-namespace", clusterResourceNamespace,
+		"leader-election", enableLeaderElection,
+		"performance-trace", enablePerformanceTrace,
+		"webhooks", enableWebhooks,
+		"health-probe-bind-address", probeAddr,
+		"metrics-bind-address", metricsAddr,
+		"webhook-bind-address", webhookAddr,
 	)
 
 	webhookHost, webhookPort, err := parseAddress(webhookAddr)
@@ -137,9 +141,10 @@ func main() {
 		})
 	}
 
+	setupLog.Info("Creating controller manager")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "unable to create controller manager")
 		os.Exit(1)
 	}
 
@@ -228,6 +233,7 @@ func main() {
 
 	// start performance trace
 	if enablePerformanceTrace {
+		setupLog.Info("Starting performance trace")
 		var perfTraceFile *os.File
 		if perfTraceFile, err = os.OpenFile("trace.out", os.O_CREATE|os.O_WRONLY, 0660); err != nil {
 			setupLog.Error(err, "unable to create performance trace")
@@ -237,20 +243,21 @@ func main() {
 			setupLog.Error(err, "unable to start performance trace")
 			os.Exit(1)
 		}
-		setupLog.Info("Performance trace started")
 	}
 
-	setupLog.Info("Starting manager")
+	setupLog.Info("Starting controller manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(err, "unable to start controller manager")
 		os.Exit(1)
 	}
 
 	// stop performance trace
 	if enablePerformanceTrace {
+		setupLog.Info("Stopping performance trace")
 		trace.Stop()
-		setupLog.Info("Performance trace stopped")
 	}
+
+	setupLog.Info("Stopped.")
 }
 
 const inClusterNamespacePath = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"
