@@ -151,15 +151,16 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 	}
 
 	if space.GetDeletionTimestamp().IsZero() {
-		return r.handleCreationOrUpdate(ctx, space, cfspace, secret, orgClient)
+		return r.handleCreationOrUpdate(ctx, orgClient, space, cfspace, secret)
 	} else {
-		return r.handleDeletion(ctx, space, cfspace, secret, orgClient, &skipStatusUpdate)
+		return r.handleDeletion(ctx, orgClient, space, cfspace, secret, &skipStatusUpdate)
 	}
 }
 
-func (r *SpaceReconciler) handleCreationOrUpdate(ctx context.Context,
-	space cfv1alpha1.GenericSpace, cfspace *facade.Space, secret *corev1.Secret,
-	orgClient facade.OrganizationClient) (result ctrl.Result, err error) {
+func (r *SpaceReconciler) handleCreationOrUpdate(
+	ctx context.Context, orgClient facade.OrganizationClient,
+	space cfv1alpha1.GenericSpace, cfspace *facade.Space,
+	secret *corev1.Secret) (result ctrl.Result, err error) {
 
 	// Add finalizers on space and secret
 	if !containsString(space.GetFinalizers(), spaceFinalizer) {
@@ -259,15 +260,16 @@ func (r *SpaceReconciler) handleCreationOrUpdate(ctx context.Context,
 	return getPollingInterval(space.GetAnnotations(), "60s", cfv1alpha1.AnnotationPollingIntervalReady), nil
 }
 
-func (r *SpaceReconciler) handleDeletion(ctx context.Context, space cfv1alpha1.GenericSpace,
-	cfspace *facade.Space, secret *corev1.Secret,
-	orgClient facade.OrganizationClient, skipStatusUpdate *bool) (result ctrl.Result, err error) {
+func (r *SpaceReconciler) handleDeletion(
+	ctx context.Context, orgClient facade.OrganizationClient,
+	space cfv1alpha1.GenericSpace, cfspace *facade.Space,
+	secret *corev1.Secret, skipStatusUpdate *bool) (result ctrl.Result, err error) {
 
 	// Find depending service instances (directly from K8s, i.e. bypassing cache)
 	// This is not very efficient. Do this only in this deletion case when it is needed.
 	serviceInstanceList := &cfv1alpha1.ServiceInstanceList{}
 	if space.IsNamespaced() {
-		// Space
+		// Namespaced Space
 		if err := client.NewNamespacedClient(r.Client, space.GetNamespace()).List(
 			ctx,
 			serviceInstanceList,
@@ -276,7 +278,7 @@ func (r *SpaceReconciler) handleDeletion(ctx context.Context, space cfv1alpha1.G
 			return ctrl.Result{}, errors.Wrap(err, "failed to list depending service instances")
 		}
 	} else {
-		// ClusterSpace
+		// Cluster Space
 		if err := r.Client.List(
 			ctx,
 			serviceInstanceList,
@@ -286,15 +288,26 @@ func (r *SpaceReconciler) handleDeletion(ctx context.Context, space cfv1alpha1.G
 		}
 	}
 
+	// Still some depending service instances?
 	if len(serviceInstanceList.Items) > 0 {
-		space.SetReadyCondition(cfv1alpha1.ConditionUnknown, spaceReadyConditionReasonDeletionBlocked, "Waiting for deletion of depending service instances")
+		space.SetReadyCondition(cfv1alpha1.ConditionUnknown,
+			spaceReadyConditionReasonDeletionBlocked,
+			"Waiting for deletion of depending service instances")
 		// TODO: apply some increasing period, depending on the age of the last update
 		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
-	} else if len(removeString(space.GetFinalizers(), spaceFinalizer)) > 0 {
-		space.SetReadyCondition(cfv1alpha1.ConditionUnknown, spaceReadyConditionReasonDeletionBlocked, "Deletion blocked due to foreign finalizers")
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	// Still some foreign finalizers?
+	if len(removeString(space.GetFinalizers(), spaceFinalizer)) > 0 {
+		space.SetReadyCondition(cfv1alpha1.ConditionUnknown,
+			spaceReadyConditionReasonDeletionBlocked,
+			"Deletion blocked due to foreign finalizers")
 		// TODO: apply some increasing period, depending on the age of the last update
-	} else if cfspace == nil {
+		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
+	}
+
+	// CF space already gone?
+	if cfspace == nil {
 		// Remove finalizers from secret and space
 		if containsString(secret.GetFinalizers(), spaceFinalizer) {
 			controllerutil.RemoveFinalizer(secret, spaceFinalizer)
@@ -309,24 +322,28 @@ func (r *SpaceReconciler) handleDeletion(ctx context.Context, space cfv1alpha1.G
 			}
 		}
 
-		// skip status update, since the instance will anyway deleted timely by the API server
+		// skip status update, since custom resource will anyway be deleted timely by API server
 		// this will suppress unnecessary ugly 409'ish error messages in the logs
-		// (occurring in the case that API server would delete the resource in the course of the subsequent reconciliation)
+		// (might occur when API server deletes resource during subsequent reconcile)
 		*skipStatusUpdate = true
+
 		return ctrl.Result{}, nil
-	} else {
-		// Actual deletion of space
-		log := ctrl.LoggerFrom(ctx)
-		log.V(1).Info("Deleting space")
-		if err := orgClient.DeleteSpace(ctx, cfspace.Guid, cfspace.Owner); err != nil {
-			return ctrl.Result{}, err
-		}
-		status := space.GetStatus()
-		status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
-		space.SetReadyCondition(cfv1alpha1.ConditionUnknown, spaceReadyConditionDeleting, "Deletion triggered")
-		// TODO: apply some increasing period, depending on the age of the last update
-		return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 	}
+
+	// Actual deletion of space in CF
+	log := ctrl.LoggerFrom(ctx)
+	log.V(1).Info("Deleting space")
+	if err := orgClient.DeleteSpace(ctx, cfspace.Guid, cfspace.Owner); err != nil {
+		return ctrl.Result{}, err
+	}
+	status := space.GetStatus()
+	status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
+
+	space.SetReadyCondition(cfv1alpha1.ConditionUnknown,
+		spaceReadyConditionDeleting, "Deletion triggered")
+
+	// TODO: apply some increasing period, depending on the age of the last update
+	return ctrl.Result{RequeueAfter: 10 * time.Second}, nil
 }
 
 func (r *SpaceReconciler) newSpace() (cfv1alpha1.GenericSpace, error) {
