@@ -13,10 +13,11 @@ import (
 )
 
 type FakeSpaceHealthChecker struct {
-	CheckStub        func(context.Context) error
+	CheckStub        func(context.Context, string) error
 	checkMutex       sync.RWMutex
 	checkArgsForCall []struct {
 		arg1 context.Context
+		arg2 string
 	}
 	checkReturns struct {
 		result1 error
@@ -28,18 +29,19 @@ type FakeSpaceHealthChecker struct {
 	invocationsMutex sync.RWMutex
 }
 
-func (fake *FakeSpaceHealthChecker) Check(arg1 context.Context) error {
+func (fake *FakeSpaceHealthChecker) Check(arg1 context.Context, arg2 string) error {
 	fake.checkMutex.Lock()
 	ret, specificReturn := fake.checkReturnsOnCall[len(fake.checkArgsForCall)]
 	fake.checkArgsForCall = append(fake.checkArgsForCall, struct {
 		arg1 context.Context
-	}{arg1})
+		arg2 string
+	}{arg1, arg2})
 	stub := fake.CheckStub
 	fakeReturns := fake.checkReturns
-	fake.recordInvocation("Check", []interface{}{arg1})
+	fake.recordInvocation("Check", []interface{}{arg1, arg2})
 	fake.checkMutex.Unlock()
 	if stub != nil {
-		return stub(arg1)
+		return stub(arg1, arg2)
 	}
 	if specificReturn {
 		return ret.result1
@@ -53,17 +55,17 @@ func (fake *FakeSpaceHealthChecker) CheckCallCount() int {
 	return len(fake.checkArgsForCall)
 }
 
-func (fake *FakeSpaceHealthChecker) CheckCalls(stub func(context.Context) error) {
+func (fake *FakeSpaceHealthChecker) CheckCalls(stub func(context.Context, string) error) {
 	fake.checkMutex.Lock()
 	defer fake.checkMutex.Unlock()
 	fake.CheckStub = stub
 }
 
-func (fake *FakeSpaceHealthChecker) CheckArgsForCall(i int) context.Context {
+func (fake *FakeSpaceHealthChecker) CheckArgsForCall(i int) (context.Context, string) {
 	fake.checkMutex.RLock()
 	defer fake.checkMutex.RUnlock()
 	argsForCall := fake.checkArgsForCall[i]
-	return argsForCall.arg1
+	return argsForCall.arg1, argsForCall.arg2
 }
 
 func (fake *FakeSpaceHealthChecker) CheckReturns(result1 error) {

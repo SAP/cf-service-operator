@@ -9,9 +9,9 @@ description: >
 
 ## Command line parameters
 
-cf-service-operator accepts the following command line flags:
+The `cf-service-operator` accepts the following command line flags:
 
-```
+```bash
 Usage of manager:
   -cluster-resource-namespace string
       The namespace for secrets in which cluster-scoped resources are found.
@@ -24,8 +24,12 @@ Usage of manager:
       Enabling this will ensure there is only one active controller manager.
   -metrics-bind-address string
       The address the metric endpoint binds to. (default ":8080")
+  -performance-trace
+      Enable performance trace (writes results to 'perf-trace.out'). (default: false)
   -sap-binding-metadata
       Enhance binding secrets by SAP binding metadata by default.
+  -webhooks
+      Enable webhooks in controller. May be disabled for local development. (default: true)
   -webhook-bind-address string
       The address the webhook endpoint binds to. (default ":9443")
   -webhook-tls-directory string
@@ -47,7 +51,9 @@ Usage of manager:
 ```
 
 Notes:
-- When running in-cluster, then `-cluster-resource-namespace` defaults to the operator's namespace; otherwise this flag is mandatory.
+
+- When running in-cluster, then `-cluster-resource-namespace` defaults to the operator's namespace;
+  otherwise this flag is mandatory.
 - The logic for looking up the kubeconfig file is
   - path provided as `-kubeconfig` (if present)
   - value of environment variable `$KUBECONFIG`(if present)
@@ -62,11 +68,67 @@ Notes:
 
 ## Environment variables
 
-cf-service-operator honors the following environment variables:
+The `cf-service-operator` honors the following environment variables:
 
-- `$KUBECONFIG` the path to the kubeconfig used by the operator executable; note that this has lower precedence than the command line flag `-kubeconfig`.
+### Kubernetes Configuration
+
+- `$KUBECONFIG` the path to the kubeconfig used by the operator executable. \
+  Note, that this has lower precedence than the command line flag `-kubeconfig`.
+
+### Cache Configuration
+
+To optimize the usage of CF resources and reduce the number of API calls, the CF service operator
+supports an optional caching mechanism. This feature allows resources to be stored in memory and
+refreshed based on a configurable timeout. \
+By storing the CF resources in memory, we aim to reduce the number of requests to the CF API and
+avoid reaching the rate limit.
+
+Below are the environment variables that control the caching behavior:
+
+- **`RESOURCE_CACHE_ENABLED`**
+  - Description: Determines whether the caching mechanism is enabled or disabled.
+  - Type: Boolean
+  - Default: `false`
+  - Values:
+    - `true`: Enables caching of CF resources.
+    - `false`: Disables the cache, and the operator will fetch CF resources directly from the
+      CF API on each request.
+
+- **`CACHE_TIMEOUT`**
+  - Description: This defines the duration after which the cache is refreshed.
+    The cache is refreshed based on the last time it was refreshed.
+  - Type: String
+  - Default: `1m` (1 minute)
+  - Values:
+    - The timeout can be specified in seconds (`s`), minutes (`m`), or hours (`h`). \
+      For example:
+      - `30s` for 30 seconds
+      - `10m` for 10 minutes
+      - `1h` for 1 hour.
+
+These environment variables can be configured in your `deployment.yaml` file as follows:
+
+```yaml
+    env:
+    - name: CACHE_TIMEOUT
+      value: "{{ .Values.cache.timeout }}"
+    - name: RESOURCE_CACHE_ENABLED
+      value: "{{ .Values.cache.enabled }}"
+```
+
+Additionally, the corresponding values can be set in the `values.yaml` file of the [helm chart](https://github.com/SAP/cf-service-operator-helm/blob/main/chart/values.yaml), allowing the operator to be easily configured:
+
+```yaml
+# -- Enable Resources Cache
+cache:
+  # -- Whether to enable the cache
+  enabled: false  # default: false
+  # -- Cache expiration time
+  timeout: 1m     # default: 1m
+```
 
 ## Logging
 
-cf-service-operator uses [logr](https://github.com/go-logr) with [zap](https://github.com/uber-go/zap) for logging.
+The `cf-service-operator` uses [logr](https://github.com/go-logr) with
+[zap](https://github.com/uber-go/zap) for logging.
 Please check the according documentation for details about how to configure logging.

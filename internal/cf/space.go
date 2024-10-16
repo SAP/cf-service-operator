@@ -12,12 +12,23 @@ import (
 
 	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
 	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
-	"github.com/pkg/errors"
 
 	"github.com/sap/cf-service-operator/internal/facade"
 )
 
 func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facade.Space, error) {
+	if c.resourceCache.checkResourceCacheEnabled() {
+		// attempt to retrieve space from cache
+		if c.resourceCache.isCacheExpired(spaceType) {
+			populateResourceCache(c, spaceType, "")
+		}
+		space, inCache := c.resourceCache.getSpaceFromCache(owner)
+		if inCache {
+			return space, nil
+		}
+	}
+
+	// attempt to retrieve space from Cloud Foundry
 	listOpts := cfclient.NewSpaceListOptions()
 	listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
 	spaces, err := c.client.Spaces.ListAll(ctx, listOpts)
@@ -32,19 +43,8 @@ func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facad
 	}
 	space := spaces[0]
 
-	guid := space.GUID
-	name := space.Name
-	generation, err := strconv.ParseInt(*space.Metadata.Annotations[annotationGeneration], 10, 64)
-	if err != nil {
-		return nil, errors.Wrap(err, "error parsing space generation")
-	}
-
-	return &facade.Space{
-		Guid:       guid,
-		Name:       name,
-		Owner:      owner,
-		Generation: generation,
-	}, nil
+	// TODO: add directly to cache
+	return c.InitSpace(space, owner)
 }
 
 // Required parameters (may not be initial): name, owner, generation
@@ -68,12 +68,14 @@ func (c *organizationClient) CreateSpace(ctx context.Context, name string, owner
 		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
 
 	_, err = c.client.Spaces.Create(ctx, req)
+	// do not add space to the cache here because we wait until the space GUID is known
+
 	return err
 }
 
 // Required parameters (may not be initial): guid, generation
 // Optional parameters (may be initial): name
-func (c *organizationClient) UpdateSpace(ctx context.Context, guid string, name string, generation int64) error {
+func (c *organizationClient) UpdateSpace(ctx context.Context, guid string, name string, owner string, generation int64) error {
 	// TODO: why is there no cfresource.NewSpaceUpdate() method ?
 	req := &cfresource.SpaceUpdate{}
 	if name != "" {
@@ -83,11 +85,34 @@ func (c *organizationClient) UpdateSpace(ctx context.Context, guid string, name 
 		WithAnnotation(annotationPrefix, annotationKeyGeneration, strconv.FormatInt(generation, 10))
 
 	_, err := c.client.Spaces.Update(ctx, guid, req)
+
+	// update space in cache
+	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
+		isUpdated := c.resourceCache.updateSpaceInCache(owner, name, generation)
+		if !isUpdated {
+			// add space to cache
+			space := &facade.Space{
+				Guid:       guid,
+				Name:       name,
+				Owner:      owner,
+				Generation: generation,
+			}
+			c.resourceCache.addSpaceInCache(owner, space)
+		}
+	}
+
 	return err
 }
 
-func (c *organizationClient) DeleteSpace(ctx context.Context, guid string) error {
+func (c *organizationClient) DeleteSpace(ctx context.Context, guid string, owner string) error {
 	_, err := c.client.Spaces.Delete(ctx, guid)
+
+	// delete space from cache
+	if err == nil && c.resourceCache.checkResourceCacheEnabled() {
+		c.resourceCache.deleteSpaceFromCache(owner)
+		c.resourceCache.deleteSpaceUserRoleFromCache(guid)
+	}
+
 	return err
 }
 
@@ -96,6 +121,20 @@ func (c *organizationClient) AddAuditor(ctx context.Context, guid string, userna
 }
 
 func (c *organizationClient) AddDeveloper(ctx context.Context, guid string, username string) error {
+	if c.resourceCache.checkResourceCacheEnabled() {
+		// attempt to retrieve space user role from cache
+		if c.resourceCache.isCacheExpired(spaceUserRoleType) {
+			populateResourceCache(c, spaceUserRoleType, username)
+		}
+		if len(c.resourceCache.getCachedSpaceUserRoles()) != 0 {
+			_, inCache := c.resourceCache.getSpaceUserRoleFromCache(guid)
+			if inCache {
+				return nil
+			}
+		}
+	}
+
+	// attempt to retrieve space user role from Cloud Foundry
 	userListOpts := cfclient.NewUserListOptions()
 	userListOpts.UserNames.EqualTo(username)
 	users, err := c.client.Users.ListAll(ctx, userListOpts)
@@ -126,4 +165,25 @@ func (c *organizationClient) AddDeveloper(ctx context.Context, guid string, user
 
 func (c *organizationClient) AddManager(ctx context.Context, guid string, username string) error {
 	return nil
+}
+
+// InitSpace wraps cfclient.Space as a facade.Space
+func (c *organizationClient) InitSpace(space *cfresource.Space, owner string) (*facade.Space, error) {
+	guid := space.GUID
+	name := space.Name
+	generation, err := strconv.ParseInt(*space.Metadata.Annotations[annotationGeneration], 10, 64)
+	if err != nil {
+		return nil, err
+	}
+
+	if owner == "" {
+		owner = *space.Metadata.Labels[labelOwner]
+	}
+
+	return &facade.Space{
+		Guid:       guid,
+		Name:       name,
+		Owner:      owner,
+		Generation: generation,
+	}, nil
 }
