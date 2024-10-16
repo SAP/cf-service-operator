@@ -150,16 +150,9 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			Name:      space.GetSpec().AuthSecretName,
 		}
 	}
-
 	spaceGuid := space.GetSpec().Guid
 	if spaceGuid == "" {
 		spaceGuid = space.GetStatus().SpaceGuid
-	}
-
-	// Retrieve referenced space secret containing credentials for accessing CF
-	spaceSecret := &corev1.Secret{}
-	if err := r.Get(ctx, spaceSecretName, spaceSecret); err != nil {
-		return ctrl.Result{}, errors.Wrapf(err, "failed to get Secret containing space credentials, secret name: %s", spaceSecretName)
 	}
 
 	// Require readiness of space unless in deletion case
@@ -173,6 +166,12 @@ func (r *ServiceInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if spaceGuid == "" {
 			return ctrl.Result{}, fmt.Errorf("unexpected error; unable to find guid on ready %s: name: %s", space.GetKind(), space.GetName())
 		}
+	}
+
+	// Retrieve referenced space secret containing credentials for accessing CF
+	spaceSecret := &corev1.Secret{}
+	if err := r.Get(ctx, spaceSecretName, spaceSecret); err != nil {
+		return ctrl.Result{}, errors.Wrapf(err, "failed to get Secret containing space credentials, secret name: %s", spaceSecretName)
 	}
 
 	// Build client for accessing CF
