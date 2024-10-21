@@ -1,6 +1,6 @@
 module github.com/sap/cf-service-operator
 
-go 1.22.5
+go 1.23.2
 
 require (
 	github.com/cloudfoundry-community/go-cfclient/v3 v3.0.0-alpha.5
@@ -19,6 +19,7 @@ require (
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
+	github.com/caarlos0/env/v11 v11.2.2
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/codegangsta/inject v0.0.0-20150114235600-33e0aa1cb7c0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

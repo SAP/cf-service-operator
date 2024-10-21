@@ -46,11 +46,12 @@ type FakeSpaceClient struct {
 	createInstanceReturnsOnCall map[int]struct {
 		result1 error
 	}
-	DeleteBindingStub        func(context.Context, string) error
+	DeleteBindingStub        func(context.Context, string, string) error
 	deleteBindingMutex       sync.RWMutex
 	deleteBindingArgsForCall []struct {
 		arg1 context.Context
 		arg2 string
+		arg3 string
 	}
 	deleteBindingReturns struct {
 		result1 error
@@ -58,16 +59,29 @@ type FakeSpaceClient struct {
 	deleteBindingReturnsOnCall map[int]struct {
 		result1 error
 	}
-	DeleteInstanceStub        func(context.Context, string) error
+	DeleteInstanceStub        func(context.Context, string, string) error
 	deleteInstanceMutex       sync.RWMutex
 	deleteInstanceArgsForCall []struct {
 		arg1 context.Context
 		arg2 string
+		arg3 string
 	}
 	deleteInstanceReturns struct {
 		result1 error
 	}
 	deleteInstanceReturnsOnCall map[int]struct {
+		result1 error
+	}
+	FillBindingDetailsStub        func(context.Context, *facade.Binding) error
+	fillBindingDetailsMutex       sync.RWMutex
+	fillBindingDetailsArgsForCall []struct {
+		arg1 context.Context
+		arg2 *facade.Binding
+	}
+	fillBindingDetailsReturns struct {
+		result1 error
+	}
+	fillBindingDetailsReturnsOnCall map[int]struct {
 		result1 error
 	}
 	FindServicePlanStub        func(context.Context, string, string, string) (string, error)
@@ -114,13 +128,14 @@ type FakeSpaceClient struct {
 		result1 *facade.Instance
 		result2 error
 	}
-	UpdateBindingStub        func(context.Context, string, int64, map[string]interface{}) error
+	UpdateBindingStub        func(context.Context, string, string, int64, map[string]interface{}) error
 	updateBindingMutex       sync.RWMutex
 	updateBindingArgsForCall []struct {
 		arg1 context.Context
 		arg2 string
-		arg3 int64
-		arg4 map[string]interface{}
+		arg3 string
+		arg4 int64
+		arg5 map[string]interface{}
 	}
 	updateBindingReturns struct {
 		result1 error
@@ -128,16 +143,17 @@ type FakeSpaceClient struct {
 	updateBindingReturnsOnCall map[int]struct {
 		result1 error
 	}
-	UpdateInstanceStub        func(context.Context, string, string, string, map[string]interface{}, []string, int64) error
+	UpdateInstanceStub        func(context.Context, string, string, string, string, map[string]interface{}, []string, int64) error
 	updateInstanceMutex       sync.RWMutex
 	updateInstanceArgsForCall []struct {
 		arg1 context.Context
 		arg2 string
 		arg3 string
 		arg4 string
-		arg5 map[string]interface{}
-		arg6 []string
-		arg7 int64
+		arg5 string
+		arg6 map[string]interface{}
+		arg7 []string
+		arg8 int64
 	}
 	updateInstanceReturns struct {
 		result1 error
@@ -287,19 +303,20 @@ func (fake *FakeSpaceClient) CreateInstanceReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeSpaceClient) DeleteBinding(arg1 context.Context, arg2 string) error {
+func (fake *FakeSpaceClient) DeleteBinding(arg1 context.Context, arg2 string, arg3 string) error {
 	fake.deleteBindingMutex.Lock()
 	ret, specificReturn := fake.deleteBindingReturnsOnCall[len(fake.deleteBindingArgsForCall)]
 	fake.deleteBindingArgsForCall = append(fake.deleteBindingArgsForCall, struct {
 		arg1 context.Context
 		arg2 string
-	}{arg1, arg2})
+		arg3 string
+	}{arg1, arg2, arg3})
 	stub := fake.DeleteBindingStub
 	fakeReturns := fake.deleteBindingReturns
-	fake.recordInvocation("DeleteBinding", []interface{}{arg1, arg2})
+	fake.recordInvocation("DeleteBinding", []interface{}{arg1, arg2, arg3})
 	fake.deleteBindingMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1
@@ -313,17 +330,17 @@ func (fake *FakeSpaceClient) DeleteBindingCallCount() int {
 	return len(fake.deleteBindingArgsForCall)
 }
 
-func (fake *FakeSpaceClient) DeleteBindingCalls(stub func(context.Context, string) error) {
+func (fake *FakeSpaceClient) DeleteBindingCalls(stub func(context.Context, string, string) error) {
 	fake.deleteBindingMutex.Lock()
 	defer fake.deleteBindingMutex.Unlock()
 	fake.DeleteBindingStub = stub
 }
 
-func (fake *FakeSpaceClient) DeleteBindingArgsForCall(i int) (context.Context, string) {
+func (fake *FakeSpaceClient) DeleteBindingArgsForCall(i int) (context.Context, string, string) {
 	fake.deleteBindingMutex.RLock()
 	defer fake.deleteBindingMutex.RUnlock()
 	argsForCall := fake.deleteBindingArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeSpaceClient) DeleteBindingReturns(result1 error) {
@@ -349,19 +366,20 @@ func (fake *FakeSpaceClient) DeleteBindingReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeSpaceClient) DeleteInstance(arg1 context.Context, arg2 string) error {
+func (fake *FakeSpaceClient) DeleteInstance(arg1 context.Context, arg2 string, arg3 string) error {
 	fake.deleteInstanceMutex.Lock()
 	ret, specificReturn := fake.deleteInstanceReturnsOnCall[len(fake.deleteInstanceArgsForCall)]
 	fake.deleteInstanceArgsForCall = append(fake.deleteInstanceArgsForCall, struct {
 		arg1 context.Context
 		arg2 string
-	}{arg1, arg2})
+		arg3 string
+	}{arg1, arg2, arg3})
 	stub := fake.DeleteInstanceStub
 	fakeReturns := fake.deleteInstanceReturns
-	fake.recordInvocation("DeleteInstance", []interface{}{arg1, arg2})
+	fake.recordInvocation("DeleteInstance", []interface{}{arg1, arg2, arg3})
 	fake.deleteInstanceMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2)
+		return stub(arg1, arg2, arg3)
 	}
 	if specificReturn {
 		return ret.result1
@@ -375,17 +393,17 @@ func (fake *FakeSpaceClient) DeleteInstanceCallCount() int {
 	return len(fake.deleteInstanceArgsForCall)
 }
 
-func (fake *FakeSpaceClient) DeleteInstanceCalls(stub func(context.Context, string) error) {
+func (fake *FakeSpaceClient) DeleteInstanceCalls(stub func(context.Context, string, string) error) {
 	fake.deleteInstanceMutex.Lock()
 	defer fake.deleteInstanceMutex.Unlock()
 	fake.DeleteInstanceStub = stub
 }
 
-func (fake *FakeSpaceClient) DeleteInstanceArgsForCall(i int) (context.Context, string) {
+func (fake *FakeSpaceClient) DeleteInstanceArgsForCall(i int) (context.Context, string, string) {
 	fake.deleteInstanceMutex.RLock()
 	defer fake.deleteInstanceMutex.RUnlock()
 	argsForCall := fake.deleteInstanceArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3
 }
 
 func (fake *FakeSpaceClient) DeleteInstanceReturns(result1 error) {
@@ -407,6 +425,68 @@ func (fake *FakeSpaceClient) DeleteInstanceReturnsOnCall(i int, result1 error) {
 		})
 	}
 	fake.deleteInstanceReturnsOnCall[i] = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSpaceClient) FillBindingDetails(arg1 context.Context, arg2 *facade.Binding) error {
+	fake.fillBindingDetailsMutex.Lock()
+	ret, specificReturn := fake.fillBindingDetailsReturnsOnCall[len(fake.fillBindingDetailsArgsForCall)]
+	fake.fillBindingDetailsArgsForCall = append(fake.fillBindingDetailsArgsForCall, struct {
+		arg1 context.Context
+		arg2 *facade.Binding
+	}{arg1, arg2})
+	stub := fake.FillBindingDetailsStub
+	fakeReturns := fake.fillBindingDetailsReturns
+	fake.recordInvocation("FillBindingDetails", []interface{}{arg1, arg2})
+	fake.fillBindingDetailsMutex.Unlock()
+	if stub != nil {
+		return stub(arg1, arg2)
+	}
+	if specificReturn {
+		return ret.result1
+	}
+	return fakeReturns.result1
+}
+
+func (fake *FakeSpaceClient) FillBindingDetailsCallCount() int {
+	fake.fillBindingDetailsMutex.RLock()
+	defer fake.fillBindingDetailsMutex.RUnlock()
+	return len(fake.fillBindingDetailsArgsForCall)
+}
+
+func (fake *FakeSpaceClient) FillBindingDetailsCalls(stub func(context.Context, *facade.Binding) error) {
+	fake.fillBindingDetailsMutex.Lock()
+	defer fake.fillBindingDetailsMutex.Unlock()
+	fake.FillBindingDetailsStub = stub
+}
+
+func (fake *FakeSpaceClient) FillBindingDetailsArgsForCall(i int) (context.Context, *facade.Binding) {
+	fake.fillBindingDetailsMutex.RLock()
+	defer fake.fillBindingDetailsMutex.RUnlock()
+	argsForCall := fake.fillBindingDetailsArgsForCall[i]
+	return argsForCall.arg1, argsForCall.arg2
+}
+
+func (fake *FakeSpaceClient) FillBindingDetailsReturns(result1 error) {
+	fake.fillBindingDetailsMutex.Lock()
+	defer fake.fillBindingDetailsMutex.Unlock()
+	fake.FillBindingDetailsStub = nil
+	fake.fillBindingDetailsReturns = struct {
+		result1 error
+	}{result1}
+}
+
+func (fake *FakeSpaceClient) FillBindingDetailsReturnsOnCall(i int, result1 error) {
+	fake.fillBindingDetailsMutex.Lock()
+	defer fake.fillBindingDetailsMutex.Unlock()
+	fake.FillBindingDetailsStub = nil
+	if fake.fillBindingDetailsReturnsOnCall == nil {
+		fake.fillBindingDetailsReturnsOnCall = make(map[int]struct {
+			result1 error
+		})
+	}
+	fake.fillBindingDetailsReturnsOnCall[i] = struct {
 		result1 error
 	}{result1}
 }
@@ -608,21 +688,22 @@ func (fake *FakeSpaceClient) GetInstanceReturnsOnCall(i int, result1 *facade.Ins
 	}{result1, result2}
 }
 
-func (fake *FakeSpaceClient) UpdateBinding(arg1 context.Context, arg2 string, arg3 int64, arg4 map[string]interface{}) error {
+func (fake *FakeSpaceClient) UpdateBinding(arg1 context.Context, arg2 string, arg3 string, arg4 int64, arg5 map[string]interface{}) error {
 	fake.updateBindingMutex.Lock()
 	ret, specificReturn := fake.updateBindingReturnsOnCall[len(fake.updateBindingArgsForCall)]
 	fake.updateBindingArgsForCall = append(fake.updateBindingArgsForCall, struct {
 		arg1 context.Context
 		arg2 string
-		arg3 int64
-		arg4 map[string]interface{}
-	}{arg1, arg2, arg3, arg4})
+		arg3 string
+		arg4 int64
+		arg5 map[string]interface{}
+	}{arg1, arg2, arg3, arg4, arg5})
 	stub := fake.UpdateBindingStub
 	fakeReturns := fake.updateBindingReturns
-	fake.recordInvocation("UpdateBinding", []interface{}{arg1, arg2, arg3, arg4})
+	fake.recordInvocation("UpdateBinding", []interface{}{arg1, arg2, arg3, arg4, arg5})
 	fake.updateBindingMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4)
+		return stub(arg1, arg2, arg3, arg4, arg5)
 	}
 	if specificReturn {
 		return ret.result1
@@ -636,17 +717,17 @@ func (fake *FakeSpaceClient) UpdateBindingCallCount() int {
 	return len(fake.updateBindingArgsForCall)
 }
 
-func (fake *FakeSpaceClient) UpdateBindingCalls(stub func(context.Context, string, int64, map[string]interface{}) error) {
+func (fake *FakeSpaceClient) UpdateBindingCalls(stub func(context.Context, string, string, int64, map[string]interface{}) error) {
 	fake.updateBindingMutex.Lock()
 	defer fake.updateBindingMutex.Unlock()
 	fake.UpdateBindingStub = stub
 }
 
-func (fake *FakeSpaceClient) UpdateBindingArgsForCall(i int) (context.Context, string, int64, map[string]interface{}) {
+func (fake *FakeSpaceClient) UpdateBindingArgsForCall(i int) (context.Context, string, string, int64, map[string]interface{}) {
 	fake.updateBindingMutex.RLock()
 	defer fake.updateBindingMutex.RUnlock()
 	argsForCall := fake.updateBindingArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5
 }
 
 func (fake *FakeSpaceClient) UpdateBindingReturns(result1 error) {
@@ -672,11 +753,11 @@ func (fake *FakeSpaceClient) UpdateBindingReturnsOnCall(i int, result1 error) {
 	}{result1}
 }
 
-func (fake *FakeSpaceClient) UpdateInstance(arg1 context.Context, arg2 string, arg3 string, arg4 string, arg5 map[string]interface{}, arg6 []string, arg7 int64) error {
-	var arg6Copy []string
-	if arg6 != nil {
-		arg6Copy = make([]string, len(arg6))
-		copy(arg6Copy, arg6)
+func (fake *FakeSpaceClient) UpdateInstance(arg1 context.Context, arg2 string, arg3 string, arg4 string, arg5 string, arg6 map[string]interface{}, arg7 []string, arg8 int64) error {
+	var arg7Copy []string
+	if arg7 != nil {
+		arg7Copy = make([]string, len(arg7))
+		copy(arg7Copy, arg7)
 	}
 	fake.updateInstanceMutex.Lock()
 	ret, specificReturn := fake.updateInstanceReturnsOnCall[len(fake.updateInstanceArgsForCall)]
@@ -685,16 +766,17 @@ func (fake *FakeSpaceClient) UpdateInstance(arg1 context.Context, arg2 string, a
 		arg2 string
 		arg3 string
 		arg4 string
-		arg5 map[string]interface{}
-		arg6 []string
-		arg7 int64
-	}{arg1, arg2, arg3, arg4, arg5, arg6Copy, arg7})
+		arg5 string
+		arg6 map[string]interface{}
+		arg7 []string
+		arg8 int64
+	}{arg1, arg2, arg3, arg4, arg5, arg6, arg7Copy, arg8})
 	stub := fake.UpdateInstanceStub
 	fakeReturns := fake.updateInstanceReturns
-	fake.recordInvocation("UpdateInstance", []interface{}{arg1, arg2, arg3, arg4, arg5, arg6Copy, arg7})
+	fake.recordInvocation("UpdateInstance", []interface{}{arg1, arg2, arg3, arg4, arg5, arg6, arg7Copy, arg8})
 	fake.updateInstanceMutex.Unlock()
 	if stub != nil {
-		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7)
+		return stub(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8)
 	}
 	if specificReturn {
 		return ret.result1
@@ -708,17 +790,17 @@ func (fake *FakeSpaceClient) UpdateInstanceCallCount() int {
 	return len(fake.updateInstanceArgsForCall)
 }
 
-func (fake *FakeSpaceClient) UpdateInstanceCalls(stub func(context.Context, string, string, string, map[string]interface{}, []string, int64) error) {
+func (fake *FakeSpaceClient) UpdateInstanceCalls(stub func(context.Context, string, string, string, string, map[string]interface{}, []string, int64) error) {
 	fake.updateInstanceMutex.Lock()
 	defer fake.updateInstanceMutex.Unlock()
 	fake.UpdateInstanceStub = stub
 }
 
-func (fake *FakeSpaceClient) UpdateInstanceArgsForCall(i int) (context.Context, string, string, string, map[string]interface{}, []string, int64) {
+func (fake *FakeSpaceClient) UpdateInstanceArgsForCall(i int) (context.Context, string, string, string, string, map[string]interface{}, []string, int64) {
 	fake.updateInstanceMutex.RLock()
 	defer fake.updateInstanceMutex.RUnlock()
 	argsForCall := fake.updateInstanceArgsForCall[i]
-	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6, argsForCall.arg7
+	return argsForCall.arg1, argsForCall.arg2, argsForCall.arg3, argsForCall.arg4, argsForCall.arg5, argsForCall.arg6, argsForCall.arg7, argsForCall.arg8
 }
 
 func (fake *FakeSpaceClient) UpdateInstanceReturns(result1 error) {
@@ -755,6 +837,8 @@ func (fake *FakeSpaceClient) Invocations() map[string][][]interface{} {
 	defer fake.deleteBindingMutex.RUnlock()
 	fake.deleteInstanceMutex.RLock()
 	defer fake.deleteInstanceMutex.RUnlock()
+	fake.fillBindingDetailsMutex.RLock()
+	defer fake.fillBindingDetailsMutex.RUnlock()
 	fake.findServicePlanMutex.RLock()
 	defer fake.findServicePlanMutex.RUnlock()
 	fake.getBindingMutex.RLock()

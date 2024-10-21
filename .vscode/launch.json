@@ -10,13 +10,21 @@
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}",
+            "env": {
+                "RESOURCE_CACHE_ENABLED": "true",
+                "CACHE_TIMEOUT": "15m",
+            },
             "args": [
+                "--cluster-resource-namespace=default",
                 "--kubeconfig=${workspaceFolder}/.kubeconfig",
+                "--performance-trace",
+                "--sap-binding-metadata",
+                "--webhooks=false",
                 "--webhook-bind-address=:2443",
                 "--webhook-tls-directory=${workspaceFolder}/.local/ssl",
-                "--enableWebhooks=false",
-                "--cluster-resource-namespace=default",
-                "--sap-binding-metadata"
+                "--zap-encoder=console",
+                "--zap-log-level=INFO",
+                "--zap-time-encoding=iso8601",
             ]
         },
         {

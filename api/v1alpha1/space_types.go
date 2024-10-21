@@ -44,7 +44,7 @@ type SpaceSpec struct {
 	Guid string `json:"guid,omitempty"`
 
 	// Space name.
-	// Must not be specified if Guid is present; defauls to metadata.name otherwise.
+	// Must not be specified if Guid is present; defaults to metadata.name otherwise.
 	// +optional
 	// +kubebuilder:validation:MinLength=1
 	Name string `json:"name,omitempty"`

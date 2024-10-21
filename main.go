@@ -7,8 +7,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"os"
+	"runtime/trace"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -28,12 +30,14 @@ import (
 
 	cfv1alpha1 "github.com/sap/cf-service-operator/api/v1alpha1"
 	"github.com/sap/cf-service-operator/internal/cf"
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
 const (
-	LeaderElectionID = "service-operator.cf.cs.sap.com"
+	LeaderElectionID     = "service-operator.cf.cs.sap.com"
+	PerformanceTraceName = "perf-trace.out"
 )
 
 var (
@@ -48,22 +52,24 @@ func init() {
 }
 
 func main() {
+	var clusterResourceNamespace string
+	var enableBindingMetadata bool
+	var enableLeaderElection bool
+	var enablePerformanceTrace bool
+	var enableWebhooks bool
 	var metricsAddr string
 	var probeAddr string
 	var webhookAddr string
 	var webhookCertDir string
-	var enableLeaderElection bool
-	var enableWebhooks bool
-	var clusterResourceNamespace string
-	var enableBindingMetadata bool
+	flag.StringVar(&clusterResourceNamespace, "cluster-resource-namespace", "", "The namespace for secrets in which cluster-scoped resources are found.")
+	flag.BoolVar(&enableBindingMetadata, "sap-binding-metadata", false, "Enhance binding secrets by SAP binding metadata by default.")
+	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&enablePerformanceTrace, "performance-trace", false, fmt.Sprintf("Enable performance trace (writes result to '%s'.", PerformanceTraceName))
+	flag.BoolVar(&enableWebhooks, "webhooks", true, "Enable webhooks in controller. May be disabled for local development.")
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.StringVar(&webhookAddr, "webhook-bind-address", ":9443", "The address the webhook endpoint binds to.")
 	flag.StringVar(&webhookCertDir, "webhook-tls-directory", "", "The directory containing TLS server key and certificate, as tls.key and tls.crt; defaults to $TMPDIR/k8s-webhook-server/serving-certs.")
-	flag.BoolVar(&enableWebhooks, "enableWebhooks", true, "Enable webhooks in controller. May be disabled for local development.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
-	flag.StringVar(&clusterResourceNamespace, "cluster-resource-namespace", "", "The namespace for secrets in which cluster-scoped resources are found.")
-	flag.BoolVar(&enableBindingMetadata, "sap-binding-metadata", false, "Enhance binding secrets by SAP binding metadata by default.")
 
 	opts := zap.Options{
 		Development: false,
@@ -87,10 +93,14 @@ func main() {
 	}
 
 	setupLog.Info(
-		"Starting",
-		"enable-leader-election", enableLeaderElection,
-		"metrics-addr", metricsAddr,
+		"Starting with configuration",
 		"cluster-resource-namespace", clusterResourceNamespace,
+		"leader-election", enableLeaderElection,
+		"performance-trace", enablePerformanceTrace,
+		"webhooks", enableWebhooks,
+		"health-probe-bind-address", probeAddr,
+		"metrics-bind-address", metricsAddr,
+		"webhook-bind-address", webhookAddr,
 	)
 
 	webhookHost, webhookPort, err := parseAddress(webhookAddr)
@@ -98,7 +108,11 @@ func main() {
 		setupLog.Error(err, "unable to parse webhook bind address", "controller", "Space")
 		os.Exit(1)
 	}
-
+	cfg, err := config.Load()
+	if err != nil {
+		setupLog.Error(err, "failed to load config")
+		os.Exit(1)
+	}
 	options := ctrl.Options{
 		Scheme: scheme,
 		// TODO: disable cache for further resources (e.g. secrets) ?
@@ -120,6 +134,7 @@ func main() {
 		},
 		HealthProbeBindAddress: probeAddr,
 	}
+
 	if enableWebhooks {
 		options.WebhookServer = webhook.NewServer(webhook.Options{
 			Host:    webhookHost,
@@ -127,12 +142,15 @@ func main() {
 			CertDir: webhookCertDir,
 		})
 	}
+
+	setupLog.Info("Creating controller manager")
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), options)
 	if err != nil {
-		setupLog.Error(err, "unable to start manager")
+		setupLog.Error(err, "unable to create controller manager")
 		os.Exit(1)
 	}
 
+	// SpaceReconciler for Space CRs
 	if err = (&controllers.SpaceReconciler{
 		Kind:                     "Space",
 		Client:                   mgr.GetClient(),
@@ -140,10 +158,13 @@ func main() {
 		ClusterResourceNamespace: clusterResourceNamespace,
 		ClientBuilder:            cf.NewOrganizationClient,
 		HealthCheckerBuilder:     cf.NewSpaceHealthChecker,
+		Config:                   cfg,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Space")
 		os.Exit(1)
 	}
+
+	// SpaceReconciler for ClusterSpace CRs
 	if err = (&controllers.SpaceReconciler{
 		Kind:                     "ClusterSpace",
 		Client:                   mgr.GetClient(),
@@ -151,29 +172,38 @@ func main() {
 		ClusterResourceNamespace: clusterResourceNamespace,
 		ClientBuilder:            cf.NewOrganizationClient,
 		HealthCheckerBuilder:     cf.NewSpaceHealthChecker,
+		Config:                   cfg,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ClusterSpace")
 		os.Exit(1)
 	}
+
+	// ServiceInstanceReconciler for ServiceInstance CRs
 	if err = (&controllers.ServiceInstanceReconciler{
 		Client:                   mgr.GetClient(),
 		Scheme:                   mgr.GetScheme(),
 		ClusterResourceNamespace: clusterResourceNamespace,
 		ClientBuilder:            cf.NewSpaceClient,
+		Config:                   cfg,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceInstance")
 		os.Exit(1)
 	}
+
+	// ServiceBindingReconciler for ServiceBinding CRs
 	if err = (&controllers.ServiceBindingReconciler{
 		Client:                   mgr.GetClient(),
 		Scheme:                   mgr.GetScheme(),
 		ClusterResourceNamespace: clusterResourceNamespace,
 		EnableBindingMetadata:    enableBindingMetadata,
 		ClientBuilder:            cf.NewSpaceClient,
+		Config:                   cfg,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ServiceBinding")
 		os.Exit(1)
 	}
+
+	// register webhooks for validations
 	if enableWebhooks {
 		if err = (&cfv1alpha1.Space{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Space")
@@ -203,11 +233,33 @@ func main() {
 		os.Exit(1)
 	}
 
-	setupLog.Info("Starting manager")
+	// start performance trace
+	if enablePerformanceTrace {
+		setupLog.Info("Starting performance trace", "file", PerformanceTraceName)
+		var perfTraceFile *os.File
+		if perfTraceFile, err = os.OpenFile(PerformanceTraceName, os.O_CREATE|os.O_WRONLY, 0660); err != nil {
+			setupLog.Error(err, "unable to create performance trace")
+			os.Exit(1)
+		}
+		if err := trace.Start(perfTraceFile); err != nil {
+			setupLog.Error(err, "unable to start performance trace")
+			os.Exit(1)
+		}
+	}
+
+	setupLog.Info("Starting controller manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
-		setupLog.Error(err, "problem running manager")
+		setupLog.Error(err, "unable to start controller manager")
 		os.Exit(1)
 	}
+
+	// stop performance trace
+	if enablePerformanceTrace {
+		setupLog.Info("Stopping performance trace")
+		trace.Stop()
+	}
+
+	setupLog.Info("Stopped.")
 }
 
 const inClusterNamespacePath = "/var/run/secrets/kubernetes.io/serviceaccount/namespace"

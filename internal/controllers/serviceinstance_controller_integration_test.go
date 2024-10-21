@@ -324,7 +324,7 @@ var _ = Describe("Service Instance Controller Integration Tests", Ordered, func(
 				fakeSpaceClient.GetInstanceReturnsOnCall(i, kNoInstance, kNoError)
 			}
 
-			//simulate ready instance to finish the test
+			// simulate ready instance to finish the test
 			fakeSpaceClient.CreateInstanceReturnsOnCall(4, kNoError)
 			fakeSpaceClient.GetInstanceReturnsOnCall(7, fakeInstanceReady, kNoError)
 
