@@ -17,7 +17,7 @@ import (
 
 func TestFacade(t *testing.T) {
 	RegisterFailHandler(Fail)
-	//RunSpecs(t, "ResourceCache Suite")
+	// RunSpecs(t, "ResourceCache Suite")
 }
 
 var _ = Describe("ResourceCache", func() {

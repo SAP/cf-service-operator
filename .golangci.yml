@@ -1,0 +1,19 @@
+run:
+  timeout: 5m
+linters:
+  enable:
+    - asciicheck
+    - errorlint
+    - gocritic
+    - gofmt
+    - gosec
+    - misspell
+    - revive
+linters-settings:
+  revive:
+    rules:
+      - name: dot-imports
+        arguments:
+        - allowedPackages:
+          - "github.com/onsi/ginkgo/v2"
+          - "github.com/onsi/gomega"

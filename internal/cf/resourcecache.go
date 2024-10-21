@@ -181,8 +181,8 @@ func (c *resourceCache) getBindingFromCache(key string) (*facade.Binding, bool) 
 func (c *resourceCache) updateBindingInCache(owner string, parameters map[string]interface{}, generation int64) (status bool) {
 	c.bindingMutex.Lock()
 	defer c.bindingMutex.Unlock()
-	//update if the instance is found in the cache
-	//update all the struct variables if they are not nil or empty
+	// update if the instance is found in the cache
+	// update all the struct variables if they are not nil or empty
 	binding, found := c.bindings[owner]
 	if found {
 		if parameters != nil {

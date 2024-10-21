@@ -351,6 +351,7 @@ func (r *ServiceInstanceReconciler) handleCreationOrUpdate(
 		}
 		status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
 	} else {
+		// nolint: gocritic
 		if cfinstance.State == facade.InstanceStateDeleting {
 			// This is the re-creation case; nothing to, we just wait until it is gone
 		} else if recreateOnCreationFailure && (cfinstance.State == facade.InstanceStateCreatedFailed || cfinstance.State == facade.InstanceStateDeleteFailed) {
@@ -535,7 +536,7 @@ func (r *ServiceInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 // - doubling time interval for consecutive errors
 // - time interval is capped at a certain maximum value
 func (r *ServiceInstanceReconciler) HandleError(ctx context.Context, serviceInstance *cfv1alpha1.ServiceInstance, issue error, log logr.Logger) (ctrl.Result, error) {
-	if issue != RetryError {
+	if !errors.Is(issue, RetryError) {
 		serviceInstance.SetReadyCondition(cfv1alpha1.ConditionUnknown, serviceInstanceReadyConditionReasonError, issue.Error())
 		return ctrl.Result{}, issue
 	}

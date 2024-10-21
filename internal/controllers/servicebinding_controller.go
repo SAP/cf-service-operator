@@ -337,6 +337,7 @@ func (r *ServiceBindingReconciler) handleCreationOrUpdate(
 		}
 		status.LastModifiedAt = &[]metav1.Time{metav1.Now()}[0]
 	} else {
+		// nolint: gocritic
 		if cfbinding.State == facade.BindingStateDeleting {
 			// This is the re-creation case; nothing to, we just wait until it is gone
 		} else if (recreateOnParameterChange && cfbinding.ParameterHash != facade.ObjectHash(parameters)) ||

@@ -59,7 +59,7 @@ spec:
               parametersFrom:
                 description: |-
                   References to secrets containing binding parameters.
-                  Top level keys must occur only once across Parameters and the secrest listed here.
+                  Top level keys must occur only once across Parameters and the secrets listed here.
                 items:
                   description: ParametersFromSource represents the source of a set
                     of Parameters

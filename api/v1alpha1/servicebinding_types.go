@@ -54,7 +54,7 @@ type ServiceBindingSpec struct {
 	Parameters *apiextensionsv1.JSON `json:"parameters,omitempty"`
 
 	// References to secrets containing binding parameters.
-	// Top level keys must occur only once across Parameters and the secrest listed here.
+	// Top level keys must occur only once across Parameters and the secrets listed here.
 	// +optional
 	ParametersFrom []ParametersFromSource `json:"parametersFrom,omitempty"`
 

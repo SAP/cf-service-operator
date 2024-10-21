@@ -81,7 +81,7 @@ type ServiceInstanceSpec struct {
 	Parameters *apiextensionsv1.JSON `json:"parameters,omitempty"`
 
 	// References to secrets containing instance parameters.
-	// Top level keys must occur only once across Parameters and the secrest listed here.
+	// Top level keys must occur only once across Parameters and the secrets listed here.
 	// +optional
 	ParametersFrom []ParametersFromSource `json:"parametersFrom,omitempty"`
 
