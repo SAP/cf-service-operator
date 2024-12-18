@@ -11,8 +11,8 @@ import (
 	"fmt"
 	"strconv"
 
-	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
-	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
+	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
+	cfresource "github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/pkg/errors"
 
 	"github.com/sap/cf-service-operator/internal/facade"
@@ -37,7 +37,8 @@ func (in *instanceFilterName) getListOptions() *cfclient.ServiceInstanceListOpti
 
 func (io *instanceFilterOwner) getListOptions() *cfclient.ServiceInstanceListOptions {
 	listOpts := cfclient.NewServiceInstanceListOptions()
-	listOpts.LabelSelector.EqualTo(fmt.Sprintf("%s/%s=%s", labelPrefix, labelKeyOwner, io.owner))
+	listOpts.LabelSel = make(map[string]cfclient.ExclusionFilter)
+	listOpts.LabelSel.EqualTo(fmt.Sprintf("%s/%s=%s", labelPrefix, labelKeyOwner, io.owner))
 	return listOpts
 }
 

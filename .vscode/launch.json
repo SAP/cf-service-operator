@@ -15,7 +15,7 @@
                 "--webhook-bind-address=:2443",
                 "--webhook-tls-directory=${workspaceFolder}/.local/ssl",
                 "--enableWebhooks=false",
-                "--cluster-resource-namespace=default",
+                "--refresh-token-auto-renewal-interval=1h",
                 "--sap-binding-metadata"
             ]
         },
