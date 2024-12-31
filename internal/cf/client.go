@@ -7,12 +7,15 @@ package cf
 
 import (
 	"fmt"
+	"net/http"
 	"sync"
+	"time"
 
-	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
-	cfconfig "github.com/cloudfoundry-community/go-cfclient/v3/config"
+	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
+	cfconfig "github.com/cloudfoundry/go-cfclient/v3/config"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/facade"
 	cfmetrics "github.com/sap/cf-service-operator/pkg/metrics"
 )
@@ -44,10 +47,11 @@ type clientIdentifier struct {
 }
 
 type clientCacheEntry struct {
-	url      string
-	username string
-	password string
-	client   cfclient.Client
+	url       string
+	username  string
+	password  string
+	client    cfclient.Client
+	expiresAt time.Time
 }
 
 var (
@@ -68,17 +72,22 @@ func newOrganizationClient(organizationName string, url string, username string,
 	if password == "" {
 		return nil, fmt.Errorf("missing or empty password")
 	}
-	config, err := cfconfig.NewUserPassword(url, username, password)
-	if err != nil {
-		return nil, err
-	}
-	httpClient := config.HTTPClient()
+
+	// prepare HTTP client with metrics
+	httpClient := &http.Client{}
 	transport, err := cfmetrics.AddMetricsToTransport(httpClient.Transport, metrics.Registry, "cf-api", url)
 	if err != nil {
 		return nil, err
 	}
 	httpClient.Transport = transport
-	config.WithHTTPClient(httpClient)
+
+	// create CF client
+	config, err := cfconfig.New(url,
+		cfconfig.UserPassword(username, password),
+		cfconfig.HttpClient(httpClient))
+	if err != nil {
+		return nil, err
+	}
 	c, err := cfclient.New(config)
 	if err != nil {
 		return nil, err
@@ -99,17 +108,22 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	if password == "" {
 		return nil, fmt.Errorf("missing or empty password")
 	}
-	config, err := cfconfig.NewUserPassword(url, username, password)
-	if err != nil {
-		return nil, err
-	}
-	httpClient := config.HTTPClient()
+
+	// add metrics to HTTP client
+	httpClient := &http.Client{}
 	transport, err := cfmetrics.AddMetricsToTransport(httpClient.Transport, metrics.Registry, "cf-api", url)
 	if err != nil {
 		return nil, err
 	}
 	httpClient.Transport = transport
-	config.WithHTTPClient(httpClient)
+
+	// create CF client
+	config, err := cfconfig.New(url,
+		cfconfig.UserPassword(username, password),
+		cfconfig.HttpClient(httpClient))
+	if err != nil {
+		return nil, err
+	}
 	c, err := cfclient.New(config)
 	if err != nil {
 		return nil, err
@@ -117,7 +131,7 @@ func newSpaceClient(spaceGuid string, url string, username string, password stri
 	return &spaceClient{spaceGuid: spaceGuid, client: *c}, nil
 }
 
-func NewOrganizationClient(organizationName string, url string, username string, password string) (facade.OrganizationClient, error) {
+func NewOrganizationClient(organizationName string, url string, username string, password string, config *config.Config) (facade.OrganizationClient, error) {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -135,6 +149,10 @@ func NewOrganizationClient(organizationName string, url string, username string,
 			delete(clientCache, identifier)
 			isInCache = false
 		}
+		if cacheEntry.expiresAt.Before(time.Now()) {
+			delete(clientCache, identifier)
+			isInCache = false
+		}
 	}
 
 	if !isInCache {
@@ -142,14 +160,21 @@ func NewOrganizationClient(organizationName string, url string, username string,
 		client, err = newOrganizationClient(organizationName, url, username, password)
 		if err == nil {
 			// add CF client to cache
-			clientCache[identifier] = &clientCacheEntry{url: url, username: username, password: password, client: client.client}
+			clientCache[identifier] = &clientCacheEntry{
+				url:       url,
+				username:  username,
+				password:  password,
+				client:    client.client,
+				expiresAt: time.Now().Add(config.RefreshTokenAutoRenewalInterval),
+			}
+
 		}
 	}
 
 	return client, err
 }
 
-func NewSpaceClient(spaceGuid string, url string, username string, password string) (facade.SpaceClient, error) {
+func NewSpaceClient(spaceGuid string, url string, username string, password string, config *config.Config) (facade.SpaceClient, error) {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -167,6 +192,10 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 			delete(clientCache, identifier)
 			isInCache = false
 		}
+		if cacheEntry.expiresAt.Before(time.Now()) {
+			delete(clientCache, identifier)
+			isInCache = false
+		}
 	}
 
 	if !isInCache {
@@ -174,14 +203,20 @@ func NewSpaceClient(spaceGuid string, url string, username string, password stri
 		client, err = newSpaceClient(spaceGuid, url, username, password)
 		if err == nil {
 			// add CF client to cache
-			clientCache[identifier] = &clientCacheEntry{url: url, username: username, password: password, client: client.client}
+			clientCache[identifier] = &clientCacheEntry{
+				url:       url,
+				username:  username,
+				password:  password,
+				client:    client.client,
+				expiresAt: time.Now().Add(config.RefreshTokenAutoRenewalInterval),
+			}
 		}
 	}
 
 	return client, err
 }
 
-func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string) (facade.SpaceHealthChecker, error) {
+func NewSpaceHealthChecker(spaceGuid string, url string, username string, password string, config *config.Config) (facade.SpaceHealthChecker, error) {
 	cacheMutex.Lock()
 	defer cacheMutex.Unlock()
 
@@ -199,6 +234,10 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 			delete(clientCache, identifier)
 			isInCache = false
 		}
+		if cacheEntry.expiresAt.Before(time.Now()) {
+			delete(clientCache, identifier)
+			isInCache = false
+		}
 	}
 
 	if !isInCache {
@@ -206,7 +245,13 @@ func NewSpaceHealthChecker(spaceGuid string, url string, username string, passwo
 		client, err = newSpaceClient(spaceGuid, url, username, password)
 		if err == nil {
 			// add CF client to cache
-			clientCache[identifier] = &clientCacheEntry{url: url, username: username, password: password, client: client.client}
+			clientCache[identifier] = &clientCacheEntry{
+				url:       url,
+				username:  username,
+				password:  password,
+				client:    client.client,
+				expiresAt: time.Now().Add(config.RefreshTokenAutoRenewalInterval),
+			}
 		}
 	}
 
