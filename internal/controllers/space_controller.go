@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/sap/cf-service-operator/internal/config"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,8 +41,9 @@ const (
 
 // SpaceReconciler reconciles a (Cluster)Space object
 type SpaceReconciler struct {
-	Kind string
-	client.Client
+	Kind                     string
+	Config                   *config.Config
+	client.Client            // K8s client
 	Scheme                   *runtime.Scheme
 	ClusterResourceNamespace string
 	ClientBuilder            facade.OrganizationClientBuilder
@@ -147,7 +149,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 			password = string(secret.Data["password"])
 		}
 
-		client, err = r.ClientBuilder(spec.OrganizationName, url, username, password)
+		client, err = r.ClientBuilder(spec.OrganizationName, url, username, password, r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the client from secret %s", secretName)
 		}
@@ -232,7 +234,7 @@ func (r *SpaceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (resu
 		url := string(secret.Data["url"])
 		username := string(secret.Data["username"])
 		password := string(secret.Data["password"])
-		checker, err := r.HealthCheckerBuilder(status.SpaceGuid, url, username, password)
+		checker, err := r.HealthCheckerBuilder(status.SpaceGuid, url, username, password, r.Config)
 		if err != nil {
 			return ctrl.Result{}, errors.Wrapf(err, "failed to build the healthchecker from secret %s", secretName)
 		}

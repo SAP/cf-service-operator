@@ -10,8 +10,8 @@ import (
 	"fmt"
 	"strconv"
 
-	cfclient "github.com/cloudfoundry-community/go-cfclient/v3/client"
-	cfresource "github.com/cloudfoundry-community/go-cfclient/v3/resource"
+	cfclient "github.com/cloudfoundry/go-cfclient/v3/client"
+	cfresource "github.com/cloudfoundry/go-cfclient/v3/resource"
 	"github.com/pkg/errors"
 
 	"github.com/sap/cf-service-operator/internal/facade"
@@ -19,7 +19,8 @@ import (
 
 func (c *organizationClient) GetSpace(ctx context.Context, owner string) (*facade.Space, error) {
 	listOpts := cfclient.NewSpaceListOptions()
-	listOpts.LabelSelector.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
+	listOpts.LabelSel = make(map[string]cfclient.ExclusionFilter)
+	listOpts.LabelSel.EqualTo(labelPrefix + "/" + labelKeyOwner + "=" + owner)
 	spaces, err := c.client.Spaces.ListAll(ctx, listOpts)
 	if err != nil {
 		return nil, err

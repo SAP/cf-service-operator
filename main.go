@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/pkg/errors"
 
@@ -28,6 +29,7 @@ import (
 
 	cfv1alpha1 "github.com/sap/cf-service-operator/api/v1alpha1"
 	"github.com/sap/cf-service-operator/internal/cf"
+	"github.com/sap/cf-service-operator/internal/config"
 	"github.com/sap/cf-service-operator/internal/controllers"
 	// +kubebuilder:scaffold:imports
 )
@@ -56,14 +58,16 @@ func main() {
 	var enableWebhooks bool
 	var clusterResourceNamespace string
 	var enableBindingMetadata bool
-	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
-	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.StringVar(&webhookAddr, "webhook-bind-address", ":9443", "The address the webhook endpoint binds to.")
-	flag.StringVar(&webhookCertDir, "webhook-tls-directory", "", "The directory containing TLS server key and certificate, as tls.key and tls.crt; defaults to $TMPDIR/k8s-webhook-server/serving-certs.")
-	flag.BoolVar(&enableWebhooks, "enableWebhooks", true, "Enable webhooks in controller. May be disabled for local development.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+	var refreshTokenAutoRenewalInterval string
 	flag.StringVar(&clusterResourceNamespace, "cluster-resource-namespace", "", "The namespace for secrets in which cluster-scoped resources are found.")
 	flag.BoolVar(&enableBindingMetadata, "sap-binding-metadata", false, "Enhance binding secrets by SAP binding metadata by default.")
+	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager. Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&enableWebhooks, "enableWebhooks", true, "Enable webhooks in controller. May be disabled for local development.")
+	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
+	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
+	flag.StringVar(&refreshTokenAutoRenewalInterval, "refresh-token-auto-renewal-interval", "12h", "The interval after which the CF client should automatically renew its refresh token (e.g. 12h, 30m).")
+	flag.StringVar(&webhookAddr, "webhook-bind-address", ":9443", "The address the webhook endpoint binds to.")
+	flag.StringVar(&webhookCertDir, "webhook-tls-directory", "", "The directory containing TLS server key and certificate, as tls.key and tls.crt; defaults to $TMPDIR/k8s-webhook-server/serving-certs.")
 
 	opts := zap.Options{
 		Development: false,
@@ -72,6 +76,16 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// Create a Config instance with the parsed flag values
+	refreshTokenAutoRenewal, err := time.ParseDuration(refreshTokenAutoRenewalInterval)
+	if err != nil {
+		setupLog.Error(err, "please provide valid --refresh-token-auto-renewal-interval e.g. 12h, 30m")
+		os.Exit(1)
+	}
+	cfg := config.Config{
+		RefreshTokenAutoRenewalInterval: refreshTokenAutoRenewal,
+	}
 
 	if clusterResourceNamespace == "" {
 		var err error
@@ -91,6 +105,7 @@ func main() {
 		"enable-leader-election", enableLeaderElection,
 		"metrics-addr", metricsAddr,
 		"cluster-resource-namespace", clusterResourceNamespace,
+		"refresh-token-auto-renewal-interval", refreshTokenAutoRenewal,
 	)
 
 	webhookHost, webhookPort, err := parseAddress(webhookAddr)
@@ -136,6 +151,7 @@ func main() {
 	if err = (&controllers.SpaceReconciler{
 		Kind:                     "Space",
 		Client:                   mgr.GetClient(),
+		Config:                   &cfg,
 		Scheme:                   mgr.GetScheme(),
 		ClusterResourceNamespace: clusterResourceNamespace,
 		ClientBuilder:            cf.NewOrganizationClient,
@@ -147,6 +163,7 @@ func main() {
 	if err = (&controllers.SpaceReconciler{
 		Kind:                     "ClusterSpace",
 		Client:                   mgr.GetClient(),
+		Config:                   &cfg,
 		Scheme:                   mgr.GetScheme(),
 		ClusterResourceNamespace: clusterResourceNamespace,
 		ClientBuilder:            cf.NewOrganizationClient,
@@ -157,6 +174,7 @@ func main() {
 	}
 	if err = (&controllers.ServiceInstanceReconciler{
 		Client:                   mgr.GetClient(),
+		Config:                   &cfg,
 		Scheme:                   mgr.GetScheme(),
 		ClusterResourceNamespace: clusterResourceNamespace,
 		ClientBuilder:            cf.NewSpaceClient,
@@ -166,6 +184,7 @@ func main() {
 	}
 	if err = (&controllers.ServiceBindingReconciler{
 		Client:                   mgr.GetClient(),
+		Config:                   &cfg,
 		Scheme:                   mgr.GetScheme(),
 		ClusterResourceNamespace: clusterResourceNamespace,
 		EnableBindingMetadata:    enableBindingMetadata,
