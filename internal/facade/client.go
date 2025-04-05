@@ -5,7 +5,11 @@ SPDX-License-Identifier: Apache-2.0
 
 package facade
 
-import "context"
+import (
+	"context"
+
+	"github.com/sap/cf-service-operator/internal/config"
+)
 
 type Space struct {
 	Guid       string
@@ -73,7 +77,7 @@ type OrganizationClient interface {
 	AddManager(ctx context.Context, guid string, username string) error
 }
 
-type OrganizationClientBuilder func(string, string, string, string) (OrganizationClient, error)
+type OrganizationClientBuilder func(string, string, string, string, *config.Config) (OrganizationClient, error)
 
 //counterfeiter:generate . SpaceClient
 type SpaceClient interface {
@@ -90,4 +94,4 @@ type SpaceClient interface {
 	FindServicePlan(ctx context.Context, serviceOfferingName string, servicePlanName string, spaceGuid string) (string, error)
 }
 
-type SpaceClientBuilder func(string, string, string, string) (SpaceClient, error)
+type SpaceClientBuilder func(string, string, string, string, *config.Config) (SpaceClient, error)
