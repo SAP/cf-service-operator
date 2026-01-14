@@ -204,3 +204,16 @@ $(INFORMER_GEN): $(LOCALBIN)
 lister-gen: $(LISTER_GEN) ## Download lister-gen
 $(LISTER_GEN): $(LOCALBIN)
 	test -s $(LOCALBIN)/lister-gen || GOBIN=$(LOCALBIN) go install k8s.io/code-generator/cmd/lister-gen@$(CODE_GENERATOR_VERSION)
+
+# Set the year for SPDX header updates (default: current year)
+YEAR ?= $(shell date +%Y)
+
+.PHONY: update-go-header-year
+update-go-header-year:
+    # Go + TXT + MD
+	@find . -type f \( -name "*.go" -o -name "*.txt" -o -name "*.md" \) -exec sed -i \
+	's/^SPDX-FileCopyrightText: [0-9]\{4\}\( SAP SE or an SAP affiliate company and [^"]\+ contributors\)/SPDX-FileCopyrightText: $(YEAR)\1/' {} +
+
+    # TOML
+	@find . -type f -name "*.toml" -exec sed -i \
+	's/^SPDX-FileCopyrightText = "[0-9]\{4\}\( SAP SE or an SAP affiliate company and [^"]\+ contributors\)"/SPDX-FileCopyrightText = "$(YEAR)\1"/' {} +
