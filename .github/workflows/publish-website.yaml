@@ -40,7 +40,7 @@ jobs:
         sudo snap install dart-sass-embedded
 
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         submodules: recursive
         fetch-depth: 0
@@ -56,7 +56,7 @@ jobs:
         echo "::set-output name=node_version::${node_version}"
 
     - name: Setup Node
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@v5
       with:
         node-version: ${{ steps.get_node_version.outputs.node_version }}
 
@@ -79,7 +79,7 @@ jobs:
           --baseURL "${{ steps.pages.outputs.base_url }}/"            
 
     - name: Upload artifact
-      uses: actions/upload-pages-artifact@v3
+      uses: actions/upload-pages-artifact@v4
       with:
         path: website/public
 
