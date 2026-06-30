@@ -154,9 +154,9 @@ LISTER_GEN ?= $(shell pwd)/bin/lister-gen
 
 ## Tool Versions
 KUSTOMIZE_VERSION ?= v3.8.7
-CONTROLLER_TOOLS_VERSION ?= v0.14.0
+CONTROLLER_TOOLS_VERSION ?= v0.17.3
 CODE_GENERATOR_VERSION ?= v0.23.4
-COUNTERFEITER_VERSION ?= v6.8.1
+COUNTERFEITER_VERSION ?= v6.12.2
 GOLINT_VERSION ?= v1.57.1
 
 KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
