@@ -1,10 +1,10 @@
 {
   "devDependencies": {
     "autoprefixer": "10.6.0",
-    "postcss": "8.5.23",
-    "postcss-cli": "11.0.0"
+    "postcss": "8.5.28",
+    "postcss-cli": "11.0.1"
   },
   "dependencies": {
-    "node": "26.8.1"
+    "node": "26.8.2"
   }
 }
