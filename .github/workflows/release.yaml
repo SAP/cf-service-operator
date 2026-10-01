@@ -35,7 +35,7 @@ defaults:
 jobs:
   release:
     name: Trigger release
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     environment: release
     permissions:
       contents: write
@@ -49,7 +49,7 @@ jobs:
         fi
 
     - name: Checkout repository
-      uses: actions/checkout@v5
+      uses: actions/checkout@v7
       with:
         token: ${{ secrets.WORKFLOW_USER_GH_TOKEN }}
         fetch-depth: 0
