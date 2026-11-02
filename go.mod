@@ -1,6 +1,6 @@
 module github.com/sap/cf-service-operator
 
-go 1.27.1
+go 1.27.3
 
 require (
 	github.com/cloudfoundry-community/go-cfclient/v3 v3.0.0-beta.1
@@ -10,10 +10,10 @@ require (
 	github.com/onsi/gomega v1.44.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.24.1
-	k8s.io/api v0.37.1
-	k8s.io/apiextensions-apiserver v0.37.1
-	k8s.io/apimachinery v0.37.1
-	k8s.io/client-go v0.37.1
+	k8s.io/api v0.37.2
+	k8s.io/apiextensions-apiserver v0.37.2
+	k8s.io/apimachinery v0.37.2
+	k8s.io/client-go v0.37.2
 	sigs.k8s.io/controller-runtime v0.25.2
 )
 
